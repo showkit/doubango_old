@@ -1,0 +1,219 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{8E2F0B2E-2596-4010-BF4A-2F688975B5C1}</ProjectGuid>
+    <RootNamespace>tinyDAV</RootNamespace>
+    <Keyword>Win32Proj</Keyword>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <PlatformToolset>v110</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <PlatformToolset>v110</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>11.0.50727.1</_ProjectFileVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <OutDir>$(SolutionDir)$(Configuration)\</OutDir>
+    <IntDir>$(Configuration)\</IntDir>
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <OutDir>$(SolutionDir)$(Configuration)\</OutDir>
+    <IntDir>$(Configuration)\</IntDir>
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>$(PSDK_DIR)include;$(DXSDK_DIR)include;..\thirdparties\win32\include;include;..\tinyMSRP\include;..\tinyRTP\include;..\tinyMEDIA\include;..\tinySDP\include;..\tinyNET\src;..\tinyDSHOW\include;..\tinySAK\src;..\thirdparties\win32\include\BroadVoice16\bvcommon;..\thirdparties\win32\include\BroadVoice16\bv16;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>HAVE_SRTP=1;HAVE_CUDA=0;HAVE_G729=0;HAVE_BV16=0;HAVE_OPENCORE_AMR=1;HAVE_H264=1;HAVE_ILBC=0;HAVE_LIBGSM=1;HAVE_TINYDSHOW=1;HAVE_DSOUND_H=1;HAVE_WAVE_API=0;HAVE_FFMPEG=1;HAVE_SPEEX_DSP=1;HAVE_WEBRTC=1;HAVE_SPEEX_JB=1;HAVE_LIB_SPEEX=1;HAVE_LIBVPX=1;G192BITSTREAM=0;DEBUG_LEVEL=DEBUG_LEVEL_INFO;WIN32;_DEBUG;_WINDOWS;_USRDLL;_WIN32_WINNT=0x0501;TINYDAV_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <MinimalRebuild>true</MinimalRebuild>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <PrecompiledHeader />
+      <WarningLevel>Level3</WarningLevel>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
+      <CompileAs>Default</CompileAs>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>Winmm.lib;$(OutDir)tinySAK.lib;$(OutDir)tinyNET.lib;$(OutDir)tinyRTP.lib;$(OutDir)tinyMSRP.lib;$(OutDir)tinySDP.lib;$(OutDir)tinyMEDIA.lib;$(OutDir)tinyDSHOW.lib;..\thirdparties\win32\lib\gsm\libgsm.a;..\thirdparties\win32\lib\ilbc\libiLBC.a;..\thirdparties\win32\lib\speex\libspeex.a;..\thirdparties\win32\lib\speex\libspeexdsp.a;..\thirdparties\win32\lib\libgcc.a;..\thirdparties\win32\lib\libmingwex.a;..\thirdparties\win32\lib\ffmpeg\libavcodec.a;..\thirdparties\win32\lib\ffmpeg\libavutil.a;..\thirdparties\win32\lib\ffmpeg\libswscale.a;..\thirdparties\win32\lib\ffmpeg\libavcore.a;..\thirdparties\win32\lib\ffmpeg\libx264.a;..\thirdparties\win32\lib\ffmpeg\libtheora.a;..\thirdparties\win32\lib\ffmpeg\libogg.a;..\thirdparties\win32\lib\webrtc\aec.lib;..\thirdparties\win32\lib\webrtc\aec_sse2.lib;..\thirdparties\win32\lib\webrtc\apm_util.lib;..\thirdparties\win32\lib\webrtc\system_wrappers.lib;..\thirdparties\win32\lib\webrtc\spl.lib;..\thirdparties\win32\lib\webrtc\ns.lib;..\thirdparties\win32\lib\vpx\vpxmd.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <IgnoreSpecificDefaultLibraries>MSVCRT;LIBCMTD;LIBCMT;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Windows</SubSystem>
+      <RandomizedBaseAddress>false</RandomizedBaseAddress>
+      <DataExecutionPrevention />
+      <TargetMachine>MachineX86</TargetMachine>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <IntrinsicFunctions>false</IntrinsicFunctions>
+      <AdditionalIncludeDirectories>$(PSDK_DIR)include;$(DXSDK_DIR)include;..\thirdparties\win32\include;include;..\tinyMSRP\include;..\tinyRTP\include;..\tinyMEDIA\include;..\tinySDP\include;..\tinyNET\src;..\tinyDSHOW\include;..\tinySAK\src;..\thirdparties\win32\include\BroadVoice16\bvcommon;..\thirdparties\win32\include\BroadVoice16\bv16;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;TINYDAV_EXPORTS;DEBUG_LEVEL=DEBUG_LEVEL_INFOS;HAVE_SRTP=1;HAVE_CUDA=0;HAVE_G729=0;HAVE_BV16=0;HAVE_H264=1;HAVE_OPENCORE_AMR=1;HAVE_ILBC=0;HAVE_LIBGSM=1;HAVE_TINYDSHOW=1;HAVE_DSOUND_H=1;HAVE_WAVE_API=0;HAVE_FFMPEG=1;HAVE_WEBRTC=1;HAVE_SPEEX_DSP=1;HAVE_SPEEX_JB=1;HAVE_LIB_SPEEX=1;HAVE_LIBVPX=1;G192BITSTREAM=0;_WIN32_WINNT=0x0501;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <FunctionLevelLinking>false</FunctionLevelLinking>
+      <PrecompiledHeader />
+      <WarningLevel>Level3</WarningLevel>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <DebugInformationFormat />
+      <CompileAs>CompileAsC</CompileAs>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>Winmm.lib;$(OutDir)tinySAK.lib;$(OutDir)tinyNET.lib;$(OutDir)tinyRTP.lib;$(OutDir)tinyMSRP.lib;$(OutDir)tinySDP.lib;$(OutDir)tinyMEDIA.lib;$(OutDir)tinyDSHOW.lib;..\thirdparties\win32\lib\gsm\libgsm.a;..\thirdparties\win32\lib\ilbc\libiLBC.a;..\thirdparties\win32\lib\speex\libspeex.a;..\thirdparties\win32\lib\speex\libspeexdsp.a;..\thirdparties\win32\lib\libgcc.a;..\thirdparties\win32\lib\libmingwex.a;..\thirdparties\win32\lib\ffmpeg\libavcodec.a;..\thirdparties\win32\lib\ffmpeg\libavutil.a;..\thirdparties\win32\lib\ffmpeg\libswscale.a;..\thirdparties\win32\lib\ffmpeg\libavcore.a;..\thirdparties\win32\lib\ffmpeg\libx264.a;..\thirdparties\win32\lib\ffmpeg\libtheora.a;..\thirdparties\win32\lib\ffmpeg\libogg.a;..\thirdparties\win32\lib\BroadVoice16\libbv16.a;..\thirdparties\win32\lib\webrtc\aec.lib;..\thirdparties\win32\lib\webrtc\aec_sse2.lib;..\thirdparties\win32\lib\webrtc\apm_util.lib;..\thirdparties\win32\lib\webrtc\system_wrappers.lib;..\thirdparties\win32\lib\webrtc\spl.lib;..\thirdparties\win32\lib\webrtc\ns.lib;..\thirdparties\win32\lib\vpx\vpxmd.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <IgnoreSpecificDefaultLibraries>MSVCRTD;LIBCMT;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <SubSystem>Windows</SubSystem>
+      <OptimizeReferences>true</OptimizeReferences>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <RandomizedBaseAddress>true</RandomizedBaseAddress>
+      <DataExecutionPrevention />
+      <TargetMachine>NotSet</TargetMachine>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="include\tinydav\tdav.h" />
+    <ClInclude Include="include\tinydav\tdav_session_av.h" />
+    <ClInclude Include="include\tinydav\tdav_win32.h" />
+    <ClInclude Include="include\tinydav.h" />
+    <ClInclude Include="include\tinydav_config.h" />
+    <ClInclude Include="include\tinydav\codecs\amr\tdav_codec_amr.h" />
+    <ClInclude Include="include\tinydav\codecs\g711\g711.h" />
+    <ClInclude Include="include\tinydav\codecs\g711\tdav_codec_g711.h" />
+    <ClInclude Include="include\tinydav\codecs\g722\g722_enc_dec.h" />
+    <ClInclude Include="include\tinydav\codecs\g722\tdav_codec_g722.h" />
+    <ClInclude Include="include\tinydav\codecs\gsm\tdav_codec_gsm.h" />
+    <ClInclude Include="include\tinydav\codecs\h261\tdav_codec_h261.h" />
+    <ClInclude Include="include\tinydav\codecs\h263\tdav_codec_h263.h" />
+    <ClInclude Include="include\tinydav\codecs\h264\tdav_codec_h264.h" />
+    <ClInclude Include="include\tinydav\codecs\h264\tdav_codec_h264_common.h" />
+    <ClInclude Include="include\tinydav\codecs\h264\tdav_codec_h264_cuda.h" />
+    <ClInclude Include="include\tinydav\codecs\h264\tdav_codec_h264_rtp.h" />
+    <ClInclude Include="include\tinydav\codecs\ilbc\tdav_codec_ilbc.h" />
+    <ClInclude Include="include\tinydav\codecs\theora\tdav_codec_theora.h" />
+    <ClInclude Include="include\tinydav\codecs\speex\tdav_codec_speex.h" />
+    <ClInclude Include="include\tinydav\codecs\msrp\tdav_codec_msrp.h" />
+    <ClInclude Include="include\tinydav\codecs\dtmf\tdav_codec_dtmf.h" />
+    <ClInclude Include="include\tinydav\codecs\bv\tdav_codec_bv16.h" />
+    <ClInclude Include="include\tinydav\codecs\bv\tdav_codec_bv32.h" />
+    <ClInclude Include="include\tinydav\codecs\g729\tdav_codec_g729.h" />
+    <ClInclude Include="include\tinydav\codecs\mp4ves\tdav_codec_mp4ves.h" />
+    <ClInclude Include="include\tinydav\codecs\vpx\tdav_codec_vp8.h" />
+    <ClInclude Include="include\tinydav\codecs\fec\tdav_codec_red.h" />
+    <ClInclude Include="include\tinydav\codecs\fec\tdav_codec_ulpfec.h" />
+    <ClInclude Include="include\tinydav\audio\tdav_consumer_audio.h" />
+    <ClInclude Include="include\tinydav\audio\tdav_jitterbuffer.h" />
+    <ClInclude Include="include\tinydav\audio\tdav_producer_audio.h" />
+    <ClInclude Include="include\tinydav\audio\tdav_session_audio.h" />
+    <ClInclude Include="include\tinydav\audio\tdav_speakup_jitterbuffer.h" />
+    <ClInclude Include="include\tinydav\audio\tdav_speex_denoise.h" />
+    <ClInclude Include="include\tinydav\audio\tdav_speex_jitterbuffer.h" />
+    <ClInclude Include="include\tinydav\audio\tdav_speex_resampler.h" />
+    <ClInclude Include="include\tinydav\audio\tdav_webrtc_denoise.h" />
+    <ClInclude Include="include\tinydav\audio\directsound\tdav_consumer_dsound.h" />
+    <ClInclude Include="include\tinydav\audio\directsound\tdav_producer_dsound.h" />
+    <ClInclude Include="include\tinydav\audio\waveapi\tdav_consumer_waveapi.h" />
+    <ClInclude Include="include\tinydav\audio\waveapi\tdav_producer_waveapi.h" />
+    <ClInclude Include="include\tinydav\audio\coreaudio\tdav_audiounit.h" />
+    <ClInclude Include="include\tinydav\audio\coreaudio\tdav_consumer_audioqueue.h" />
+    <ClInclude Include="include\tinydav\audio\coreaudio\tdav_consumer_audiounit.h" />
+    <ClInclude Include="include\tinydav\audio\coreaudio\tdav_producer_audioqueue.h" />
+    <ClInclude Include="include\tinydav\audio\coreaudio\tdav_producer_audiounit.h" />
+    <ClInclude Include="include\tinydav\video\tdav_consumer_video.h" />
+    <ClInclude Include="include\tinydav\video\tdav_converter_video.h" />
+    <ClInclude Include="include\tinydav\video\tdav_runnable_video.h" />
+    <ClInclude Include="include\tinydav\video\tdav_session_video.h" />
+    <ClInclude Include="include\tinydav\video\jb\tdav_video_frame.h" />
+    <ClInclude Include="include\tinydav\video\jb\tdav_video_jb.h" />
+    <ClInclude Include="include\tinydav\msrp\tdav_consumer_msrp.h" />
+    <ClInclude Include="include\tinydav\msrp\tdav_producer_msrp.h" />
+    <ClInclude Include="include\tinydav\msrp\tdav_session_msrp.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\tdav.c" />
+    <ClCompile Include="src\tdav_session_av.c" />
+    <ClCompile Include="src\tdav_win32.c" />
+    <ClCompile Include="src\codecs\amr\tdav_codec_amr.c" />
+    <ClCompile Include="src\codecs\g711\g711.c" />
+    <ClCompile Include="src\codecs\g711\tdav_codec_g711.c" />
+    <ClCompile Include="src\codecs\g722\g722_decode.c" />
+    <ClCompile Include="src\codecs\g722\g722_encode.c" />
+    <ClCompile Include="src\codecs\g722\tdav_codec_g722.c" />
+    <ClCompile Include="src\codecs\gsm\tdav_codec_gsm.c" />
+    <ClCompile Include="src\codecs\h261\tdav_codec_h261.c" />
+    <ClCompile Include="src\codecs\h263\tdav_codec_h263.c" />
+    <ClCompile Include="src\codecs\h264\tdav_codec_h264.c" />
+    <ClCompile Include="src\codecs\h264\tdav_codec_h264_cuda.cxx" />
+    <ClCompile Include="src\codecs\h264\tdav_codec_h264_rtp.c" />
+    <ClCompile Include="src\codecs\ilbc\tdav_codec_ilbc.c" />
+    <ClCompile Include="src\codecs\speex\tdav_codec_speex.c" />
+    <ClCompile Include="src\codecs\theora\tdav_codec_theora.c" />
+    <ClCompile Include="src\codecs\msrp\tdav_codec_msrp.c" />
+    <ClCompile Include="src\codecs\dtmf\tdav_codec_dtmf.c" />
+    <ClCompile Include="src\codecs\bv\tdav_codec_bv16.c" />
+    <ClCompile Include="src\codecs\bv\tdav_codec_bv32.c" />
+    <ClCompile Include="src\codecs\g729\tdav_codec_g729.c" />
+    <ClCompile Include="src\codecs\mp4ves\tdav_codec_mp4ves.c" />
+    <ClCompile Include="src\codecs\vpx\tdav_codec_vp8.c" />
+    <ClCompile Include="src\codecs\fec\tdav_codec_red.c" />
+    <ClCompile Include="src\codecs\fec\tdav_codec_ulpfec.c" />
+    <ClCompile Include="src\audio\tdav_consumer_audio.c" />
+    <ClCompile Include="src\audio\tdav_jitterbuffer.c" />
+    <ClCompile Include="src\audio\tdav_producer_audio.c" />
+    <ClCompile Include="src\audio\tdav_session_audio.c" />
+    <ClCompile Include="src\audio\tdav_speakup_jitterbuffer.c" />
+    <ClCompile Include="src\audio\tdav_speex_denoise.c" />
+    <ClCompile Include="src\audio\tdav_speex_jitterbuffer.c" />
+    <ClCompile Include="src\audio\tdav_speex_resampler.c" />
+    <ClCompile Include="src\audio\tdav_webrtc_denoise.c" />
+    <ClCompile Include="src\audio\directsound\tdav_consumer_dsound.c" />
+    <ClCompile Include="src\audio\directsound\tdav_producer_dsound.c" />
+    <ClCompile Include="src\audio\waveapi\tdav_consumer_waveapi.c" />
+    <ClCompile Include="src\audio\waveapi\tdav_producer_waveapi.c" />
+    <ClCompile Include="src\audio\coreaudio\tdav_audiounit.c" />
+    <ClCompile Include="src\audio\coreaudio\tdav_consumer_audioqueue.c" />
+    <ClCompile Include="src\audio\coreaudio\tdav_consumer_audiounit.c" />
+    <ClCompile Include="src\audio\coreaudio\tdav_producer_audioqueue.c" />
+    <ClCompile Include="src\audio\coreaudio\tdav_producer_audiounit.c" />
+    <ClCompile Include="src\video\tdav_consumer_video.c" />
+    <ClCompile Include="src\video\tdav_converter_video.c" />
+    <ClCompile Include="src\video\tdav_runnable_video.c" />
+    <ClCompile Include="src\video\tdav_session_video.c" />
+    <ClCompile Include="src\video\jb\tdav_video_frame.c" />
+    <ClCompile Include="src\video\jb\tdav_video_jb.c" />
+    <ClCompile Include="src\msrp\tdav_consumer_msrp.c" />
+    <ClCompile Include="src\msrp\tdav_producer_msrp.c" />
+    <ClCompile Include="src\msrp\tdav_session_msrp.c" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

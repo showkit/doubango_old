@@ -1,0 +1,189 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{B3E45009-C7C3-4090-837C-2D30C9058443}</ProjectGuid>
+    <RootNamespace>tinyHTTP</RootNamespace>
+    <Keyword>Win32Proj</Keyword>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <PlatformToolset>v110</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <PlatformToolset>v110</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>11.0.50727.1</_ProjectFileVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <OutDir>$(SolutionDir)$(Configuration)\</OutDir>
+    <IntDir>$(Configuration)\</IntDir>
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <OutDir>$(SolutionDir)$(Configuration)\</OutDir>
+    <IntDir>$(Configuration)\</IntDir>
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>..\thirdparties\win32\include;..\tinyHTTP\include;..\tinySAK\src;..\tinyNET\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>DEBUG_LEVEL=DEBUG_LEVEL_INFO;WIN32;_DEBUG;_WINDOWS;_USRDLL;TINYHTTP_EXPORTS;_WIN32_WINNT 0x0501;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <MinimalRebuild>true</MinimalRebuild>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <PrecompiledHeader />
+      <WarningLevel>Level3</WarningLevel>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
+      <CompileAs>CompileAsC</CompileAs>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>$(OutDir)tinySAK.lib;$(OutDir)tinyNET.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Windows</SubSystem>
+      <TargetMachine>MachineX86</TargetMachine>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <Optimization>MaxSpeed</Optimization>
+      <IntrinsicFunctions>false</IntrinsicFunctions>
+      <AdditionalIncludeDirectories>..\thirdparties\win32\include;..\tinyHTTP\include;..\tinySAK\src;..\tinyNET\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;TINYHTTP_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <FunctionLevelLinking>false</FunctionLevelLinking>
+      <PrecompiledHeader />
+      <WarningLevel>Level3</WarningLevel>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <DebugInformationFormat />
+      <CompileAs>CompileAsC</CompileAs>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>$(OutDir)tinySAK.lib;$(OutDir)tinyNET.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <IgnoreSpecificDefaultLibraries>MSVCRTD;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <SubSystem>Windows</SubSystem>
+      <OptimizeReferences>true</OptimizeReferences>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <TargetMachine>NotSet</TargetMachine>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="src\thttp.c" />
+    <ClCompile Include="src\thttp_action.c" />
+    <ClCompile Include="src\thttp_dialog.c" />
+    <ClCompile Include="src\thttp_event.c" />
+    <ClCompile Include="src\thttp_message.c" />
+    <ClCompile Include="src\thttp_session.c" />
+    <ClCompile Include="src\thttp_url.c" />
+    <ClCompile Include="src\auth\thttp_auth.c" />
+    <ClCompile Include="src\auth\thttp_challenge.c" />
+    <ClCompile Include="src\headers\thttp_header.c" />
+    <ClCompile Include="src\headers\thttp_header_Authorization.c" />
+    <ClCompile Include="src\headers\thttp_header_Content_Length.c" />
+    <ClCompile Include="src\headers\thttp_header_Content_Type.c" />
+    <ClCompile Include="src\headers\thttp_header_Dummy.c" />
+    <ClCompile Include="src\headers\thttp_header_ETag.c" />
+    <ClCompile Include="src\headers\thttp_header_Sec_WebSocket_Accept.c" />
+    <ClCompile Include="src\headers\thttp_header_Sec_WebSocket_Key.c" />
+    <ClCompile Include="src\headers\thttp_header_Sec_WebSocket_Protocol.c" />
+    <ClCompile Include="src\headers\thttp_header_Sec_WebSocket_Version.c" />
+    <ClCompile Include="src\headers\thttp_header_Transfer_Encoding.c" />
+    <ClCompile Include="src\headers\thttp_header_WWW_Authenticate.c" />
+    <ClCompile Include="src\parsers\thttp_parser_header.c" />
+    <ClCompile Include="src\parsers\thttp_parser_message.c" />
+    <ClCompile Include="src\parsers\thttp_parser_url.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="include\thttp.h" />
+    <ClInclude Include="include\tinyHTTP\thttp_action.h" />
+    <ClInclude Include="include\tinyHTTP\thttp_dialog.h" />
+    <ClInclude Include="include\tinyHTTP\thttp_event.h" />
+    <ClInclude Include="include\tinyHTTP\thttp_message.h" />
+    <ClInclude Include="include\tinyHTTP\thttp_session.h" />
+    <ClInclude Include="include\tinyHTTP\thttp_url.h" />
+    <ClInclude Include="include\tinyhttp.h" />
+    <ClInclude Include="include\tinyhttp_config.h" />
+    <ClInclude Include="include\tinyHTTP\auth\thttp_auth.h" />
+    <ClInclude Include="include\tinyHTTP\auth\thttp_challenge.h" />
+    <ClInclude Include="include\tinyHTTP\headers\thttp_header.h" />
+    <ClInclude Include="include\tinyHTTP\headers\thttp_header_Authorization.h" />
+    <ClInclude Include="include\tinyHTTP\headers\thttp_header_Content_Length.h" />
+    <ClInclude Include="include\tinyHTTP\headers\thttp_header_Content_Type.h" />
+    <ClInclude Include="include\tinyHTTP\headers\thttp_header_Dummy.h" />
+    <ClInclude Include="include\tinyHTTP\headers\thttp_header_ETag.h" />
+    <ClInclude Include="include\tinyhttp\headers\thttp_header_Sec_WebSocket_Accept.h" />
+    <ClInclude Include="include\tinyhttp\headers\thttp_header_Sec_WebSocket_Key.h" />
+    <ClInclude Include="include\tinyhttp\headers\thttp_header_Sec_WebSocket_Protocol.h" />
+    <ClInclude Include="include\tinyhttp\headers\thttp_header_Sec_WebSocket_Version.h" />
+    <ClInclude Include="include\tinyHTTP\headers\thttp_header_Transfer_Encoding.h" />
+    <ClInclude Include="include\tinyHTTP\headers\thttp_header_WWW_Authenticate.h" />
+    <ClInclude Include="include\tinyHTTP\parsers\thttp_parser_header.h" />
+    <ClInclude Include="include\tinyHTTP\parsers\thttp_parser_message.h" />
+    <ClInclude Include="include\tinyHTTP\parsers\thttp_parser_url.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="abnf\http.abnf" />
+    <None Include="abnf\httpauth.abnf" />
+    <None Include="abnf\uri.abnf" />
+    <None Include="abnf\ws.abnf" />
+    <None Include="ragel\thttp_machine_header.rl" />
+    <None Include="ragel\thttp_machine_message.rl" />
+    <None Include="ragel\thttp_machine_utils.rl" />
+    <None Include="ragel\thttp_machine_ws.rl" />
+    <None Include="ragel\thttp_parser_header.rl" />
+    <None Include="ragel\thttp_parser_header_Authorization.rl" />
+    <None Include="ragel\thttp_parser_header_Content_Length.rl" />
+    <None Include="ragel\thttp_parser_header_Content_Type.rl" />
+    <None Include="ragel\thttp_parser_header_Dummy.rl" />
+    <None Include="ragel\thttp_parser_header_ETag.rl" />
+    <None Include="ragel\thttp_parser_header_Sec_WebSocket_Accept.rl" />
+    <None Include="ragel\thttp_parser_header_Sec_WebSocket_Key.rl" />
+    <None Include="ragel\thttp_parser_header_Sec_WebSocket_Protocol.rl" />
+    <None Include="ragel\thttp_parser_header_Sec_WebSocket_Version.rl" />
+    <None Include="ragel\thttp_parser_header_Transfer_Encoding.rl" />
+    <None Include="ragel\thttp_parser_header_WWW_Authenticate.rl" />
+    <None Include="ragel\thttp_parser_message.rl" />
+    <None Include="ragel\thttp_parser_url.rl" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\tinyNET\tinyNET.vcxproj">
+      <Project>{7522a458-92f4-4259-b906-e84c2a65d9f1}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\tinySAK\tinySAK.vcxproj">
+      <Project>{6bc9b796-10c6-4cf7-a6e4-e2daccda84da}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

@@ -1,0 +1,531 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="headers%28%2a.h%29">
+      <UniqueIdentifier>{7ab4b2d0-de09-4974-adec-b1744805f967}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="headers%28%2a.h%29\codecs">
+      <UniqueIdentifier>{51498758-705e-47fa-b020-6fed16fc552a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="headers%28%2a.h%29\codecs\amr">
+      <UniqueIdentifier>{94e6c98b-0f2b-4aba-9b50-852c2386355a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="headers%28%2a.h%29\codecs\g711">
+      <UniqueIdentifier>{bb207957-e502-4131-9fda-670c5a903045}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="headers%28%2a.h%29\codecs\g722">
+      <UniqueIdentifier>{9f86f9c4-97df-4657-8a60-725f9de9540c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="headers%28%2a.h%29\codecs\gsm">
+      <UniqueIdentifier>{b500e6c1-c1a8-44fa-8380-f32a7380c984}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="headers%28%2a.h%29\codecs\h261">
+      <UniqueIdentifier>{daa768ad-e8c3-4f7c-a2f7-9a3336fa8740}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="headers%28%2a.h%29\codecs\h263">
+      <UniqueIdentifier>{1a3bb9ab-bd44-4542-887c-b0e0a9dbc7f7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="headers%28%2a.h%29\codecs\h264">
+      <UniqueIdentifier>{d9136ad4-776e-4f4b-b4f9-5795ed8e8a4c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="headers%28%2a.h%29\codecs\ilbc">
+      <UniqueIdentifier>{845aa4a8-045b-4709-9519-a284c1f0db33}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="headers%28%2a.h%29\codecs\theora">
+      <UniqueIdentifier>{e5506abc-c2fc-457c-b993-9c03cac55789}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="headers%28%2a.h%29\codecs\speex">
+      <UniqueIdentifier>{2c23b366-6c5d-481d-b357-214169ca80d2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="headers%28%2a.h%29\codecs\silk">
+      <UniqueIdentifier>{36151a0c-981b-4098-b411-20e47fb4cc83}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="headers%28%2a.h%29\codecs\msrp">
+      <UniqueIdentifier>{53ef77bb-dd70-42e1-8525-acc7c97dd60b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="headers%28%2a.h%29\codecs\dtmf">
+      <UniqueIdentifier>{9d18c914-677b-45bc-b3b0-2efcff114142}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="headers%28%2a.h%29\codecs\bv">
+      <UniqueIdentifier>{e2ef0ad1-a53b-4bd9-82e8-70897ac7140d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="headers%28%2a.h%29\codecs\g729">
+      <UniqueIdentifier>{bb90c214-c7c2-4abd-a221-114389e4eaf8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="headers%28%2a.h%29\codecs\mp4ves">
+      <UniqueIdentifier>{356ee16f-75ec-4d22-b335-d28111032e21}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="headers%28%2a.h%29\codecs\vpx">
+      <UniqueIdentifier>{0b217d84-78a0-49d4-98d7-7a9d1544e5b9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="headers%28%2a.h%29\codecs\fec">
+      <UniqueIdentifier>{ce33a7f0-0ba4-48f9-ae3a-edddf5ae0fb1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="headers%28%2a.h%29\audio">
+      <UniqueIdentifier>{80bcd142-4c1f-45db-8ad9-806cc95f0813}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="headers%28%2a.h%29\audio\android">
+      <UniqueIdentifier>{704c603c-019b-468f-8009-ac3376304a89}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="headers%28%2a.h%29\audio\directsound">
+      <UniqueIdentifier>{7651f3ed-e012-4f79-b7ae-fd8d83476798}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="headers%28%2a.h%29\audio\oss">
+      <UniqueIdentifier>{caac848c-49f3-4412-865f-6ddfb98ff5bf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="headers%28%2a.h%29\audio\waveapi">
+      <UniqueIdentifier>{df717bcb-be68-4e72-84f7-db1001701392}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="headers%28%2a.h%29\audio\coreaudio">
+      <UniqueIdentifier>{b3103462-f484-4348-b079-138cbb5f5c16}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="headers%28%2a.h%29\video">
+      <UniqueIdentifier>{758f69c8-ac91-4f90-80a0-52b380a99ffd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="headers%28%2a.h%29\video\android">
+      <UniqueIdentifier>{93cd250a-e3e4-4e0b-9b00-c07d2dc3d68f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="headers%28%2a.h%29\video\directshow">
+      <UniqueIdentifier>{4bb1bcc4-c3d5-4d71-9ac0-37d572a51337}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="headers%28%2a.h%29\video\v4linux">
+      <UniqueIdentifier>{49276831-97ab-4826-9922-911df0a7bf30}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="headers%28%2a.h%29\video\jb">
+      <UniqueIdentifier>{27e9fe27-3760-4b11-8369-7036ab701917}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="headers%28%2a.h%29\msrp">
+      <UniqueIdentifier>{ef6b82fd-ed7b-45b0-9c03-85fa71aeef1a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="source%28%2a.c%29">
+      <UniqueIdentifier>{9abd1e18-d089-48f7-91a1-2b53b8fc8b0a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="source%28%2a.c%29\codecs">
+      <UniqueIdentifier>{a70c22ff-8e3a-4020-9f11-5c0c95676115}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="source%28%2a.c%29\codecs\amr">
+      <UniqueIdentifier>{c0762264-a7db-4f1a-9365-042cc83a0708}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="source%28%2a.c%29\codecs\g711">
+      <UniqueIdentifier>{ddadf1e1-ac56-4d92-8c8f-cfa7eb20ee53}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="source%28%2a.c%29\codecs\g722">
+      <UniqueIdentifier>{5fe52154-68f1-47d1-ab40-963320f456b3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="source%28%2a.c%29\codecs\gsm">
+      <UniqueIdentifier>{5befd2cc-c47b-4bbf-b459-3bef0bfe0000}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="source%28%2a.c%29\codecs\h261">
+      <UniqueIdentifier>{58b806ca-e3df-4dca-b775-ef7d1d551692}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="source%28%2a.c%29\codecs\h263">
+      <UniqueIdentifier>{8fe0b533-14ae-4510-acf9-7a74a6044734}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="source%28%2a.c%29\codecs\h264">
+      <UniqueIdentifier>{64f12fc8-7fac-4bb1-9be9-cbb52ead2e3d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="source%28%2a.c%29\codecs\ilbc">
+      <UniqueIdentifier>{9f61e4ec-1179-4caf-9b56-607d6d93eb5a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="source%28%2a.c%29\codecs\silk">
+      <UniqueIdentifier>{ecae7870-e39a-42fc-b91c-1f769385b008}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="source%28%2a.c%29\codecs\speex">
+      <UniqueIdentifier>{37d5072b-f62e-4230-a3f9-c5e2cb187a14}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="source%28%2a.c%29\codecs\theora">
+      <UniqueIdentifier>{f826ba30-8bac-46c8-8f5e-88f5657795b3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="source%28%2a.c%29\codecs\msrp">
+      <UniqueIdentifier>{f1ac37e8-9b71-42a7-ab55-e4260ba43800}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="source%28%2a.c%29\codecs\dtmf">
+      <UniqueIdentifier>{ab3aa9be-70a9-43d9-a99c-8ab921758397}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="source%28%2a.c%29\codecs\bv">
+      <UniqueIdentifier>{eb600b7e-d442-4820-ab89-0fc7e4893309}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="source%28%2a.c%29\codecs\g729">
+      <UniqueIdentifier>{19f0488a-9577-4aaa-8300-99526ef111c6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="source%28%2a.c%29\codecs\mp4ves">
+      <UniqueIdentifier>{0634dfef-6b80-4448-89f8-37a2ccca98d0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="source%28%2a.c%29\codecs\vpx">
+      <UniqueIdentifier>{b011eb87-1915-45ad-bbde-835dbb3f2aa9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="source%28%2a.c%29\codecs\fec">
+      <UniqueIdentifier>{4ccc9b48-0901-4626-a7bf-dca6e7ddb356}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="source%28%2a.c%29\audio">
+      <UniqueIdentifier>{073c860d-d8bd-43be-8961-051ef2ea30cc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="source%28%2a.c%29\audio\android">
+      <UniqueIdentifier>{8c3e6a6a-9468-4418-ac7a-202f79b44a9d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="source%28%2a.c%29\audio\directsound">
+      <UniqueIdentifier>{6d2ade64-2af5-4f3f-8175-2299a8a7a69f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="source%28%2a.c%29\audio\oss">
+      <UniqueIdentifier>{d76fd972-914c-4c0c-81a5-22e921e57487}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="source%28%2a.c%29\audio\waveapi">
+      <UniqueIdentifier>{a0f332d0-6e2b-4bf8-8eb5-d14633668e17}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="source%28%2a.c%29\audio\coreaudio">
+      <UniqueIdentifier>{41cc0ecf-d944-440c-af3f-ad91c35c15b8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="source%28%2a.c%29\video">
+      <UniqueIdentifier>{767fdd53-ccf5-4e95-8769-ae33c1289e3b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="source%28%2a.c%29\video\android">
+      <UniqueIdentifier>{5194eb0a-5d1e-4d4d-8a21-b86d9aac6e18}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="source%28%2a.c%29\video\directshow">
+      <UniqueIdentifier>{e5d340de-124f-45bd-919c-43356ff521d5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="source%28%2a.c%29\video\v4linux">
+      <UniqueIdentifier>{b2b9720c-36e8-40ce-8515-1b0f337dd3fb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="source%28%2a.c%29\video\jb">
+      <UniqueIdentifier>{92d3787f-8aac-49eb-bb48-6d0732b1a3e7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="source%28%2a.c%29\msrp">
+      <UniqueIdentifier>{3bd2b8bc-a02c-40f5-9f0c-4839ae74ebcf}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="include\tinydav\tdav.h">
+      <Filter>headers%28%2a.h%29</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\tdav_session_av.h">
+      <Filter>headers%28%2a.h%29</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\tdav_win32.h">
+      <Filter>headers%28%2a.h%29</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav.h">
+      <Filter>headers%28%2a.h%29</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav_config.h">
+      <Filter>headers%28%2a.h%29</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\codecs\amr\tdav_codec_amr.h">
+      <Filter>headers%28%2a.h%29\codecs\amr</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\codecs\g711\g711.h">
+      <Filter>headers%28%2a.h%29\codecs\g711</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\codecs\g711\tdav_codec_g711.h">
+      <Filter>headers%28%2a.h%29\codecs\g711</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\codecs\g722\g722_enc_dec.h">
+      <Filter>headers%28%2a.h%29\codecs\g722</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\codecs\g722\tdav_codec_g722.h">
+      <Filter>headers%28%2a.h%29\codecs\g722</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\codecs\gsm\tdav_codec_gsm.h">
+      <Filter>headers%28%2a.h%29\codecs\gsm</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\codecs\h261\tdav_codec_h261.h">
+      <Filter>headers%28%2a.h%29\codecs\h261</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\codecs\h263\tdav_codec_h263.h">
+      <Filter>headers%28%2a.h%29\codecs\h263</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\codecs\h264\tdav_codec_h264.h">
+      <Filter>headers%28%2a.h%29\codecs\h264</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\codecs\h264\tdav_codec_h264_common.h">
+      <Filter>headers%28%2a.h%29\codecs\h264</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\codecs\h264\tdav_codec_h264_cuda.h">
+      <Filter>headers%28%2a.h%29\codecs\h264</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\codecs\h264\tdav_codec_h264_rtp.h">
+      <Filter>headers%28%2a.h%29\codecs\h264</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\codecs\ilbc\tdav_codec_ilbc.h">
+      <Filter>headers%28%2a.h%29\codecs\ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\codecs\theora\tdav_codec_theora.h">
+      <Filter>headers%28%2a.h%29\codecs\theora</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\codecs\speex\tdav_codec_speex.h">
+      <Filter>headers%28%2a.h%29\codecs\speex</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\codecs\msrp\tdav_codec_msrp.h">
+      <Filter>headers%28%2a.h%29\codecs\msrp</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\codecs\dtmf\tdav_codec_dtmf.h">
+      <Filter>headers%28%2a.h%29\codecs\dtmf</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\codecs\bv\tdav_codec_bv16.h">
+      <Filter>headers%28%2a.h%29\codecs\bv</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\codecs\bv\tdav_codec_bv32.h">
+      <Filter>headers%28%2a.h%29\codecs\bv</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\codecs\g729\tdav_codec_g729.h">
+      <Filter>headers%28%2a.h%29\codecs\g729</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\codecs\mp4ves\tdav_codec_mp4ves.h">
+      <Filter>headers%28%2a.h%29\codecs\mp4ves</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\codecs\vpx\tdav_codec_vp8.h">
+      <Filter>headers%28%2a.h%29\codecs\vpx</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\codecs\fec\tdav_codec_red.h">
+      <Filter>headers%28%2a.h%29\codecs\fec</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\codecs\fec\tdav_codec_ulpfec.h">
+      <Filter>headers%28%2a.h%29\codecs\fec</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\audio\tdav_consumer_audio.h">
+      <Filter>headers%28%2a.h%29\audio</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\audio\tdav_jitterbuffer.h">
+      <Filter>headers%28%2a.h%29\audio</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\audio\tdav_producer_audio.h">
+      <Filter>headers%28%2a.h%29\audio</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\audio\tdav_session_audio.h">
+      <Filter>headers%28%2a.h%29\audio</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\audio\tdav_speakup_jitterbuffer.h">
+      <Filter>headers%28%2a.h%29\audio</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\audio\tdav_speex_denoise.h">
+      <Filter>headers%28%2a.h%29\audio</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\audio\tdav_speex_jitterbuffer.h">
+      <Filter>headers%28%2a.h%29\audio</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\audio\tdav_speex_resampler.h">
+      <Filter>headers%28%2a.h%29\audio</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\audio\tdav_webrtc_denoise.h">
+      <Filter>headers%28%2a.h%29\audio</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\audio\directsound\tdav_consumer_dsound.h">
+      <Filter>headers%28%2a.h%29\audio\directsound</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\audio\directsound\tdav_producer_dsound.h">
+      <Filter>headers%28%2a.h%29\audio\directsound</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\audio\waveapi\tdav_consumer_waveapi.h">
+      <Filter>headers%28%2a.h%29\audio\waveapi</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\audio\waveapi\tdav_producer_waveapi.h">
+      <Filter>headers%28%2a.h%29\audio\waveapi</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\audio\coreaudio\tdav_audiounit.h">
+      <Filter>headers%28%2a.h%29\audio\coreaudio</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\audio\coreaudio\tdav_consumer_audioqueue.h">
+      <Filter>headers%28%2a.h%29\audio\coreaudio</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\audio\coreaudio\tdav_consumer_audiounit.h">
+      <Filter>headers%28%2a.h%29\audio\coreaudio</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\audio\coreaudio\tdav_producer_audioqueue.h">
+      <Filter>headers%28%2a.h%29\audio\coreaudio</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\audio\coreaudio\tdav_producer_audiounit.h">
+      <Filter>headers%28%2a.h%29\audio\coreaudio</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\video\tdav_consumer_video.h">
+      <Filter>headers%28%2a.h%29\video</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\video\tdav_converter_video.h">
+      <Filter>headers%28%2a.h%29\video</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\video\tdav_runnable_video.h">
+      <Filter>headers%28%2a.h%29\video</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\video\tdav_session_video.h">
+      <Filter>headers%28%2a.h%29\video</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\video\jb\tdav_video_frame.h">
+      <Filter>headers%28%2a.h%29\video\jb</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\video\jb\tdav_video_jb.h">
+      <Filter>headers%28%2a.h%29\video\jb</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\msrp\tdav_consumer_msrp.h">
+      <Filter>headers%28%2a.h%29\msrp</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\msrp\tdav_producer_msrp.h">
+      <Filter>headers%28%2a.h%29\msrp</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tinydav\msrp\tdav_session_msrp.h">
+      <Filter>headers%28%2a.h%29\msrp</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\tdav.c">
+      <Filter>source%28%2a.c%29</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tdav_session_av.c">
+      <Filter>source%28%2a.c%29</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tdav_win32.c">
+      <Filter>source%28%2a.c%29</Filter>
+    </ClCompile>
+    <ClCompile Include="src\codecs\amr\tdav_codec_amr.c">
+      <Filter>source%28%2a.c%29\codecs\amr</Filter>
+    </ClCompile>
+    <ClCompile Include="src\codecs\g711\g711.c">
+      <Filter>source%28%2a.c%29\codecs\g711</Filter>
+    </ClCompile>
+    <ClCompile Include="src\codecs\g711\tdav_codec_g711.c">
+      <Filter>source%28%2a.c%29\codecs\g711</Filter>
+    </ClCompile>
+    <ClCompile Include="src\codecs\g722\g722_decode.c">
+      <Filter>source%28%2a.c%29\codecs\g722</Filter>
+    </ClCompile>
+    <ClCompile Include="src\codecs\g722\g722_encode.c">
+      <Filter>source%28%2a.c%29\codecs\g722</Filter>
+    </ClCompile>
+    <ClCompile Include="src\codecs\g722\tdav_codec_g722.c">
+      <Filter>source%28%2a.c%29\codecs\g722</Filter>
+    </ClCompile>
+    <ClCompile Include="src\codecs\gsm\tdav_codec_gsm.c">
+      <Filter>source%28%2a.c%29\codecs\gsm</Filter>
+    </ClCompile>
+    <ClCompile Include="src\codecs\h261\tdav_codec_h261.c">
+      <Filter>source%28%2a.c%29\codecs\h261</Filter>
+    </ClCompile>
+    <ClCompile Include="src\codecs\h263\tdav_codec_h263.c">
+      <Filter>source%28%2a.c%29\codecs\h263</Filter>
+    </ClCompile>
+    <ClCompile Include="src\codecs\h264\tdav_codec_h264.c">
+      <Filter>source%28%2a.c%29\codecs\h264</Filter>
+    </ClCompile>
+    <ClCompile Include="src\codecs\h264\tdav_codec_h264_cuda.cxx">
+      <Filter>source%28%2a.c%29\codecs\h264</Filter>
+    </ClCompile>
+    <ClCompile Include="src\codecs\h264\tdav_codec_h264_rtp.c">
+      <Filter>source%28%2a.c%29\codecs\h264</Filter>
+    </ClCompile>
+    <ClCompile Include="src\codecs\ilbc\tdav_codec_ilbc.c">
+      <Filter>source%28%2a.c%29\codecs\ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="src\codecs\speex\tdav_codec_speex.c">
+      <Filter>source%28%2a.c%29\codecs\speex</Filter>
+    </ClCompile>
+    <ClCompile Include="src\codecs\theora\tdav_codec_theora.c">
+      <Filter>source%28%2a.c%29\codecs\theora</Filter>
+    </ClCompile>
+    <ClCompile Include="src\codecs\msrp\tdav_codec_msrp.c">
+      <Filter>source%28%2a.c%29\codecs\msrp</Filter>
+    </ClCompile>
+    <ClCompile Include="src\codecs\dtmf\tdav_codec_dtmf.c">
+      <Filter>source%28%2a.c%29\codecs\dtmf</Filter>
+    </ClCompile>
+    <ClCompile Include="src\codecs\bv\tdav_codec_bv16.c">
+      <Filter>source%28%2a.c%29\codecs\bv</Filter>
+    </ClCompile>
+    <ClCompile Include="src\codecs\bv\tdav_codec_bv32.c">
+      <Filter>source%28%2a.c%29\codecs\bv</Filter>
+    </ClCompile>
+    <ClCompile Include="src\codecs\g729\tdav_codec_g729.c">
+      <Filter>source%28%2a.c%29\codecs\g729</Filter>
+    </ClCompile>
+    <ClCompile Include="src\codecs\mp4ves\tdav_codec_mp4ves.c">
+      <Filter>source%28%2a.c%29\codecs\mp4ves</Filter>
+    </ClCompile>
+    <ClCompile Include="src\codecs\vpx\tdav_codec_vp8.c">
+      <Filter>source%28%2a.c%29\codecs\vpx</Filter>
+    </ClCompile>
+    <ClCompile Include="src\codecs\fec\tdav_codec_red.c">
+      <Filter>source%28%2a.c%29\codecs\fec</Filter>
+    </ClCompile>
+    <ClCompile Include="src\codecs\fec\tdav_codec_ulpfec.c">
+      <Filter>source%28%2a.c%29\codecs\fec</Filter>
+    </ClCompile>
+    <ClCompile Include="src\audio\tdav_consumer_audio.c">
+      <Filter>source%28%2a.c%29\audio</Filter>
+    </ClCompile>
+    <ClCompile Include="src\audio\tdav_jitterbuffer.c">
+      <Filter>source%28%2a.c%29\audio</Filter>
+    </ClCompile>
+    <ClCompile Include="src\audio\tdav_producer_audio.c">
+      <Filter>source%28%2a.c%29\audio</Filter>
+    </ClCompile>
+    <ClCompile Include="src\audio\tdav_session_audio.c">
+      <Filter>source%28%2a.c%29\audio</Filter>
+    </ClCompile>
+    <ClCompile Include="src\audio\tdav_speakup_jitterbuffer.c">
+      <Filter>source%28%2a.c%29\audio</Filter>
+    </ClCompile>
+    <ClCompile Include="src\audio\tdav_speex_denoise.c">
+      <Filter>source%28%2a.c%29\audio</Filter>
+    </ClCompile>
+    <ClCompile Include="src\audio\tdav_speex_jitterbuffer.c">
+      <Filter>source%28%2a.c%29\audio</Filter>
+    </ClCompile>
+    <ClCompile Include="src\audio\tdav_speex_resampler.c">
+      <Filter>source%28%2a.c%29\audio</Filter>
+    </ClCompile>
+    <ClCompile Include="src\audio\tdav_webrtc_denoise.c">
+      <Filter>source%28%2a.c%29\audio</Filter>
+    </ClCompile>
+    <ClCompile Include="src\audio\directsound\tdav_consumer_dsound.c">
+      <Filter>source%28%2a.c%29\audio\directsound</Filter>
+    </ClCompile>
+    <ClCompile Include="src\audio\directsound\tdav_producer_dsound.c">
+      <Filter>source%28%2a.c%29\audio\directsound</Filter>
+    </ClCompile>
+    <ClCompile Include="src\audio\waveapi\tdav_consumer_waveapi.c">
+      <Filter>source%28%2a.c%29\audio\waveapi</Filter>
+    </ClCompile>
+    <ClCompile Include="src\audio\waveapi\tdav_producer_waveapi.c">
+      <Filter>source%28%2a.c%29\audio\waveapi</Filter>
+    </ClCompile>
+    <ClCompile Include="src\audio\coreaudio\tdav_audiounit.c">
+      <Filter>source%28%2a.c%29\audio\coreaudio</Filter>
+    </ClCompile>
+    <ClCompile Include="src\audio\coreaudio\tdav_consumer_audioqueue.c">
+      <Filter>source%28%2a.c%29\audio\coreaudio</Filter>
+    </ClCompile>
+    <ClCompile Include="src\audio\coreaudio\tdav_consumer_audiounit.c">
+      <Filter>source%28%2a.c%29\audio\coreaudio</Filter>
+    </ClCompile>
+    <ClCompile Include="src\audio\coreaudio\tdav_producer_audioqueue.c">
+      <Filter>source%28%2a.c%29\audio\coreaudio</Filter>
+    </ClCompile>
+    <ClCompile Include="src\audio\coreaudio\tdav_producer_audiounit.c">
+      <Filter>source%28%2a.c%29\audio\coreaudio</Filter>
+    </ClCompile>
+    <ClCompile Include="src\video\tdav_consumer_video.c">
+      <Filter>source%28%2a.c%29\video</Filter>
+    </ClCompile>
+    <ClCompile Include="src\video\tdav_converter_video.c">
+      <Filter>source%28%2a.c%29\video</Filter>
+    </ClCompile>
+    <ClCompile Include="src\video\tdav_runnable_video.c">
+      <Filter>source%28%2a.c%29\video</Filter>
+    </ClCompile>
+    <ClCompile Include="src\video\tdav_session_video.c">
+      <Filter>source%28%2a.c%29\video</Filter>
+    </ClCompile>
+    <ClCompile Include="src\video\jb\tdav_video_frame.c">
+      <Filter>source%28%2a.c%29\video\jb</Filter>
+    </ClCompile>
+    <ClCompile Include="src\video\jb\tdav_video_jb.c">
+      <Filter>source%28%2a.c%29\video\jb</Filter>
+    </ClCompile>
+    <ClCompile Include="src\msrp\tdav_consumer_msrp.c">
+      <Filter>source%28%2a.c%29\msrp</Filter>
+    </ClCompile>
+    <ClCompile Include="src\msrp\tdav_producer_msrp.c">
+      <Filter>source%28%2a.c%29\msrp</Filter>
+    </ClCompile>
+    <ClCompile Include="src\msrp\tdav_session_msrp.c">
+      <Filter>source%28%2a.c%29\msrp</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>

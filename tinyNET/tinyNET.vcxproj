@@ -1,0 +1,211 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{7522A458-92F4-4259-B906-E84C2A65D9F1}</ProjectGuid>
+    <RootNamespace>tinyNET</RootNamespace>
+    <Keyword>Win32Proj</Keyword>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <PlatformToolset>v110</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <PlatformToolset>v110</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>11.0.50727.1</_ProjectFileVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <OutDir>$(SolutionDir)$(Configuration)\</OutDir>
+    <IntDir>$(Configuration)\</IntDir>
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <OutDir>$(SolutionDir)$(Configuration)\</OutDir>
+    <IntDir>$(Configuration)\</IntDir>
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>src;..\thirdparties\win32\include;..\tinySAK\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>DEBUG_LEVEL=DEBUG_LEVEL_INFO;TNET_HAVE_OPENSSL_H=1;WIN32;_WIN32_WINNT=0x0501;_DEBUG;_WINDOWS;_USRDLL;TINYNET_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <MinimalRebuild>true</MinimalRebuild>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <PrecompiledHeader />
+      <WarningLevel>Level3</WarningLevel>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
+      <CompileAs>CompileAsC</CompileAs>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>ws2_32.lib;IPHLPAPI.lib;$(OutDir)tinySAK.lib;..\thirdparties\win32\lib\openssl\libeay32.lib;..\thirdparties\win32\lib\openssl\ssleay32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Windows</SubSystem>
+      <TargetMachine>MachineX86</TargetMachine>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <Optimization>MaxSpeed</Optimization>
+      <IntrinsicFunctions>false</IntrinsicFunctions>
+      <AdditionalIncludeDirectories>src;..\thirdparties\win32\include;..\tinySAK\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>TNET_HAVE_OPENSSL_H=1;WIN32;NDEBUG;_WINDOWS;_USRDLL;TINYNET_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <FunctionLevelLinking>false</FunctionLevelLinking>
+      <PrecompiledHeader />
+      <WarningLevel>Level3</WarningLevel>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <DebugInformationFormat />
+      <CompileAs>CompileAsC</CompileAs>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>ws2_32.lib;IPHLPAPI.lib;$(OutDir)tinySAK.lib;..\thirdparties\win32\lib\openssl\libeay32.lib;..\thirdparties\win32\lib\openssl\ssleay32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <IgnoreSpecificDefaultLibraries>MSVCRTD;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <SubSystem>Windows</SubSystem>
+      <OptimizeReferences>true</OptimizeReferences>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <TargetMachine>NotSet</TargetMachine>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="src\tnet.c" />
+    <ClCompile Include="src\tnet_auth.c" />
+    <ClCompile Include="src\tnet_endianness.c" />
+    <ClCompile Include="src\tnet_nat.c" />
+    <ClCompile Include="src\tnet_poll.c" />
+    <ClCompile Include="src\tnet_socket.c" />
+    <ClCompile Include="src\tnet_transport.c" />
+    <ClCompile Include="src\tnet_transport_cfsocket.c" />
+    <ClCompile Include="src\tnet_transport_poll.c" />
+    <ClCompile Include="src\tnet_transport_win32.c" />
+    <ClCompile Include="src\tnet_utils.c" />
+    <ClCompile Include="src\stun\tnet_stun.c" />
+    <ClCompile Include="src\stun\tnet_stun_attribute.c" />
+    <ClCompile Include="src\stun\tnet_stun_message.c" />
+    <ClCompile Include="src\turn\tnet_turn.c" />
+    <ClCompile Include="src\turn\tnet_turn_attribute.c" />
+    <ClCompile Include="src\turn\tnet_turn_message.c" />
+    <ClCompile Include="src\ice\tnet_ice_candidate.c" />
+    <ClCompile Include="src\ice\tnet_ice_ctx.c" />
+    <ClCompile Include="src\ice\tnet_ice_event.c" />
+    <ClCompile Include="src\ice\tnet_ice_pair.c" />
+    <ClCompile Include="src\ice\tnet_ice_utils.c" />
+    <ClCompile Include="src\dns\tnet_dns.c" />
+    <ClCompile Include="src\dns\tnet_dns_a.c" />
+    <ClCompile Include="src\dns\tnet_dns_aaaa.c" />
+    <ClCompile Include="src\dns\tnet_dns_cname.c" />
+    <ClCompile Include="src\dns\tnet_dns_message.c" />
+    <ClCompile Include="src\dns\tnet_dns_mx.c" />
+    <ClCompile Include="src\dns\tnet_dns_naptr.c" />
+    <ClCompile Include="src\dns\tnet_dns_ns.c" />
+    <ClCompile Include="src\dns\tnet_dns_opt.c" />
+    <ClCompile Include="src\dns\tnet_dns_ptr.c" />
+    <ClCompile Include="src\dns\tnet_dns_regexp.c" />
+    <ClCompile Include="src\dns\tnet_dns_resolvconf.c" />
+    <ClCompile Include="src\dns\tnet_dns_rr.c" />
+    <ClCompile Include="src\dns\tnet_dns_soa.c" />
+    <ClCompile Include="src\dns\tnet_dns_srv.c" />
+    <ClCompile Include="src\dns\tnet_dns_txt.c" />
+    <ClCompile Include="src\dhcp\tnet_dhcp.c" />
+    <ClCompile Include="src\dhcp\tnet_dhcp_message.c" />
+    <ClCompile Include="src\dhcp\tnet_dhcp_option.c" />
+    <ClCompile Include="src\dhcp\tnet_dhcp_option_sip.c" />
+    <ClCompile Include="src\dhcp6\tnet_dhcp6.c" />
+    <ClCompile Include="src\dhcp6\tnet_dhcp6_duid.c" />
+    <ClCompile Include="src\dhcp6\tnet_dhcp6_message.c" />
+    <ClCompile Include="src\dhcp6\tnet_dhcp6_option.c" />
+    <ClCompile Include="src\tls\tnet_tls.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\tinynet.h" />
+    <ClInclude Include="src\tinynet_config.h" />
+    <ClInclude Include="src\tnet.h" />
+    <ClInclude Include="src\tnet_auth.h" />
+    <ClInclude Include="src\tnet_endianness.h" />
+    <ClInclude Include="src\tnet_hardwares.h" />
+    <ClInclude Include="src\tnet_nat.h" />
+    <ClInclude Include="src\tnet_poll.h" />
+    <ClInclude Include="src\tnet_proto.h" />
+    <ClInclude Include="src\tnet_socket.h" />
+    <ClInclude Include="src\tnet_transport.h" />
+    <ClInclude Include="src\tnet_types.h" />
+    <ClInclude Include="src\tnet_utils.h" />
+    <ClInclude Include="src\stun\tnet_stun.h" />
+    <ClInclude Include="src\stun\tnet_stun_attribute.h" />
+    <ClInclude Include="src\stun\tnet_stun_message.h" />
+    <ClInclude Include="src\turn\tnet_turn.h" />
+    <ClInclude Include="src\turn\tnet_turn_attribute.h" />
+    <ClInclude Include="src\turn\tnet_turn_message.h" />
+    <ClInclude Include="src\ice\tnet_ice_candidate.h" />
+    <ClInclude Include="src\ice\tnet_ice_ctx.h" />
+    <ClInclude Include="src\ice\tnet_ice_event.h" />
+    <ClInclude Include="src\ice\tnet_ice_pair.h" />
+    <ClInclude Include="src\ice\tnet_ice_utils.h" />
+    <ClInclude Include="src\dns\tnet_dns.h" />
+    <ClInclude Include="src\dns\tnet_dns_a.h" />
+    <ClInclude Include="src\dns\tnet_dns_aaaa.h" />
+    <ClInclude Include="src\dns\tnet_dns_cname.h" />
+    <ClInclude Include="src\dns\tnet_dns_message.h" />
+    <ClInclude Include="src\dns\tnet_dns_mx.h" />
+    <ClInclude Include="src\dns\tnet_dns_naptr.h" />
+    <ClInclude Include="src\dns\tnet_dns_ns.h" />
+    <ClInclude Include="src\dns\tnet_dns_opt.h" />
+    <ClInclude Include="src\dns\tnet_dns_ptr.h" />
+    <ClInclude Include="src\dns\tnet_dns_regexp.h" />
+    <ClInclude Include="src\dns\tnet_dns_resolvconf.h" />
+    <ClInclude Include="src\dns\tnet_dns_rr.h" />
+    <ClInclude Include="src\dns\tnet_dns_soa.h" />
+    <ClInclude Include="src\dns\tnet_dns_srv.h" />
+    <ClInclude Include="src\dns\tnet_dns_txt.h" />
+    <ClInclude Include="src\dhcp\tnet_dhcp.h" />
+    <ClInclude Include="src\dhcp\tnet_dhcp_message.h" />
+    <ClInclude Include="src\dhcp\tnet_dhcp_option.h" />
+    <ClInclude Include="src\dhcp\tnet_dhcp_option_sip.h" />
+    <ClInclude Include="src\dhcp6\tnet_dhcp6.h" />
+    <ClInclude Include="src\dhcp6\tnet_dhcp6_duid.h" />
+    <ClInclude Include="src\dhcp6\tnet_dhcp6_message.h" />
+    <ClInclude Include="src\dhcp6\tnet_dhcp6_option.h" />
+    <ClInclude Include="src\tls\tnet_tls.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="ragel\tnet_dns_regexp.rl" />
+    <None Include="ragel\tnet_dns_resolvconf.rl" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\tinySAK\tinySAK.vcxproj">
+      <Project>{6bc9b796-10c6-4cf7-a6e4-e2daccda84da}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>
