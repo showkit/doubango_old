@@ -31,6 +31,14 @@
 #include "tsk_memory.h"
 #include "tsk_debug.h"
 
+typedef struct tdav_codec_g722_s
+{
+	TMEDIA_DECLARE_CODEC_AUDIO;
+
+	g722_encode_state_t *enc_state;
+	g722_decode_state_t *dec_state;
+}
+tdav_codec_g722_t;
 
 static int tdav_codec_g722_open(tmedia_codec_t* self)
 {
@@ -192,14 +200,14 @@ static const tmedia_codec_plugin_def_t tdav_codec_g722_plugin_def_s =
 	tmedia_audio,
 	tmedia_codec_id_g722,
 	"G722",
-	"g722 Codec",
+	"g722 Codec (native)",
 	TMEDIA_CODEC_FORMAT_G722,
 	tsk_false,
 	16000,
 	
 	{ /* audio */
 		1, // channels
-		20 // ptime
+		0 // ptime @deprecated
 	},
 
 	/* video */

@@ -41,7 +41,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="&quot;$(DOUBANGO_HOME)\thirdparties\win32\include&quot;;&quot;$(SolutionDir)\include&quot;;&quot;$(DOUBANGO_HOME)\tinySAK\src&quot;"
+				AdditionalIncludeDirectories="..\..\thirdparties\win32\include;&quot;$(SolutionDir)\include&quot;;..\..\tinySAK\src"
 				PreprocessorDefinitions="DEBUG_LEVEL=DEBUG_LEVEL_INFO;WIN32;_DEBUG;_CONSOLE"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -206,6 +206,10 @@
 			>
 			<File
 				RelativePath=".\test_parser.h"
+				>
+			</File>
+			<File
+				RelativePath=".\test_rfc5939.h"
 				>
 			</File>
 			<File

@@ -246,6 +246,7 @@ typedef struct tmedia_session_mgr_s
 
 	tsk_bool_t started;
 	tsk_bool_t ro_changed;
+	tsk_bool_t ro_provisional;
 	tsk_bool_t state_changed;
 	tsk_bool_t mediaType_changed;
 
@@ -263,9 +264,9 @@ typedef struct tmedia_session_mgr_s
 	/* NAT Traversal context */
 	tnet_nat_context_handle_t* natt_ctx;
 	struct {
+		struct tnet_ice_ctx_s *ctx_data;
 		struct tnet_ice_ctx_s *ctx_audio;
 		struct tnet_ice_ctx_s *ctx_video;
-        struct tnet_ice_ctx_s *ctx_data;
 	} ice;
 
 	/* session error callback */
@@ -335,12 +336,6 @@ tmedia_session_param_type_t;
 //#define TMEDIA_SESSION_VIDEO_GET_PVOID(KEY_STR, VALUE_PPTR)	TMEDIA_SESSION_GET_PVOID(tmedia_video, KEY_STR, VALUE_PPTR)
 //#define TMEDIA_SESSION_VIDEO_GET_STR(KEY_STR, VALUE_PSTR)	TMEDIA_SESSION_GET_STR(tmedia_video, KEY_STR, VALUE_PSTR)
 //#define TMEDIA_SESSION_VIDEO_GET_INT64(KEY_STR, VALUE_PINT64)	TMEDIA_SESSION_GET_INT64(tmedia_video, KEY_STR, VALUE_PINT64)
-/* Data Session */
-#define TMEDIA_SESSION_DATA_SET_INT32(KEY_STR, VALUE_INT32)	TMEDIA_SESSION_SET_INT32(tmedia_data, KEY_STR, VALUE_INT32)
-#define TMEDIA_SESSION_DATA_SET_POBJECT(KEY_STR, VALUE_PTR)	TMEDIA_SESSION_SET_POBJECT(tmedia_data, KEY_STR, VALUE_PTR)
-#define TMEDIA_SESSION_DATA_SET_STR(KEY_STR, VALUE_STR)	TMEDIA_SESSION_SET_STR(tmedia_data, KEY_STR, VALUE_STR)
-#define TMEDIA_SESSION_DATA_SET_INT64(KEY_STR, VALUE_INT64)	TMEDIA_SESSION_SET_INT64(tmedia_data, KEY_STR, VALUE_INT64)
-#define TMEDIA_SESSION_DATA_GET_INT32(KEY_STR, VALUE_PINT32)	TMEDIA_SESSION_GET_INT32(tmedia_data, KEY_STR, VALUE_PINT32)
 /* Msrp Session */
 #define TMEDIA_SESSION_MSRP_SET_INT32(KEY_STR, VALUE_INT32)	TMEDIA_SESSION_SET_INT32(tmedia_msrp, KEY_STR, VALUE_INT32)
 #define TMEDIA_SESSION_MSRP_SET_POBJECT(KEY_STR, VALUE_PTR)	TMEDIA_SESSION_SET_POBJECT(tmedia_msrp, KEY_STR, VALUE_PTR)
@@ -436,6 +431,7 @@ tmedia_session_param_type_t;
 
 TINYMEDIA_API tmedia_session_mgr_t* tmedia_session_mgr_create(tmedia_type_t type, const char* addr, tsk_bool_t ipv6, tsk_bool_t offerer);
 TINYMEDIA_API int tmedia_session_mgr_set_media_type(tmedia_session_mgr_t* self, tmedia_type_t type);
+TINYMEDIA_API int tmedia_session_mgr_set_codecs_supported(tmedia_session_mgr_t* self, tmedia_codec_id_t codecs_supported);
 TINYMEDIA_API tmedia_session_t* tmedia_session_mgr_find(tmedia_session_mgr_t* self, tmedia_type_t type);
 TINYMEDIA_API int tmedia_session_mgr_set_natt_ctx(tmedia_session_mgr_t* self, tnet_nat_context_handle_t* natt_ctx, const char* public_addr);
 TINYMEDIA_API int tmedia_session_mgr_set_ice_ctx(tmedia_session_mgr_t* self, struct tnet_ice_ctx_s* ctx_audio, struct tnet_ice_ctx_s* ctx_video, struct tnet_ice_ctx_s* ctx_data);
@@ -446,7 +442,7 @@ TINYMEDIA_API int tmedia_session_mgr_set_3(tmedia_session_mgr_t* self, const tme
 TINYMEDIA_API int tmedia_session_mgr_get(tmedia_session_mgr_t* self, ...);
 TINYMEDIA_API int tmedia_session_mgr_stop(tmedia_session_mgr_t* self);
 TINYMEDIA_API const tsdp_message_t* tmedia_session_mgr_get_lo(tmedia_session_mgr_t* self);
-TINYMEDIA_API int tmedia_session_mgr_set_ro(tmedia_session_mgr_t* self, const tsdp_message_t* sdp);
+TINYMEDIA_API int tmedia_session_mgr_set_ro(tmedia_session_mgr_t* self, const tsdp_message_t* sdp, tmedia_ro_type_t ro_type);
 TINYMEDIA_API const tsdp_message_t* tmedia_session_mgr_get_ro(tmedia_session_mgr_t* self);
 TINYMEDIA_API int tmedia_session_mgr_hold(tmedia_session_mgr_t* self, tmedia_type_t type);
 TINYMEDIA_API tsk_bool_t tmedia_session_mgr_is_held(tmedia_session_mgr_t* self, tmedia_type_t type, tsk_bool_t local);

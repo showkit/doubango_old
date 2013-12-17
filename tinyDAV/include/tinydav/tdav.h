@@ -41,11 +41,10 @@ TDAV_BEGIN_DECLS
 typedef enum tdav_codec_id_e
 {
 	tdav_codec_id_none = tmedia_codec_id_none,
-	
-	//tdav_codec_id_amr_nb_oa = tmedia_codec_id_amr_nb_oa,
-	//tdav_codec_id_amr_nb_be = tmedia_codec_id_amr_nb_be,
     tdav_codec_id_pcma_passthrough = tmedia_codec_id_pcma_passthrough,
     tdav_codec_id_pcmu_passthrough = tmedia_codec_id_pcmu_passthrough,
+	tdav_codec_id_amr_nb_oa = tmedia_codec_id_amr_nb_oa,
+	tdav_codec_id_amr_nb_be = tmedia_codec_id_amr_nb_be,
 	tdav_codec_id_amr_wb_oa = tmedia_codec_id_amr_wb_oa,
 	tdav_codec_id_amr_wb_be = tmedia_codec_id_amr_wb_be,
 	tdav_codec_id_gsm = tmedia_codec_id_gsm,
@@ -79,6 +78,7 @@ typedef enum tdav_codec_id_e
 	tdav_codec_id_vp8 = tmedia_codec_id_vp8,
     cms_codec_id_passthrough = tmedia_codec_id_passthrough,
     cms_codec_id_data = tmedia_codec_id_showkit_data,
+
 	/* room for new Video codecs */
 
 	tdav_codec_id_t140 = tmedia_codec_id_t140,
@@ -88,8 +88,9 @@ tdav_codec_id_t;
 
 TINYDAV_API int tdav_init();
 TINYDAV_API int tdav_codec_set_priority(tdav_codec_id_t codec_id, int priority);
-TINYDAV_API void tdav_set_codecs(tdav_codec_id_t codecs);
+TINYDAV_API int tdav_set_codecs(tdav_codec_id_t codecs);
 TINYDAV_API tsk_bool_t tdav_codec_is_supported(tdav_codec_id_t codec);
+TINYDAV_API tsk_bool_t tdav_codec_is_enabled(tdav_codec_id_t codec);
 TINYDAV_API int tdav_deinit();
 
 TDAV_END_DECLS

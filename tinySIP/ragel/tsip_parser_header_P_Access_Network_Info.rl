@@ -105,9 +105,13 @@ tsip_header_P_Access_Network_Info_t *tsip_header_P_Access_Network_Info_parse(con
 	const char *eof = pe;
 	tsip_header_P_Access_Network_Info_t *hdr_ani = tsip_header_P_Access_Network_Info_create_null();
 	
-	const char *tag_start;
+	const char *tag_start = tsk_null;
 
 	%%write data;
+	(void)(eof);
+	(void)(tsip_machine_parser_header_P_Access_Network_Info_first_final);
+	(void)(tsip_machine_parser_header_P_Access_Network_Info_error);
+	(void)(tsip_machine_parser_header_P_Access_Network_Info_en_main);
 	%%write init;
 	%%write exec;
 	

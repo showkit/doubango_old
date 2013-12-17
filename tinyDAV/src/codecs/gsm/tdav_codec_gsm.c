@@ -83,7 +83,7 @@ tsk_size_t tdav_codec_gsm_encode(tmedia_codec_t* self, const void* in_data, tsk_
 		return 0;
 	}
 
-	out_size = ((in_size / (TMEDIA_CODEC_PCM_FRAME_SIZE(self) * sizeof(short))) * TDAV_GSM_FRAME_SIZE);
+	out_size = ((in_size / (TMEDIA_CODEC_PCM_FRAME_SIZE_AUDIO_ENCODING(self) * sizeof(short))) * TDAV_GSM_FRAME_SIZE);
 
 	/* allocate new buffer if needed */
 	if(*out_max_size <out_size){
@@ -111,7 +111,7 @@ tsk_size_t tdav_codec_gsm_decode(tmedia_codec_t* self, const void* in_data, tsk_
 		return 0;
 	}
 	
-	out_size = (in_size / TDAV_GSM_FRAME_SIZE) * (TMEDIA_CODEC_PCM_FRAME_SIZE(self) * sizeof(short));
+	out_size = (in_size / TDAV_GSM_FRAME_SIZE) * (TMEDIA_CODEC_PCM_FRAME_SIZE_AUDIO_DECODING(self) * sizeof(short));
 
 	/* allocate new buffer if needed */
 	if(*out_max_size <out_size){
@@ -182,14 +182,14 @@ static const tmedia_codec_plugin_def_t tdav_codec_gsm_plugin_def_s =
 	tmedia_audio,
 	tmedia_codec_id_gsm,
 	"GSM",
-	"GSM Full Rate",
+	"GSM Full Rate (libgsm)",
 	TMEDIA_CODEC_FORMAT_GSM,
 	tsk_false,
 	8000, // rate
 	
 	{ /* audio */
 		1, // channels
-		20 // ptime
+		0 // ptime @deprecated
 	},
 
 	/* video */

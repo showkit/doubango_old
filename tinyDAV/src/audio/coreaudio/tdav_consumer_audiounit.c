@@ -35,7 +35,6 @@
 #define kNoDataError		-1
 #define kRingPacketCount	+10
 
-
 static tsk_size_t tdav_consumer_audiounit_get(tdav_consumer_audiounit_t* self, void* data, tsk_size_t size);
 
 static OSStatus __handle_output_buffer(void *inRefCon, 
@@ -71,24 +70,12 @@ done:
 static tsk_size_t tdav_consumer_audiounit_get(tdav_consumer_audiounit_t* self, void* data, tsk_size_t size)
 {
 	tsk_ssize_t retSize = 0;
-	int i ;
+	
 #if DISABLE_JITTER_BUFFER
-
-        retSize = speex_buffer_read(self->ring.buffer, data, size);
-        if(retSize < size){
-            
-            uint8_t* d = (uint8_t*)data;
-            float sval = (float)d[retSize-1] / 255.0 ;
-            int count = (size - retSize);
-            for ( i = 0 ; i < count ; ++i )
-            {
-                float v = (float)i / (float)count;
-                v = ((v)*(v)*(3.0-2.0 * (v)));
-                d[i+retSize] = 0xFF * ( sval * (1.f - v) ) ;
-            }
-            //memset(((uint8_t*)data)+retSize, 0, (size - retSize));
-        }
-
+	retSize = speex_buffer_read(self->ring.buffer, data, size);
+	if(retSize < size){
+		memset(((uint8_t*)data)+retSize, 0, (size - retSize));
+	}
 #else
 	self->ring.leftBytes += size;
 	while (self->ring.leftBytes >= self->ring.chunck.size) {
@@ -105,7 +92,6 @@ static tsk_size_t tdav_consumer_audiounit_get(tdav_consumer_audiounit_t* self, v
 	else{
 		memset(data, 0, size);
 	}
-//    }
 #endif
 
 	return retSize;
@@ -183,10 +169,17 @@ static int tdav_consumer_audiounit_prepare(tmedia_consumer_t* self, const tmedia
 		}
 		
 #endif
-		
-		TMEDIA_CONSUMER(consumer)->audio.ptime = codec->plugin->audio.ptime;
-		TMEDIA_CONSUMER(consumer)->audio.in.channels = codec->plugin->audio.channels;
-		TMEDIA_CONSUMER(consumer)->audio.in.rate = codec->plugin->rate;
+
+		TMEDIA_CONSUMER(consumer)->audio.ptime = TMEDIA_CODEC_PTIME_AUDIO_DECODING(codec);
+		TMEDIA_CONSUMER(consumer)->audio.in.channels = TMEDIA_CODEC_CHANNELS_AUDIO_DECODING(codec);
+		TMEDIA_CONSUMER(consumer)->audio.in.rate = TMEDIA_CODEC_RATE_DECODING(codec);
+        
+        TSK_DEBUG_INFO("AudioUnit consumer: in.channels=%d, out.channles=%d, in.rate=%d, out.rate=%d, ptime=%d",
+                       TMEDIA_CONSUMER(consumer)->audio.in.channels,
+                       TMEDIA_CONSUMER(consumer)->audio.out.channels,
+                       TMEDIA_CONSUMER(consumer)->audio.in.rate,
+                       TMEDIA_CONSUMER(consumer)->audio.out.rate,
+                       TMEDIA_CONSUMER(consumer)->audio.ptime);
 		
 		audioFormat.mSampleRate = TMEDIA_CONSUMER(consumer)->audio.out.rate ? TMEDIA_CONSUMER(consumer)->audio.out.rate : TMEDIA_CONSUMER(consumer)->audio.in.rate;
 		audioFormat.mFormatID = kAudioFormatLinearPCM;
@@ -233,8 +226,7 @@ static int tdav_consumer_audiounit_prepare(tmedia_consumer_t* self, const tmedia
 	}
 	
 	// allocate the chunck buffer and create the ring
-	int packetperbuffer = (1000 / TMEDIA_CONSUMER(consumer)->audio.ptime);
-	consumer->ring.chunck.size = audioFormat.mSampleRate * audioFormat.mBytesPerFrame / packetperbuffer;
+	consumer->ring.chunck.size = (TMEDIA_CONSUMER(consumer)->audio.ptime * audioFormat.mSampleRate * audioFormat.mBytesPerFrame) / 1000;
 	consumer->ring.size = kRingPacketCount * consumer->ring.chunck.size;
 	if(!(consumer->ring.chunck.buffer = tsk_realloc(consumer->ring.chunck.buffer, consumer->ring.chunck.size))){
 		TSK_DEBUG_ERROR("Failed to allocate new buffer");
@@ -307,11 +299,11 @@ static int tdav_consumer_audiounit_consume(tmedia_consumer_t* self, const void* 
 {	
 	tdav_consumer_audiounit_t* consumer = (tdav_consumer_audiounit_t*)self;
 	if(!consumer || !buffer || !size){
-//		TSK_DEBUG_ERROR("Invalid parameter");
+		TSK_DEBUG_ERROR("Invalid parameter");
 		return -1;
 	}
 #if DISABLE_JITTER_BUFFER
-
+	{
 		if(consumer->ring.buffer){
 			tsk_mutex_lock(consumer->ring.mutex);
 			speex_buffer_write(consumer->ring.buffer, (void*)buffer, size);
@@ -319,11 +311,11 @@ static int tdav_consumer_audiounit_consume(tmedia_consumer_t* self, const void* 
 			return 0;
 		}
 		return -2;
-
+	}
 #else
-
+	{
 		return tdav_consumer_audio_put(TDAV_CONSUMER_AUDIO(consumer), buffer, size, proto_hdr);
-
+	}
 #endif
 }
 

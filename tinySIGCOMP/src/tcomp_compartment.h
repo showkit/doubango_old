@@ -55,8 +55,8 @@ typedef struct tcomp_compartment_s
 	tcomp_states_L_t *local_states;
 	tcomp_params_t *remote_parameters;
 	tcomp_params_t *local_parameters;
-	uint16_t total_memory_size;
-	uint16_t total_memory_left;
+	uint32_t total_memory_size;
+	uint32_t total_memory_left;
 
 	tcomp_buffer_handle_t *lpReqFeedback;
 	tcomp_buffer_handle_t *lpRetFeedback;
@@ -66,11 +66,14 @@ typedef struct tcomp_compartment_s
 	tcomp_buffers_L_t* nacks;
 	uint8_t nacks_history_count;
 
+	tsk_bool_t useOnlyACKedStates;
+
 	TSK_DECLARE_SAFEOBJ;
 }
 tcomp_compartment_t;
 
-tcomp_compartment_t* tcomp_compartment_create(uint64_t id, uint16_t sigCompParameters);
+tcomp_compartment_t* tcomp_compartment_create(uint64_t id, uint32_t sigCompParameters, tsk_bool_t useOnlyACKedStates);
+int tcomp_compartment_setUseOnlyACKedStates(tcomp_compartment_t* self, tsk_bool_t useOnlyACKedStates);
 
 //
 //	SigComp Parameters
@@ -84,10 +87,9 @@ void tcomp_compartment_setRetFeedback(tcomp_compartment_t *compartment, tcomp_bu
 
 void tcomp_compartment_clearStates(tcomp_compartment_t *compartment);
 void tcomp_compartment_freeStateByPriority(tcomp_compartment_t *compartment);
-void tcomp_compartment_freeState(tcomp_compartment_t *compartment, tcomp_state_t **lpState);
 void tcomp_compartment_freeStates(tcomp_compartment_t *compartment, tcomp_tempstate_to_free_t **tempStates, uint8_t size);
 void tcomp_compartment_addState(tcomp_compartment_t *compartment, tcomp_state_t **lpState);
-uint16_t tcomp_compartment_findState(tcomp_compartment_t *compartment, const tcomp_buffer_handle_t *partial_identifier, tcomp_state_t **lpState);
+uint32_t tcomp_compartment_findState(tcomp_compartment_t *compartment, const tcomp_buffer_handle_t *partial_identifier, tcomp_state_t **lpState);
 void tcomp_compartment_freeGhostState(tcomp_compartment_t *compartment);
 
 

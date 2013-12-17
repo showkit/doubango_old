@@ -121,10 +121,14 @@ tsip_header_Warnings_L_t *tsip_header_Warning_parse(const char *data, tsk_size_t
 	const char *eof = pe;
 	tsip_header_Warnings_L_t *hdr_warnings = tsk_list_create();
 	
-	const char *tag_start;
+	const char *tag_start = tsk_null;
 	tsip_header_Warning_t *curr_warning = 0;
 
 	%%write data;
+	(void)(eof);
+	(void)(tsip_machine_parser_header_Warning_first_final);
+	(void)(tsip_machine_parser_header_Warning_error);
+	(void)(tsip_machine_parser_header_Warning_en_main);
 	%%write init;
 	%%write exec;
 	

@@ -49,7 +49,12 @@
 #include "tsk_memory.h"
 #include "tsk_debug.h"
 
-#define TDAV_SESSION_VIDEO_AVPF_FIR_INTERVAL_MIN	800 // millis
+// Minimum time between two incoming FIR. If smaller, the request from the remote party will be ignored
+// Tell the encoder to send IDR frame if condition is met
+#define TDAV_SESSION_VIDEO_AVPF_FIR_HONOR_INTERVAL_MIN	1500 // millis
+// Minimum time between two outgoing FIR. If smaller, the request from the remote party will be ignored
+// Tell the RTCP session to request IDR if condition is met
+#define TDAV_SESSION_VIDEO_AVPF_FIR_REQUEST_INTERVAL_MIN	3000 // millis
 
 #define TDAV_SESSION_VIDEO_PKT_LOSS_PROB_BAD	2
 #define TDAV_SESSION_VIDEO_PKT_LOSS_PROB_GOOD	6
@@ -59,11 +64,14 @@
 #define TDAV_SESSION_VIDEO_PKT_LOSS_MEDIUM		22
 #define TDAV_SESSION_VIDEO_PKT_LOSS_HIGH		63
 
+// The maximum number of pakcet loss allowed
+#define TDAV_SESSION_VIDEO_PKT_LOSS_MAX_COUNT_TO_REQUEST_FIR	50
+
 static const tmedia_codec_action_t __action_encode_idr = tmedia_codec_action_encode_idr;
 static const tmedia_codec_action_t __action_encode_bw_up = tmedia_codec_action_bw_up;
 static const tmedia_codec_action_t __action_encode_bw_down = tmedia_codec_action_bw_down;
 
-// FIXME: lock
+// FIXME: lock ?
 #define _tdav_session_video_codec_set(__self, key, value) \
 	{ \
 		static tmedia_param_t* __param = tsk_null; \
@@ -77,7 +85,12 @@ static const tmedia_codec_action_t __action_encode_bw_down = tmedia_codec_action
 		} \
 		if((__self)->encoder.codec && __param){ \
 			/*tsk_mutex_lock((__self)->encoder.h_mutex);*/ \
-			tmedia_codec_set((tmedia_codec_t*)(__self)->encoder.codec, __param); \
+			if(TDAV_SESSION_AV(__self)->producer && TDAV_SESSION_AV(__self)->producer->encoder.codec_id == (__self)->encoder.codec->id) { /* Whether the producer ourput encoded frames */ \
+				tmedia_producer_set(TDAV_SESSION_AV(__self)->producer, __param); \
+			} \
+			else { \
+				tmedia_codec_set((tmedia_codec_t*)(__self)->encoder.codec, __param); \
+			} \
 			/*tsk_mutex_unlock((__self)->encoder.h_mutex);*/ \
 		} \
 		/* TSK_OBJECT_SAFE_FREE(param); */ \
@@ -85,11 +98,11 @@ static const tmedia_codec_action_t __action_encode_bw_down = tmedia_codec_action
 
 #define _tdav_session_video_remote_requested_idr(__self, __ssrc_media) { \
 	uint64_t __now = tsk_time_now(); \
-	if((__now - (__self)->avpf.last_fir_time) > TDAV_SESSION_VIDEO_AVPF_FIR_INTERVAL_MIN){ /* guard to avoid sending too many FIR */ \
+	if((__now - (__self)->avpf.last_fir_time) > TDAV_SESSION_VIDEO_AVPF_FIR_HONOR_INTERVAL_MIN){ /* guard to avoid sending too many FIR */ \
 		_tdav_session_video_codec_set((__self), "action", __action_encode_idr); \
-		if((__self)->cb_rtcpevent.func){ \
-			(__self)->cb_rtcpevent.func((__self)->cb_rtcpevent.context, tmedia_rtcp_event_type_fir, (__ssrc_media)); \
-		} \
+	} \
+	if((__self)->cb_rtcpevent.func){ \
+		(__self)->cb_rtcpevent.func((__self)->cb_rtcpevent.context, tmedia_rtcp_event_type_fir, (__ssrc_media)); \
 	} \
 	(__self)->avpf.last_fir_time = __now; \
 }
@@ -120,26 +133,82 @@ static int tdav_session_video_raw_cb(const tmedia_video_encode_result_xt* result
 	
 	if(base->rtp_manager && base->rtp_manager->is_started){
 		if(rtp_header){
-			rtp_header->ssrc = base->rtp_manager->rtp.ssrc; // uses negotiated SSRC (SDP)
+			// uses negotiated SSRC (SDP)
+			rtp_header->ssrc = base->rtp_manager->rtp.ssrc.local;
+			// uses negotiated payload type
+			if(base->pt_map.local != base->rtp_manager->rtp.payload_type || base->pt_map.remote != rtp_header->payload_type || base->pt_map.neg == -1){
+				if(rtp_header->codec_id == tmedia_codec_id_none){
+					TSK_DEBUG_WARN("Internal codec id is equal to none");
+				}
+				else{
+					const tsk_list_item_t* item;
+					tsk_bool_t found = tsk_false;
+					tsk_list_lock(TMEDIA_SESSION(base)->neg_codecs);
+					tsk_list_foreach(item, TMEDIA_SESSION(base)->neg_codecs){
+						if((item->data) && ((const tmedia_codec_t*)item->data)->id == rtp_header->codec_id){
+							base->pt_map.local = base->rtp_manager->rtp.payload_type;
+							base->pt_map.remote = rtp_header->payload_type;
+							base->pt_map.neg = atoi(((const tmedia_codec_t*)item->data)->neg_format);
+							found = tsk_true;
+							break;
+						}
+					}
+					tsk_list_unlock(TMEDIA_SESSION(base)->neg_codecs);
+					if(found){
+						TSK_DEBUG_INFO("Codec PT mapping: local=%d, remote=%d, neg=%d", base->pt_map.local, base->pt_map.remote, base->pt_map.neg);
+					}
+					else{
+						TSK_DEBUG_ERROR("Failed to map codec PT: local=%d, remote=%d", base->rtp_manager->rtp.payload_type, rtp_header->payload_type);
+					}
+				}
+			}
+			rtp_header->payload_type = base->pt_map.neg;
 		}
 		packet = rtp_header 
 			? trtp_rtp_packet_create_2(rtp_header)
-			: trtp_rtp_packet_create(base->rtp_manager->rtp.ssrc, base->rtp_manager->rtp.seq_num, base->rtp_manager->rtp.timestamp, base->rtp_manager->rtp.payload_type, result->last_chunck);
-
+			: trtp_rtp_packet_create(base->rtp_manager->rtp.ssrc.local, base->rtp_manager->rtp.seq_num, base->rtp_manager->rtp.timestamp, base->rtp_manager->rtp.payload_type, result->last_chunck);
+		
 		if(packet ){
 			tsk_size_t rtp_hdr_size;
 			if(result->last_chunck){
+#if 1
+#if 1
+				/*	http://www.cs.columbia.edu/~hgs/rtp/faq.html#timestamp-computed
+					For video, time clock rate is fixed at 90 kHz. The timestamps generated depend on whether the application can determine the frame number or not. 
+					If it can or it can be sure that it is transmitting every frame with a fixed frame rate, the timestamp is governed by the nominal frame rate. Thus, for a 30 f/s video, timestamps would increase by 3,000 for each frame, for a 25 f/s video by 3,600 for each frame. 
+					If a frame is transmitted as several RTP packets, these packets would all bear the same timestamp. 
+					If the frame number cannot be determined or if frames are sampled aperiodically, as is typically the case for software codecs, the timestamp has to be computed from the system clock (e.g., gettimeofday())
+				*/
+
+				if(!video->encoder.last_frame_time){
+					// For the first frame it's not possible to compute the duration as there is no previous one.
+					// In this case, we trust the duration from the result (computed based on the codec fps and rate).
+					video->encoder.last_frame_time = tsk_time_now();
+					base->rtp_manager->rtp.timestamp += result->duration;
+				}
+				else{
+					uint64_t now = tsk_time_now();
+					uint32_t duration = (uint32_t)(now - video->encoder.last_frame_time);
+					base->rtp_manager->rtp.timestamp += (duration * 90/* 90KHz */);
+					video->encoder.last_frame_time = now;
+				}
+#else
+				base->rtp_manager->rtp.timestamp = (uint32_t)(tsk_gettimeofday_ms() * 90/* 90KHz */);
+#endif
+#else
 				base->rtp_manager->rtp.timestamp += result->duration;
+#endif
+			
 			}
 
 			packet->payload.data_const = result->buffer.ptr;
 			packet->payload.size = result->buffer.size;
 			s = trtp_manager_send_rtp_packet(base->rtp_manager, packet, tsk_false); // encrypt and send data
+			++base->rtp_manager->rtp.seq_num; // seq_num must be incremented here (before the bail) because already used by SRTP context
 			if(s < TRTP_RTP_HEADER_MIN_SIZE) { 
-				TSK_DEBUG_ERROR("Failed to send packet. %u expected but only %u sent", packet->payload.size, s); 
-				goto bail; 
+				TSK_DEBUG_ERROR("Failed to send packet with seqnum=%u. %u expected but only %u sent", packet->header->seq_num, packet->payload.size, s);
+				goto bail;
 			}
-			++base->rtp_manager->rtp.seq_num;
 			rtp_hdr_size = TRTP_RTP_HEADER_MIN_SIZE + (packet->header->csrc_count << 2);
 			// Save packet
 			// FIXME: only if AVPF is enabled
@@ -162,7 +231,13 @@ static int tdav_session_video_raw_cb(const tmedia_video_encode_result_xt* result
 					++video->avpf.count;
 				}
 
-				tsk_list_push_ascending_data(video->avpf.packets, (void**)&packet_avpf); // filtered per seqnum
+				// The packet must not added 'ascending' but 'back' because the sequence number coult wrap
+				// For example:
+				//	- send(65533, 65534, 65535, 0, 1)
+				//  - will be stored as (if added 'ascending'): 0, 1, 65533, 65534, 65535
+				//  - this means there is no benefit (if added 'ascending') as we cannot make 'smart search' using seqnums
+				// tsk_list_push_ascending_data(video->avpf.packets, (void**)&packet_avpf); // filtered per seqnum
+				tsk_list_push_back_data(video->avpf.packets, (void**)&packet_avpf);
 				tsk_list_unlock(video->avpf.packets);
 			}
 
@@ -174,7 +249,7 @@ static int tdav_session_video_raw_cb(const tmedia_video_encode_result_xt* result
 				ret = tdav_codec_ulpfec_enc_protect((struct tdav_codec_ulpfec_s*)base->ulpfec.codec, packet);
 				if(result->last_chunck){
 					trtp_rtp_packet_t* packet_fec;
-					if((packet_fec = trtp_rtp_packet_create(base->rtp_manager->rtp.ssrc, base->ulpfec.seq_num++, base->ulpfec.timestamp, base->ulpfec.payload_type, tsk_true))){
+					if((packet_fec = trtp_rtp_packet_create(base->rtp_manager->rtp.ssrc.local, base->ulpfec.seq_num++, base->ulpfec.timestamp, base->ulpfec.payload_type, tsk_true))){
 						// serialize the FEC payload packet packet
 						s = tdav_codec_ulpfec_enc_serialize((const struct tdav_codec_ulpfec_s*)base->ulpfec.codec, &video->encoder.buffer, &video->encoder.buffer_size);
 						if(s > 0){
@@ -224,8 +299,20 @@ bail:
 static int tdav_session_video_decode_cb(const tmedia_video_decode_result_xt* result)
 {
 	tdav_session_av_t* base = (tdav_session_av_t*)result->usr_data;
+	tdav_session_video_t* video = (tdav_session_video_t*)base;
 
 	switch(result->type){
+		case tmedia_video_decode_result_type_idr:
+			{
+				if(video->decoder.last_corrupted_timestamp != ((const trtp_rtp_header_t*)result->proto_hdr)->timestamp){
+					TSK_DEBUG_INFO("IDR frame decoded");
+					video->decoder.stream_corrupted = tsk_false;
+				}
+				else{
+					TSK_DEBUG_INFO("IDR frame decoded but corrupted :(");
+				}
+				break;
+			}
 		case tmedia_video_decode_result_type_error:
 			{
 				TSK_DEBUG_INFO("Decoding failed -> send Full Intra Refresh (FIR)");
@@ -250,28 +337,27 @@ static int tdav_session_video_producer_enc_cb(const void* callback_data, const v
 		return 0;
 	}
 
+	// do nothing if session is held
+	// when the session is held the end user will get feedback he also has possibilities to put the consumer and producer on pause
 	if(TMEDIA_SESSION(base)->lo_held){
 		return 0;
 	}
-    
-    //todo: this part is added by @mattvv attempting to fix blank audio between seesions
-    //if there is no codec associated, try and negociate codec again.
-    //this is from doubango r836
-    
-    if(!video->encoder.codec){
-        const tmedia_codec_t* codec;
-        tsk_safeobj_lock(base);
-        if(!(codec = tdav_session_av_get_best_neg_codec(base))){
-            TSK_DEBUG_ERROR("No codec matched: added r836");
-            tsk_safeobj_unlock(base);
-            return -2;
-        }
-        video->encoder.codec = tsk_object_ref(TSK_OBJECT(codec));
-        tsk_safeobj_unlock(base);
-    }
-    //end added part
 
-	if(base->rtp_manager && video->encoder.codec){
+	// get best negotiated codec if not already done
+	// the encoder codec could be null when session is renegotiated without re-starting (e.g. hold/resume)
+	if(!video->encoder.codec){
+		const tmedia_codec_t* codec;
+		tsk_safeobj_lock(base);
+		if(!(codec = tdav_session_av_get_best_neg_codec(base))){
+			TSK_DEBUG_ERROR("No codec matched");
+			tsk_safeobj_unlock(base);
+			return -2;
+		}
+		video->encoder.codec = tsk_object_ref(TSK_OBJECT(codec));
+		tsk_safeobj_unlock(base);
+	}
+
+	if(base->rtp_manager){
 		//static int __rotation_counter = 0;
 		/* encode */
 		tsk_size_t out_size = 0;
@@ -280,17 +366,16 @@ static int tdav_session_video_producer_enc_cb(const void* callback_data, const v
 			TSK_DEBUG_ERROR("Not started");
 			return 0;
 		}
-		
-		//base->producer->video.rotation = ((__rotation_counter++ % 150) < 75) ? 90 : 0;
 	
-#define PRODUCER_SIZE_CHANGED (video->conv.producerWidth != base->producer->video.width) || (video->conv.producerHeight != base->producer->video.height) \
-|| (video->conv.xProducerSize != size)
+#define PRODUCER_OUTPUT_RAW (base->producer->encoder.codec_id == tmedia_codec_id_none) // Otherwise, frames from the producer are already encoded
+#define PRODUCER_SIZE_CHANGED (video->conv.producerWidth && video->conv.producerWidth != base->producer->video.width) || (video->conv.producerHeight && video->conv.producerHeight != base->producer->video.height) \
+|| (video->conv.xProducerSize && video->conv.xProducerSize != size)
 #define ENCODED_NEED_FLIP TMEDIA_CODEC_VIDEO(video->encoder.codec)->out.flip
+#define ENCODED_NEED_RESIZE (base->producer->video.width != TMEDIA_CODEC_VIDEO(video->encoder.codec)->out.width || base->producer->video.height != TMEDIA_CODEC_VIDEO(video->encoder.codec)->out.height)
 #define PRODUCED_FRAME_NEED_ROTATION (base->producer->video.rotation != 0)
 #define PRODUCED_FRAME_NEED_CHROMA_CONVERSION (base->producer->video.chroma != TMEDIA_CODEC_VIDEO(video->encoder.codec)->out.chroma)
 		// Video codecs only accept YUV420P buffers ==> do conversion if needed or producer doesn't have the right size
-#if 0
-		if(PRODUCED_FRAME_NEED_CHROMA_CONVERSION || PRODUCER_SIZE_CHANGED || ENCODED_NEED_FLIP || PRODUCED_FRAME_NEED_ROTATION){
+		if(PRODUCER_OUTPUT_RAW && (PRODUCED_FRAME_NEED_CHROMA_CONVERSION || PRODUCER_SIZE_CHANGED || ENCODED_NEED_FLIP || ENCODED_NEED_RESIZE ||PRODUCED_FRAME_NEED_ROTATION)){
 			// Create video converter if not already done or producer size have changed
 			if(!video->conv.toYUV420 || PRODUCER_SIZE_CHANGED){
 				TSK_OBJECT_SAFE_FREE(video->conv.toYUV420);
@@ -346,16 +431,19 @@ static int tdav_session_video_producer_enc_cb(const void* callback_data, const v
 
 		// Encode data
 		tsk_mutex_lock(video->encoder.h_mutex);
-		if(video->encoder.conv_buffer && yuv420p_size){
-			/* producer doesn't support yuv42p */
-			out_size = video->encoder.codec->plugin->encode(video->encoder.codec, video->encoder.conv_buffer, yuv420p_size, &video->encoder.buffer, &video->encoder.buffer_size);
-		}
-		else{
-			/* producer supports yuv42p */
-			out_size = video->encoder.codec->plugin->encode(video->encoder.codec, buffer, size,  &video->encoder.buffer, &video->encoder.buffer_size);
+		if(video->encoder.codec){ // codec is destroyed by stop() which use same mutex
+			if(video->encoder.conv_buffer && yuv420p_size){
+				/* producer doesn't support yuv42p */
+				out_size = video->encoder.codec->plugin->encode(video->encoder.codec, video->encoder.conv_buffer, yuv420p_size, &video->encoder.buffer, &video->encoder.buffer_size);
+			}
+			else{
+				/* producer supports yuv42p */
+				out_size = video->encoder.codec->plugin->encode(video->encoder.codec, buffer, size,  &video->encoder.buffer, &video->encoder.buffer_size);
+			}
 		}
 		tsk_mutex_unlock(video->encoder.h_mutex);
-#endif
+
+
 		if(out_size){
 			/* Never called, see tdav_session_video_raw_cb() */
 			trtp_manager_send_rtp(base->rtp_manager, video->encoder.buffer, out_size, 6006, tsk_true, tsk_true);
@@ -429,11 +517,9 @@ static int tdav_session_video_rtcp_cb(const void* callback_data, const trtp_rtcp
 		const trtp_rtcp_rblock_t* block;
 		tsk_list_foreach(item, blocks){
 			if(!(block = item->data)) continue;
-			if(base->rtp_manager->rtp.ssrc == block->ssrc){
+			if(base->rtp_manager->rtp.ssrc.local == block->ssrc){
 				tdav_session_video_pkt_loss_level_t pkt_loss_level = tdav_session_video_pkt_loss_level_low;
-                base->rtp_manager->rtp.pct_loss = block->fraction ;
-                //printf("got block: %u fraction: %u\n", block->ssrc, block->fraction);
-                if(block->fraction > TDAV_SESSION_VIDEO_PKT_LOSS_HIGH)  pkt_loss_level = tdav_session_video_pkt_loss_level_high;
+				if(block->fraction > TDAV_SESSION_VIDEO_PKT_LOSS_HIGH)  pkt_loss_level = tdav_session_video_pkt_loss_level_high;
 				else if(block->fraction > TDAV_SESSION_VIDEO_PKT_LOSS_MEDIUM)  pkt_loss_level = tdav_session_video_pkt_loss_level_medium;
 				if(pkt_loss_level == tdav_session_video_pkt_loss_level_high || (pkt_loss_level > video->encoder.pkt_loss_level)){ // high or low -> medium
 					video->encoder.pkt_loss_level = pkt_loss_level;
@@ -468,16 +554,30 @@ static int tdav_session_video_rtcp_cb(const void* callback_data, const trtp_rtcp
 		switch(psfb->fci_type){
 			case trtp_rtcp_psfb_fci_type_fir:
 				{
+					TSK_DEBUG_INFO("Receiving RTCP-FIR (%u)", ((const trtp_rtcp_report_fb_t*)psfb)->ssrc_media);
 					_tdav_session_video_remote_requested_idr(video, ((const trtp_rtcp_report_fb_t*)psfb)->ssrc_media);
 					break;
 				}
 			case trtp_rtcp_psfb_fci_type_pli:
 				{
-					uint64_t now = tsk_time_now();
-					if((now - video->avpf.last_pli_time) < 500){ // more than one PLI in 500ms
+					uint64_t now;
+					TSK_DEBUG_INFO("Receiving RTCP-PLI (%u)", ((const trtp_rtcp_report_fb_t*)psfb)->ssrc_media);
+					now = tsk_time_now();
+					// more than one PLI in 500ms ?
+					// "if" removed because PLI really means codec prediction chain is broken
+					/*if((now - video->avpf.last_pli_time) < 500)*/{
 						_tdav_session_video_remote_requested_idr(video, ((const trtp_rtcp_report_fb_t*)psfb)->ssrc_media);
 					}
 					video->avpf.last_pli_time = now;
+					break;
+				}
+			case trtp_rtcp_psfb_fci_type_afb:
+				{
+					if(psfb->afb.type == trtp_rtcp_psfb_afb_type_remb){
+						uint32_t bandwidth = ((psfb->afb.remb.mantissa << psfb->afb.remb.exp) / 1024);
+						TSK_DEBUG_INFO("Receiving RTCP-AFB-REMB (%u), exp=%u, mantissa=%u, bandwidth = %ukbps", ((const trtp_rtcp_report_fb_t*)psfb)->ssrc_media, psfb->afb.remb.exp, psfb->afb.remb.mantissa, bandwidth);
+						// for now we just don't respect the requested bandwidth
+					}
 					break;
 				}
 			default: break;
@@ -496,21 +596,29 @@ static int tdav_session_video_rtcp_cb(const void* callback_data, const trtp_rtcp
 						const tsk_list_item_t* item;
 						const trtp_rtp_packet_t* pkt_rtp;
 						for(i = 0; i < rtpfb->nack.count; ++i){
-							static const int32_t __Pow2[16] = { 0x8000, 0x4000, 0x2000, 0x1000, 0x800, 0x400, 0x200, 0x100, 0x80, 0x40, 0x20, 0x10, 0x8, 0x4, 0x2, 0x1 };
+							static const int32_t __Pow2[16] = { 0x1, 0x2, 0x4, 0x8, 0x10, 0x20, 0x40, 0x80, 0x100, 0x200, 0x400, 0x800, 0x1000, 0x2000, 0x4000, 0x8000 };
 							int32_t blp_count;
 							blp = rtpfb->nack.blp[i];
 							blp_count = blp ? 16 : 0;
 							
-							for(j = -1; j < blp_count; ++j){
+							for(j = -1/*Packet ID (PID)*/; j < blp_count; ++j){
 								if(j == -1 || (blp & __Pow2[j])){
 									pid = (rtpfb->nack.pid[i] + (j + 1));
 									tsk_list_lock(video->avpf.packets);
 									tsk_list_foreach(item, video->avpf.packets){
 										if(!(pkt_rtp = item->data)){
 											continue;
-										}										
-
-										if(pkt_rtp->header->seq_num > pid){
+										}
+										
+										// Very Important: the seq_nums are not consecutive because of wrapping. 
+										// For example, '65533, 65534, 65535, 0, 1' is a valid sequences which means we have to check all packets (probaly need somthing smarter)
+										if(pkt_rtp->header->seq_num == pid){
+											TSK_DEBUG_INFO("NACK Found, pid=%d, blp=%u", pid, blp);
+											trtp_manager_send_rtp_packet(base->rtp_manager, pkt_rtp, tsk_true);
+											break;
+										}
+										if(item == video->avpf.packets->tail){
+											// should never be called unless the tail is too small
 											int32_t old_max = video->avpf.max;
 											int32_t len_drop = (pkt_rtp->header->seq_num - pid);
 											video->avpf.max = TSK_CLAMP((int32_t)tmedia_defaults_get_avpf_tail_min(), (old_max + len_drop), (int32_t)tmedia_defaults_get_avpf_tail_max());
@@ -520,32 +628,21 @@ static int tdav_session_video_rtcp_cb(const void* callback_data, const trtp_rtcp
 												pid, 
 												video->avpf.max,
 												video->avpf.count);
-											// FIR not really requested but needed
-											/*_tdav_session_video_remote_requested_idr(video, ((const trtp_rtcp_report_fb_t*)rtpfb)->ssrc_media);
-											tsk_list_clear_items(video->avpf.packets);
-											video->avpf.count = 0;*/
-											goto done;
-										}
-										if(pkt_rtp->header->seq_num == pid){
-											TSK_DEBUG_INFO("NACK Found=%d", pid);
-											trtp_manager_send_rtp_packet(base->rtp_manager, pkt_rtp, tsk_true);
-											break;
-										}
-										if(item == video->avpf.packets->tail){
-											// must never be called
-											TSK_DEBUG_INFO("**NACK Not Found=%d", pid);
-										}
-									}
-done:
+												// FIR not really requested but needed
+												/*_tdav_session_video_remote_requested_idr(video, ((const trtp_rtcp_report_fb_t*)rtpfb)->ssrc_media);
+												tsk_list_clear_items(video->avpf.packets);
+												video->avpf.count = 0;*/
+										} // if(last_item)
+									}// foreach(pkt)
 									tsk_list_unlock(video->avpf.packets);
-								}
-							}
-						}
-					}
+								}// if(BLP is set)
+							}// foreach(BIT in BLP)
+						}// foreach(nack)
+					}// if(nack-blp and nack-pid are set)
 					break;
-				}
-		}
-	}
+				}// case
+		}// switch
+	}// while(rtcp-pkt)
 
 	return 0;
 }
@@ -568,13 +665,31 @@ static int _tdav_session_video_jb_cb(const tdav_video_jb_cb_data_xt* data)
 			}
 		case tdav_video_jb_cb_data_type_fl:
 			{
-				tsk_size_t i, j, k;
-				uint16_t seq_nums[16];
-				for(i = 0; i < data->fl.count; i+=16){
-					for(j = 0, k = i; j < 16 && k < data->fl.count; ++j, ++k){
-						seq_nums[j] = (data->fl.seq_num + i + j);
+				if(data->fl.count > TDAV_SESSION_VIDEO_PKT_LOSS_MAX_COUNT_TO_REQUEST_FIR){
+					TSK_DEBUG_INFO("Packet loss too high (%u) -> Requesting FIR", data->fl.count);
+					trtp_manager_signal_frame_corrupted(base->rtp_manager, data->ssrc);
+				}
+				else{
+					tsk_size_t i, j, k;
+					uint16_t seq_nums[16];
+					for(i = 0; i < data->fl.count; i+=16){
+						for(j = 0, k = i; j < 16 && k < data->fl.count; ++j, ++k){
+							seq_nums[j] = (data->fl.seq_num + i + j);
+							TSK_DEBUG_INFO("Request re-send(%u)", seq_nums[j]);
+						}
+						trtp_manager_signal_pkt_loss(base->rtp_manager, data->ssrc, seq_nums, j);
 					}
-					trtp_manager_signal_pkt_loss(base->rtp_manager, data->ssrc, seq_nums, j);
+				}
+				break;
+			}
+		case tdav_video_jb_cb_data_type_fps_changed:
+			{
+				if(base->congestion_ctrl_enabled){
+					video->fps_changed = tsk_true;
+					if(video->decoder.codec){
+						TSK_DEBUG_INFO("Congestion control enabled and fps updated from %u to %u", data->fps.old, data->fps.new);
+						TMEDIA_CODEC_VIDEO(video->decoder.codec)->in.fps = data->fps.new;
+					}
 				}
 				break;
 			}
@@ -587,7 +702,7 @@ int _tdav_session_video_open_decoder(tdav_session_video_t* self, uint8_t payload
 {
 	int ret = 0;
 
-	if((self->decoder.payload_type != payload_type) || !self->decoder.codec){
+	if((self->decoder.codec_payload_type != payload_type) || !self->decoder.codec){
 		tsk_istr_t format;
 		TSK_OBJECT_SAFE_FREE(self->decoder.codec);
 		tsk_itoa(payload_type, &format);
@@ -596,7 +711,8 @@ int _tdav_session_video_open_decoder(tdav_session_video_t* self, uint8_t payload
 			ret = -2;
 			goto bail;
 		}
-		self->decoder.payload_type = payload_type;
+		self->decoder.codec_payload_type = payload_type;
+		self->decoder.codec_decoded_frames_count = 0; // because we switched the codecs
 	}
 	// Open codec if not already done
 	if(!TMEDIA_CODEC(self->decoder.codec)->opened){
@@ -604,6 +720,7 @@ int _tdav_session_video_open_decoder(tdav_session_video_t* self, uint8_t payload
 			TSK_DEBUG_ERROR("Failed to open [%s] codec", self->decoder.codec->plugin->desc);
 			goto bail;
 		}
+		self->decoder.codec_decoded_frames_count = 0; // because first time to use
 	}
 
 bail:
@@ -613,32 +730,63 @@ bail:
 static int _tdav_session_video_decode(tdav_session_video_t* self, const trtp_rtp_packet_t* packet)
 {
 	tdav_session_av_t* base = (tdav_session_av_t*)self;
-	static const trtp_rtp_header_t* rtp_header = tsk_null;
+	static const trtp_rtp_header_t* __rtp_header = tsk_null;
+	static const tmedia_codec_id_t __codecs_supporting_zero_artifacts = (tmedia_codec_id_vp8 | tmedia_codec_id_h264_bp | tmedia_codec_id_h264_mp | tmedia_codec_id_h263);
 	int ret = 0;
 
 	if(!self || !packet || !packet->header){
 		TSK_DEBUG_ERROR("Invalid parameter");
 		return -1;
 	}
-
+    __rtp_header = packet->header;
 	tsk_safeobj_lock(base);
 
 	if(base->consumer && base->consumer->is_started){
 		tsk_size_t out_size, _size;
 		const void* _buffer;
+		tdav_session_video_t* video = (tdav_session_video_t*)base;
 
-		if(TMEDIA_SESSION(self)->bypass_decoding){
-			ret = tmedia_consumer_consume(base->consumer, (packet->payload.data ? packet->payload.data : packet->payload.data_const), packet->payload.size, packet->header);
-			goto bail;
-		}
-				
 		// Find the codec to use to decode the RTP payload
-		if(!self->decoder.codec || self->decoder.payload_type != packet->header->payload_type){
+		if(!self->decoder.codec || self->decoder.codec_payload_type != packet->header->payload_type){
 			if((ret = _tdav_session_video_open_decoder(self, packet->header->payload_type))){
 				goto bail;
 			}
-		}		
+		}
+
+		// check whether bypassing is enabled (e.g. rtcweb breaker ON and media coder OFF)
+		if(TMEDIA_SESSION(self)->bypass_decoding){
+			// set codec id for internal use (useful to find codec with dynamic payload type)
+			TRTP_RTP_HEADER(packet->header)->codec_id = self->decoder.codec->id;
+			// consume the frame
+			ret = tmedia_consumer_consume(base->consumer, (packet->payload.data ? packet->payload.data : packet->payload.data_const), packet->payload.size, packet->header);
+			goto bail;
+		}
 		
+		// Check if stream is corrupted or not
+		if(video->decoder.last_seqnum && (video->decoder.last_seqnum + 1) != packet->header->seq_num){
+			TSK_DEBUG_INFO("/!\\Video stream corrupted because of packet loss [%u - %u]. Pause rendering if 'zero_artifacts' (supported = %s, enabled = %s).", 
+				video->decoder.last_seqnum, 
+				packet->header->seq_num,
+				(__codecs_supporting_zero_artifacts & self->decoder.codec->id) ? "yes" : "no",
+				self->zero_artifacts ? "yes" : "no"
+				);
+            // TH - send fir request, they'll get metered elsewhere
+			//if(!video->decoder.stream_corrupted){ // do not do the job twice
+				if(self->zero_artifacts && (__codecs_supporting_zero_artifacts & self->decoder.codec->id)){
+					// request IDR now and every time after 'TDAV_SESSION_VIDEO_AVPF_FIR_REQUEST_INTERVAL_MIN' ellapsed
+					// 'zero-artifacts' not enabled then, we'll request IDR when decoding fails
+					TSK_DEBUG_INFO("Sending FIR to request IDR...");
+				}
+                trtp_manager_signal_frame_corrupted(base->rtp_manager, packet->header->ssrc);
+				// value will be updated when we decode an IDR frame
+				video->decoder.stream_corrupted = tsk_true;
+				video->decoder.stream_corrupted_since = tsk_time_now();
+			//}
+			// will be used as guard to avoid redering corrupted IDR
+			video->decoder.last_corrupted_timestamp = packet->header->timestamp;
+		}
+		video->decoder.last_seqnum = packet->header->seq_num; // update last seqnum
+
 		// Decode data
 		out_size = self->decoder.codec->plugin->decode(
 				self->decoder.codec, 
@@ -650,6 +798,16 @@ static int _tdav_session_video_decode(tdav_session_video_t* self, const trtp_rtp
 		if(!out_size || !self->decoder.buffer){
 			goto bail;
 		}
+		// check if stream is corrupted
+		// the above decoding process is required in order to reset stream corruption status when IDR frame is decoded
+		if(self->zero_artifacts && self->decoder.stream_corrupted && (__codecs_supporting_zero_artifacts & self->decoder.codec->id)){
+			TSK_DEBUG_INFO("Do not render video frame because stream is corrupted and 'zero-artifacts' is enabled. Last seqnum=%u", video->decoder.last_seqnum);
+			if(video->decoder.stream_corrupted && (tsk_time_now() - video->decoder.stream_corrupted_since) > TDAV_SESSION_VIDEO_AVPF_FIR_REQUEST_INTERVAL_MIN){
+				TSK_DEBUG_INFO("Sending FIR to request IDR because frame corrupted since %llu...", video->decoder.stream_corrupted_since);
+				trtp_manager_signal_frame_corrupted(base->rtp_manager, packet->header->ssrc);
+			}
+			goto bail;
+		}
 
 		// important: do not override the display size (used by the end-user) unless requested
 		if(base->consumer->video.display.auto_resize){
@@ -658,13 +816,14 @@ static int _tdav_session_video_decode(tdav_session_video_t* self, const trtp_rtp
 		}
 
 		// Convert decoded data to the consumer chroma and size
-#define CONSUMER_IN_N_DISPLAY_MISMATCH		(base->consumer->video.in.width != base->consumer->video.display.width || base->consumer->video.in.height != base->consumer->video.display.height)
+#define CONSUMER_NEED_DECODER (base->consumer->decoder.codec_id == tmedia_codec_id_none) // Otherwise, the consumer requires encoded frames
+#define CONSUMER_IN_N_DISPLAY_MISMATCH		(!base->consumer->video.display.auto_resize && (base->consumer->video.in.width != base->consumer->video.display.width || base->consumer->video.in.height != base->consumer->video.display.height))
 #define CONSUMER_DISPLAY_N_CODEC_MISMATCH		(base->consumer->video.display.width != TMEDIA_CODEC_VIDEO(self->decoder.codec)->in.width || base->consumer->video.display.height != TMEDIA_CODEC_VIDEO(self->decoder.codec)->in.height)
 #define CONSUMER_DISPLAY_N_CONVERTER_MISMATCH	( (self->conv.fromYUV420 && self->conv.fromYUV420->dstWidth != base->consumer->video.display.width) || (self->conv.fromYUV420 && self->conv.fromYUV420->dstHeight != base->consumer->video.display.height) )
 #define CONSUMER_CHROMA_MISMATCH	(base->consumer->video.display.chroma != TMEDIA_CODEC_VIDEO(self->decoder.codec)->in.chroma)
 #define DECODED_NEED_FLIP	(TMEDIA_CODEC_VIDEO(self->decoder.codec)->in.flip)
-#if 0
-		if((CONSUMER_CHROMA_MISMATCH || CONSUMER_DISPLAY_N_CODEC_MISMATCH || CONSUMER_IN_N_DISPLAY_MISMATCH || CONSUMER_DISPLAY_N_CONVERTER_MISMATCH || DECODED_NEED_FLIP)){
+
+		if(CONSUMER_NEED_DECODER && (CONSUMER_CHROMA_MISMATCH || CONSUMER_DISPLAY_N_CODEC_MISMATCH || CONSUMER_IN_N_DISPLAY_MISMATCH || CONSUMER_DISPLAY_N_CONVERTER_MISMATCH || DECODED_NEED_FLIP)){
 
 			// Create video converter if not already done
 			if(!self->conv.fromYUV420 || CONSUMER_DISPLAY_N_CONVERTER_MISMATCH){
@@ -681,7 +840,7 @@ static int _tdav_session_video_decode(tdav_session_video_t* self, const trtp_rtp
 		}
 
 		// update consumer size using the codec decoded values
-		// must be done here to avoid fooling "CONSUMER_INSIZE_MISMATCH"
+		// must be done here to avoid fooling "CONSUMER_IN_N_DISPLAY_MISMATCH" unless "auto_resize" option is enabled
         base->consumer->video.in.width = TMEDIA_CODEC_VIDEO(self->decoder.codec)->in.width;//decoded width
         base->consumer->video.in.height = TMEDIA_CODEC_VIDEO(self->decoder.codec)->in.height;//decoded height
 
@@ -703,11 +862,35 @@ static int _tdav_session_video_decode(tdav_session_video_t* self, const trtp_rtp
 			_buffer = self->decoder.buffer;
 			_size = out_size;
 		}
-#endif
-		ret = tmedia_consumer_consume(base->consumer, self->decoder.buffer, out_size, packet->header);
+
+		// congetion control
+		// send RTCP-REMB if:
+        //  - congestion control is enabled and
+		//  - fps changed or
+		//	- first frame or
+		//  - approximately every 5 minutes (300 = 60 * 5)
+		if(base->congestion_ctrl_enabled && base->rtp_manager && (self->fps_changed || self->decoder.codec_decoded_frames_count == 0 || ((self->decoder.codec_decoded_frames_count % (TMEDIA_CODEC_VIDEO(self->decoder.codec)->in.fps * 300)) == 0))){
+			int32_t bandwidth_max_upload_kbps = base->bandwidth_max_upload_kbps;
+			int32_t bandwidth_max_download_kbps = base->bandwidth_max_download_kbps;
+			// bandwidth already computed in start() be the decoded video size was not correct and based on the SDP negotiation
+			bandwidth_max_download_kbps = TSK_MIN(
+							tmedia_get_video_bandwidth_kbps_2(TMEDIA_CODEC_VIDEO(self->decoder.codec)->in.width, TMEDIA_CODEC_VIDEO(self->decoder.codec)->in.height, TMEDIA_CODEC_VIDEO(self->decoder.codec)->in.fps),
+							bandwidth_max_download_kbps);
+			if(self->encoder.codec){
+				bandwidth_max_upload_kbps = TSK_MIN(
+							tmedia_get_video_bandwidth_kbps_2(TMEDIA_CODEC_VIDEO(self->encoder.codec)->out.width, TMEDIA_CODEC_VIDEO(self->encoder.codec)->out.height, TMEDIA_CODEC_VIDEO(self->encoder.codec)->out.fps),
+							bandwidth_max_upload_kbps);
+			}
+			self->fps_changed = tsk_false; // reset
+			TSK_DEBUG_INFO("video with congestion control enabled: max_bw_up=%d kpbs, max_bw_down=%d kpbs", bandwidth_max_upload_kbps, bandwidth_max_download_kbps);
+			ret = trtp_manager_set_app_bandwidth_max(base->rtp_manager, bandwidth_max_upload_kbps, bandwidth_max_download_kbps);
+		}
+		// inc() frame count and consume decoded video
+		++self->decoder.codec_decoded_frames_count;
+		ret = tmedia_consumer_consume(base->consumer, _buffer, _size, __rtp_header);
 	}
-	else if(!base->consumer->is_started){
-		TSK_DEBUG_INFO("Consumer not started");
+	else if(!base->consumer || !base->consumer->is_started){
+		TSK_DEBUG_INFO("Consumer not started (is_null=%d)", !base->consumer);
 	}
 
 bail:
@@ -853,6 +1036,7 @@ static int tdav_session_video_start(tmedia_session_t* self)
 	video->encoder.codec = tsk_object_ref((tsk_object_t*)codec);
 	if(!TMEDIA_CODEC(video->encoder.codec)->opened){
 		if((ret = tmedia_codec_open(video->encoder.codec))){
+			tsk_mutex_unlock(video->encoder.h_mutex);
 			TSK_DEBUG_ERROR("Failed to open [%s] codec", video->encoder.codec->plugin->desc);
 			return ret;
 		}
@@ -880,6 +1064,8 @@ static int tdav_session_video_stop(tmedia_session_t* self)
 	tdav_session_video_t* video;
 	tdav_session_av_t* base;
 
+	TSK_DEBUG_INFO("tdav_session_video_stop");
+
 	video = (tdav_session_video_t*)self;
 	base = (tdav_session_av_t*)self;
 	
@@ -891,9 +1077,16 @@ static int tdav_session_video_stop(tmedia_session_t* self)
 	tsk_list_clear_items(video->avpf.packets);
 	tsk_list_unlock(video->avpf.packets);
 
+	// the encoder must be locked before stopping the session as such action will close all codecs	
+	tsk_mutex_lock(video->encoder.h_mutex);
 	ret = tdav_session_av_stop(base);
 	TSK_OBJECT_SAFE_FREE(video->encoder.codec);
+	tsk_mutex_unlock(video->encoder.h_mutex);
 	TSK_OBJECT_SAFE_FREE(video->decoder.codec);
+
+	// reset rotation info (MUST for reINVITE when mobile device in portrait[90 degrees])
+	video->encoder.rotation = 0;
+
 	return ret;
 }
 
@@ -907,7 +1100,6 @@ static const tsdp_header_M_t* tdav_session_video_get_lo(tmedia_session_t* self)
 	tsk_bool_t updated = tsk_false;
 	const tsdp_header_M_t* ret;
 	tdav_session_av_t* base = TDAV_SESSION_AV(self);
-
 
 	if(!(ret = tdav_session_av_get_lo(base, &updated))){
 		TSK_DEBUG_ERROR("tdav_session_av_get_lo(video) failed");
@@ -982,8 +1174,11 @@ static int tdav_session_video_rtcp_send_event(tmedia_session_t* self, tmedia_rtc
 	switch(event_type){
 		case tmedia_rtcp_event_type_fir:
 			{
-				TSK_DEBUG_INFO("User requested Full Intra Refresh (FIR)");
 				if(base->rtp_manager && base->rtp_manager->is_started){
+					if(!ssrc_media){ // when called from C++/Java/C# bindings "ssrc_media" is a default parameter with value=0
+						ssrc_media = base->rtp_manager->rtp.ssrc.remote;
+					}
+					TSK_DEBUG_INFO("Send FIR(%u)", ssrc_media);
 					ret = trtp_manager_signal_frame_corrupted(base->rtp_manager, ssrc_media);
 				}
 				break;
@@ -1032,6 +1227,8 @@ static tsk_object_t* tdav_session_video_ctor(tsk_object_t * self, va_list * app)
 		
 		/* init() self */
 		video->jb_enabled = tmedia_defaults_get_videojb_enabled();
+		video->zero_artifacts = tmedia_defaults_get_video_zeroartifacts_enabled();
+		TSK_DEBUG_INFO("Video 'zero-artifacts' option = %s", video->zero_artifacts  ? "yes" : "no");
 		if(!(video->encoder.h_mutex = tsk_mutex_create())){
 			TSK_DEBUG_ERROR("Failed to create encode mutex");
 			return tsk_null;
@@ -1063,6 +1260,7 @@ static tsk_object_t* tdav_session_video_ctor(tsk_object_t * self, va_list * app)
 static tsk_object_t* tdav_session_video_dtor(tsk_object_t * self)
 { 
 	tdav_session_video_t *video = self;
+	TSK_DEBUG_INFO("*** tdav_session_video_t destroyed ***");
 	if(video){
 		tdav_session_video_stop((tmedia_session_t*)video);
 		// deinit self (rtp manager should be destroyed after the producer)

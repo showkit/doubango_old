@@ -249,12 +249,10 @@ int tsip_header_serialize(const tsip_header_t *self, tsk_buffer_t *output)
 	static const char* hname;
 	static char separator;
 
- 
 	if(self && TSIP_HEADER(self)->serialize){
 		tsk_list_item_t *item;
 		
 		hname = tsip_header_get_name_2(self);
-        
 		ret = 0; // for empty lists
 
 		/* Header name */

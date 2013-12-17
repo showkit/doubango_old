@@ -24,12 +24,18 @@
 #include "tsk_string.h"
 #include "tsk_debug.h"
 
+#include <limits.h> /* INT_MAX */
+
 // /!\ These are global values shared by all sessions and stacks. Could be set (update) per session using "session_set()"
 
 static tmedia_profile_t __profile = tmedia_profile_default;
 static tmedia_bandwidth_level_t __bl = tmedia_bl_unrestricted;
-static tmedia_pref_video_size_t __pref_video_size = tmedia_pref_video_size_cif; // 352 x 288: Android, iOS, WP7
-static unsigned __pref_video_framerate = 15;
+static tsk_bool_t __congestion_ctrl_enabled = tsk_false;
+static int32_t __video_fps = 15; // allowed values: ]0 - 120]
+static int32_t __video_motion_rank = 2; // allowed values: 1(low), 2(medium) or 4(high)
+static int32_t __bw_video_up_max_kbps = INT_MAX; // <= 0: unrestricted, Unit: kbps
+static int32_t __bw_video_down_max_kbps = INT_MAX; // <= 0: unrestricted, Unit: kbps
+static tmedia_pref_video_size_t __pref_video_size = tmedia_pref_video_size_cif; // 352 x 288: Android, iOS, WP7 
 static int32_t __jb_margin_ms = -1; // disable
 static int32_t __jb_max_late_rate_percent = -1; // -1: disable 4: default for speex
 static uint32_t __echo_tail = 20;
@@ -45,11 +51,15 @@ static int32_t __sx = -1;
 static int32_t __sy = -1;
 static int32_t __audio_producer_gain = 0;
 static int32_t __audio_consumer_gain = 0;
+static int32_t __audio_channels_playback = 1;
+static int32_t __audio_channels_record = 1;
+static int32_t __audio_ptime = 20;
 static uint16_t __rtp_port_range_start = 1024;
 static uint16_t __rtp_port_range_stop = 65535;
 static tsk_bool_t __rtp_symetric_enabled = tsk_false; // This option is force symetric RTP for remote size. Local: always ON
 static tmedia_type_t __media_type = tmedia_audio;
 static int32_t __volume = 100;
+static char* __producer_friendly_name[2] = { tsk_null/*audio*/, tsk_null/*video*/ }; // pref. camera(index=1) and sound card(index=0) friendly names (e.g. Logitech HD Pro Webcam C920).
 static int32_t __inv_session_expires = 0; // Session Timers: 0: disabled
 static char* __inv_session_refresher = tsk_null;
 static tmedia_srtp_mode_t __srtp_mode = tmedia_srtp_mode_none;
@@ -57,12 +67,26 @@ static tmedia_srtp_type_t __srtp_type = tmedia_srtp_type_sdes;
 static tsk_bool_t __rtcp_enabled = tsk_true;
 static tsk_bool_t __rtcpmux_enabled = tsk_true;
 static tsk_bool_t __ice_enabled = tsk_false;
+static char* __stun_server_ip = tsk_null; // STUN/TURN server IP address
+static uint16_t __stun_server_port = 3478; // STUN for SIP headers (Contact, Via...)
+static char* __stun_usr_name = tsk_null; // STUN/TURN credentials
+static char* __stun_usr_pwd = tsk_null; // STUN/TURN credentials
+static tsk_bool_t __stun_enabled = tsk_false; // Whether STUN for SIP headers is enabled
+static tsk_bool_t __icestun_enabled = tsk_true; // Whether STUN for ICE (reflexive candidates) is enabled
 static tsk_bool_t __bypass_encoding_enabled = tsk_false;
 static tsk_bool_t __bypass_decoding_enabled = tsk_false;
-static tsk_bool_t __videojb_enabled = tsk_false;
+static tsk_bool_t __videojb_enabled = tsk_true;
+static tsk_bool_t __video_zeroartifacts_enabled = tsk_false; // Requires from remote parties to support AVPF (RTCP-FIR/NACK/PLI)
 static tsk_size_t __rtpbuff_size = 0x1FFFE; // Network buffer size use for RTP (SO_RCVBUF, SO_SNDBUF)
 static tsk_size_t __avpf_tail_min = 20; // Min size for tail used to honor RTCP-NACK requests
 static tsk_size_t __avpf_tail_max = 160; // Max size for tail used to honor RTCP-NACK requests
+static uint32_t __opus_maxcapturerate = 16000; // supported: 8k,12k,16k,24k,48k. IMPORTANT: only 8k and 16k will work with WebRTC AEC
+static uint32_t __opus_maxplaybackrate = 48000; // supported: 8k,12k,16k,24k,48k
+static char* __ssl_certs_priv_path = tsk_null;
+static char* __ssl_certs_pub_path = tsk_null;
+static char* __ssl_certs_ca_path = tsk_null;
+static tsk_bool_t __ssl_certs_verify = tsk_false;
+static tsk_size_t __max_fds = 0; // Maximum number of FDs this process is allowed to open. Zero to disable.
 
 int tmedia_defaults_set_profile(tmedia_profile_t profile){
 	__profile = profile;
@@ -81,13 +105,53 @@ int tmedia_defaults_set_bl(tmedia_bandwidth_level_t bl){
 tmedia_bandwidth_level_t tmedia_defaults_get_bl(){
 	return __bl;
 }
-int tmedia_defaults_set_pref_video_framerate(unsigned pref_video_framerate){
-    __pref_video_framerate = pref_video_framerate;
-    return 0;
+
+int tmedia_defaults_set_congestion_ctrl_enabled(tsk_bool_t enabled){
+	__congestion_ctrl_enabled = enabled;
+	return 0;
 }
-unsigned tmedia_defaults_get_pref_video_framerate() {
-    return __pref_video_framerate;
+tsk_bool_t tmedia_defaults_get_congestion_ctrl_enabled(){
+	return __congestion_ctrl_enabled;
 }
+
+int tmedia_defaults_set_video_fps(int32_t video_fps){
+	if(video_fps > 0 && video_fps <= 120){
+		__video_fps = video_fps;
+		return 0;
+	}
+	TSK_DEBUG_ERROR("%d not valid for video fps", video_fps);
+	return -1;
+}
+int32_t tmedia_defaults_get_video_fps(){
+	return __video_fps;
+}
+
+int tmedia_defaults_set_video_motion_rank(int32_t video_motion_rank){
+	switch(video_motion_rank){
+		case 1/*low*/: case 2/*medium*/: case 4/*high*/: __video_motion_rank = video_motion_rank; return 0;
+		default: TSK_DEBUG_ERROR("%d not valid for video motion rank. Must be 1, 2 or 4", video_motion_rank); return -1;
+	}
+}
+int32_t tmedia_defaults_get_video_motion_rank(){
+	return __video_motion_rank;
+}
+
+int tmedia_defaults_set_bandwidth_video_upload_max(int32_t bw_video_up_max_kbps){
+	__bw_video_up_max_kbps = bw_video_up_max_kbps > 0 ? bw_video_up_max_kbps : INT_MAX;
+	return 0;
+}
+int32_t tmedia_defaults_get_bandwidth_video_upload_max(){
+	return __bw_video_up_max_kbps;
+}
+
+int tmedia_defaults_set_bandwidth_video_download_max(int32_t bw_video_down_max_kbps){
+	__bw_video_down_max_kbps = bw_video_down_max_kbps > 0 ? bw_video_down_max_kbps : INT_MAX;
+	return 0;
+}
+int32_t tmedia_defaults_get_bandwidth_video_download_max(){
+	return __bw_video_down_max_kbps;
+}
+
 int tmedia_defaults_set_pref_video_size(tmedia_pref_video_size_t pref_video_size){
 	__pref_video_size = pref_video_size;
 	return 0;
@@ -210,6 +274,31 @@ int32_t tmedia_defaults_get_screen_y(){
 	return __sy;
 }
 
+int tmedia_defaults_set_audio_ptime(int32_t audio_ptime){
+	if(audio_ptime > 0){
+		__audio_ptime = audio_ptime;
+		return 0;
+	}
+	TSK_DEBUG_ERROR("Invalid parameter");
+	return -1;
+}
+int32_t tmedia_defaults_get_audio_ptime(){
+	return __audio_ptime;
+}
+int tmedia_defaults_set_audio_channels(int32_t channels_playback, int32_t channels_record){
+	if(channels_playback != 1 && channels_playback != 2) { TSK_DEBUG_ERROR("Invalid parameter"); return -1; }
+	if(channels_record != 1 && channels_record != 2) { TSK_DEBUG_ERROR("Invalid parameter"); return -1; }
+	__audio_channels_playback = channels_playback;
+	__audio_channels_record = channels_record;
+	return 0;
+}
+int32_t tmedia_defaults_get_audio_channels_playback(){
+	return __audio_channels_playback;
+}
+int32_t tmedia_defaults_get_audio_channels_record(){
+	return __audio_channels_record;
+}
+
 int tmedia_defaults_set_audio_gain(int32_t audio_producer_gain, int32_t audio_consumer_gain){
 	__audio_producer_gain = audio_producer_gain;
 	__audio_consumer_gain = audio_consumer_gain;
@@ -266,6 +355,22 @@ int32_t tmedia_defaults_get_volume(){
 	return __volume;
 }
 
+int tmedia_producer_set_friendly_name(tmedia_type_t media_type, const char* friendly_name) {
+	if(media_type != tmedia_audio && media_type != tmedia_video) {
+		TSK_DEBUG_ERROR("Invalid parameter");
+		return -1;
+	}
+	tsk_strupdate(&__producer_friendly_name[(media_type == tmedia_audio) ? 0 : 1], friendly_name);
+	return 0;
+}
+const char* tmedia_producer_get_friendly_name(tmedia_type_t media_type){
+	if(media_type != tmedia_audio && media_type != tmedia_video) {
+		TSK_DEBUG_ERROR("Invalid parameter");
+		return tsk_null;
+	}
+	return __producer_friendly_name[(media_type == tmedia_audio) ? 0 : 1];
+}
+
 int32_t tmedia_defaults_get_inv_session_expires(){
 	return __inv_session_expires;
 }
@@ -318,6 +423,38 @@ int tmedia_defaults_set_rtcpmux_enabled(tsk_bool_t rtcpmux_enabled){
 	return 0;
 }
 
+int tmedia_defaults_set_stun_server(const char* server_ip, uint16_t server_port, const char* usr_name, const char* usr_pwd){
+	tsk_strupdate(&__stun_server_ip, server_ip);
+	__stun_server_port = server_port;
+	tsk_strupdate(&__stun_usr_name, usr_name);
+	tsk_strupdate(&__stun_usr_pwd, usr_pwd);
+	return 0;
+}
+int tmedia_defaults_get_stun_server(const char** server_ip, uint16_t*const server_port, const char** usr_name, const char** usr_pwd){
+	static const char* __stun_server_ip_default = "numb.viagenie.ca"; // default server for backward compatibility
+	if(server_ip) *server_ip = tsk_strnullORempty(__stun_server_ip) ? __stun_server_ip_default : __stun_server_ip;
+	if(server_port) *server_port = __stun_server_port;
+	if(usr_name) *usr_name = __stun_usr_name;
+	if(usr_pwd) *usr_pwd = __stun_usr_pwd;
+	return 0;
+}
+
+int tmedia_defaults_set_stun_enabled(tsk_bool_t stun_enabled){
+	__stun_enabled = stun_enabled;
+	return 0;
+}
+tsk_bool_t tmedia_defaults_get_stun_enabled(){
+	return __stun_enabled;
+}
+
+int tmedia_defaults_set_icestun_enabled(tsk_bool_t icestun_enabled){
+	__icestun_enabled = icestun_enabled;
+	return 0;
+}
+tsk_bool_t tmedia_defaults_get_icestun_enabled(){
+	return __icestun_enabled;
+}
+
 int tmedia_defaults_set_ice_enabled(tsk_bool_t ice_enabled){
 	__ice_enabled = ice_enabled;
 	return 0;
@@ -350,6 +487,14 @@ tsk_bool_t tmedia_defaults_get_videojb_enabled(){
 	return __videojb_enabled;
 }
 
+int tmedia_defaults_set_video_zeroartifacts_enabled(tsk_bool_t enabled){
+	__video_zeroartifacts_enabled = enabled;
+	return 0;
+}
+tsk_bool_t tmedia_defaults_get_video_zeroartifacts_enabled(){
+	return __video_zeroartifacts_enabled;
+}
+
 int tmedia_defaults_set_rtpbuff_size(tsk_size_t rtpbuff_size){
 	__rtpbuff_size = rtpbuff_size;
 	return 0;
@@ -368,4 +513,50 @@ tsk_size_t tmedia_defaults_get_avpf_tail_min(){
 }
 tsk_size_t tmedia_defaults_get_avpf_tail_max(){
 	return __avpf_tail_max;
+}
+
+int tmedia_defaults_set_opus_maxcapturerate(uint32_t opus_maxcapturerate){
+	switch(opus_maxcapturerate){
+		case 8000: case 12000: case 16000: case 24000: case 48000: __opus_maxcapturerate = opus_maxcapturerate; return 0;
+		default: TSK_DEBUG_ERROR("%u not valid for opus_maxcapturerate", opus_maxcapturerate); return -1;
+	}
+}
+uint32_t tmedia_defaults_get_opus_maxcapturerate(){
+	return __opus_maxcapturerate;
+}
+
+int tmedia_defaults_set_opus_maxplaybackrate(uint32_t opus_maxplaybackrate){
+	switch(opus_maxplaybackrate){
+		case 8000: case 12000: case 16000: case 24000: case 48000: __opus_maxplaybackrate = opus_maxplaybackrate; return 0;
+		default: TSK_DEBUG_ERROR("%u not valid for opus_maxplaybackrate", opus_maxplaybackrate); return -1;
+	}
+}
+uint32_t tmedia_defaults_get_opus_maxplaybackrate(){
+	return __opus_maxplaybackrate;
+}
+
+int tmedia_defaults_set_ssl_certs(const char* priv_path, const char* pub_path, const char* ca_path, tsk_bool_t verify){
+	tsk_strupdate(&__ssl_certs_priv_path, priv_path);
+	tsk_strupdate(&__ssl_certs_pub_path, pub_path);
+	tsk_strupdate(&__ssl_certs_ca_path, ca_path);
+	__ssl_certs_verify = verify;
+	return 0;
+}
+int tmedia_defaults_get_ssl_certs(const char** priv_path, const char** pub_path, const char** ca_path, tsk_bool_t *verify){
+	if(priv_path) *priv_path = __ssl_certs_priv_path;
+	if(pub_path) *pub_path = __ssl_certs_pub_path;
+	if(ca_path) *ca_path = __ssl_certs_ca_path;
+	if(verify) *verify = __ssl_certs_verify;
+	return 0;
+}
+
+int tmedia_defaults_set_max_fds(int32_t max_fds) {
+	if (max_fds > 0 && max_fds < 0xFFFF) {
+		__max_fds = (tsk_size_t)max_fds;
+		return 0;
+	}
+	return -1;
+}
+tsk_size_t tmedia_defaults_get_max_fds() {
+	return __max_fds;
 }

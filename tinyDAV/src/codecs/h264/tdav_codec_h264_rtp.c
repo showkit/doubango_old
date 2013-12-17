@@ -25,7 +25,6 @@
  *
  * @author Mamadou Diop <diopmamadou(at)doubango.org>
  *
-
  */
 #include "tinydav/codecs/h264/tdav_codec_h264_rtp.h"
 
@@ -161,7 +160,8 @@ int tdav_codec_h264_parse_profile(const char* profile_level_id, profile_idc_t *p
 
 int tdav_codec_h264_get_pay(const void* in_data, tsk_size_t in_size, const void** out_data, tsk_size_t *out_size, tsk_bool_t* append_scp)
 {
-	const uint8_t* pdata = in_data;
+	const uint8_t* pdata = (const uint8_t*)in_data;
+	uint8_t nal_type;
 	if(!in_data || !in_size || !out_data || !out_size){
 		TSK_DEBUG_ERROR("Invalid parameter");
 		return -1;
@@ -169,7 +169,6 @@ int tdav_codec_h264_get_pay(const void* in_data, tsk_size_t in_size, const void*
 
 	*out_data = tsk_null;
 	*out_size = 0;
-	*append_scp = tsk_true;
 
 	/* 5.3. NAL Unit Octet Usage
 	  +---------------+
@@ -178,7 +177,7 @@ int tdav_codec_h264_get_pay(const void* in_data, tsk_size_t in_size, const void*
       |F|NRI|  Type   |
       +---------------+
 	*/
-	switch((pdata[0] & 0x1F)){
+	switch((nal_type = (pdata[0] & 0x1F))){
 		case undefined_0:
 		case undefined_30:
 		case undefined_31:
@@ -191,17 +190,18 @@ int tdav_codec_h264_get_pay(const void* in_data, tsk_size_t in_size, const void*
 		case fu_a:
 			return tdav_codec_h264_get_fua_pay(pdata, in_size, out_data, out_size, append_scp);
 		default: /* NAL unit (1-23) */
+			*append_scp = tsk_true;//(nal_type != 7 && nal_type != 8); // SPS or PPS
 			return tdav_codec_h264_get_nalunit_pay(pdata, in_size, out_data, out_size);
 	}
 
-	//TSK_DEBUG_ERROR("%d not supported as valid NAL Unit type", (*pdata & 0x1F));
+	TSK_DEBUG_WARN("%d not supported as valid NAL Unit type", (*pdata & 0x1F));
 	return -1;
 }
 
 
 int tdav_codec_h264_get_fua_pay(const uint8_t* in_data, tsk_size_t in_size, const void** out_data, tsk_size_t *out_size, tsk_bool_t* append_scp)
 {
-	if(in_size <=2){
+	if(in_size <=H264_FUA_HEADER_SIZE){
 		TSK_DEBUG_ERROR("Too short");
 		return -1;
 	}
@@ -236,41 +236,26 @@ int tdav_codec_h264_get_fua_pay(const uint8_t* in_data, tsk_size_t in_size, cons
       +---------------+
 	*/
 
-	if((in_data[1] & 0x80) == 0x80 /*S*/){
-		/* discard "FU indicator" 
-		S: 1 bit
-			When set to one, the Start bit indicates the start of a fragmented
-			NAL unit.  When the following FU payload is not the start of a
-			fragmented NAL unit payload, the Start bit is set to zero.
-		*/
-		if(in_size> H264_NAL_UNIT_TYPE_HEADER_SIZE){
-			uint8_t hdr;
-			*out_data = (in_data + H264_NAL_UNIT_TYPE_HEADER_SIZE);
-			*out_size = (in_size - H264_NAL_UNIT_TYPE_HEADER_SIZE);
-
-			// F, NRI and Type
-			hdr = (in_data[0] & 0xe0) /* F,NRI from "FU indicator"*/ | (in_data[1] & 0x1f) /* type from "FU header" */;
-			*((uint8_t*)*out_data) = hdr;
-			// Need to append Start Code Prefix
-			*append_scp = tsk_true;
-		}
-		else{
-			TSK_DEBUG_ERROR("Too short");
-			return -1;
-		}
-	}
-	else{
-		/* "FU indicator" and "FU header" */
-		if(in_size> H264_FUA_HEADER_SIZE){
-			*out_data = (in_data + H264_FUA_HEADER_SIZE);
-			*out_size = (in_size - H264_FUA_HEADER_SIZE);
-			*append_scp = tsk_false;
-		}
-		else{
-			TSK_DEBUG_ERROR("Too short");
-			return -1;
-		}
-	}
+    if(((in_data[1] & 0x80) /*S*/)){
+        /* discard "FU indicator" */
+        *out_data = (in_data + H264_NAL_UNIT_TYPE_HEADER_SIZE);
+        *out_size = (in_size - H264_NAL_UNIT_TYPE_HEADER_SIZE);
+        
+        // Do need to append Start Code Prefix ?
+        /* S: 1 bit
+         When set to one, the Start bit indicates the start of a fragmented
+         NAL unit.  When the following FU payload is not the start of a
+         fragmented NAL unit payload, the Start bit is set to zero.*/
+        *append_scp = tsk_true;
+        
+        // F, NRI and Type
+        *((uint8_t*)*out_data) = (in_data[0] & 0xe0) /* F,NRI from "FU indicator"*/ | (in_data[1] & 0x1f) /* type from "FU header" */;
+    }
+    else{
+        *append_scp = tsk_false;
+        *out_data = (in_data + H264_FUA_HEADER_SIZE);
+        *out_size = (in_size - H264_FUA_HEADER_SIZE);
+    }
 
 	return 0;
 }
@@ -299,6 +284,46 @@ int tdav_codec_h264_get_nalunit_pay(const uint8_t* in_data, tsk_size_t in_size, 
 	return 0;
 }
 
+void tdav_codec_h264_rtp_encap(struct tdav_codec_h264_common_s* self, const uint8_t* pdata, tsk_size_t size)
+{
+	static const tsk_size_t size_of_scp = sizeof(H264_START_CODE_PREFIX); /* we know it's equal to 4 .. */
+	register tsk_size_t i;
+	tsk_size_t last_scp, prev_scp;
+	tsk_size_t _size;
+
+	if(!pdata || size < size_of_scp){
+		return;
+	}
+
+	if(pdata[0] == 0 && pdata[1] == 0){
+		if(pdata[2] == 1){
+			pdata += 3, size -= 3;
+		}
+		else if(pdata[2] == 0 && pdata[3] == 1){
+			pdata += 4, size -= 4;
+		}
+	}
+
+	_size = (size - size_of_scp);
+	last_scp = 0, prev_scp = 0;
+	for(i = size_of_scp; i<_size; i++){
+		if(pdata[i] == 0 && pdata[i+1] == 0 && (pdata[i+2] == 1 || (pdata[i+2] == 0 && pdata[i+3] == 1))){  /* Find Start Code Prefix */
+			prev_scp = last_scp;
+			if((i - last_scp) >= H264_RTP_PAYLOAD_SIZE || 1){
+				tdav_codec_h264_rtp_callback(self, pdata + prev_scp,
+					(i - prev_scp), (prev_scp == size));
+			}
+			last_scp = i;
+			i += (pdata[i+2] == 1) ? 3 : 4;
+		}
+	}
+
+	if(last_scp < (int32_t)size){
+			tdav_codec_h264_rtp_callback(self, pdata + last_scp,
+				(size - last_scp), tsk_true);
+	}
+}
+
 void tdav_codec_h264_rtp_callback(struct tdav_codec_h264_common_s *self, const void *data, tsk_size_t size, tsk_bool_t marker)
 {
 	uint8_t* pdata = (uint8_t*)data;
@@ -322,7 +347,7 @@ void tdav_codec_h264_rtp_callback(struct tdav_codec_h264_common_s *self, const v
 		if(TMEDIA_CODEC_VIDEO(self)->out.callback){
 			TMEDIA_CODEC_VIDEO(self)->out.result.buffer.ptr = pdata;
 			TMEDIA_CODEC_VIDEO(self)->out.result.buffer.size = size;
-			TMEDIA_CODEC_VIDEO(self)->out.result.duration = (3003* (30/TMEDIA_CODEC_VIDEO(self)->out.fps));
+			TMEDIA_CODEC_VIDEO(self)->out.result.duration =  (uint32_t)((1./(double)TMEDIA_CODEC_VIDEO(self)->out.fps) * TMEDIA_CODEC(self)->plugin->rate);
 			TMEDIA_CODEC_VIDEO(self)->out.result.last_chunck = marker;
 			TMEDIA_CODEC_VIDEO(self)->out.callback(&TMEDIA_CODEC_VIDEO(self)->out.result);
 		}
@@ -330,7 +355,7 @@ void tdav_codec_h264_rtp_callback(struct tdav_codec_h264_common_s *self, const v
 	else if(size > H264_NAL_UNIT_TYPE_HEADER_SIZE){
 		/* Should be Fragmented as FUA */
 		uint8_t fua_hdr[H264_FUA_HEADER_SIZE]; /* "FU indicator" and "FU header" - 2bytes */
-		fua_hdr[0] = pdata[0] & 0x60/* F=0 */, fua_hdr[0] |= fu_a;
+		fua_hdr[0] = pdata[0] & 0x60/* NRI */, fua_hdr[0] |= fu_a;
 		fua_hdr[1] = 0x80/* S=1,E=0,R=0 */, fua_hdr[1] |= pdata[0] & 0x1f; /* type */
 		// discard header
 		pdata += H264_NAL_UNIT_TYPE_HEADER_SIZE;
@@ -340,7 +365,7 @@ void tdav_codec_h264_rtp_callback(struct tdav_codec_h264_common_s *self, const v
 			tsk_size_t packet_size = TSK_MIN(H264_RTP_PAYLOAD_SIZE, size);
 
 			if(self->rtp.size < (packet_size + H264_FUA_HEADER_SIZE)){
-				if(!(self->rtp.ptr = tsk_realloc(self->rtp.ptr, (packet_size + H264_FUA_HEADER_SIZE)))){
+				if(!(self->rtp.ptr = (uint8_t*)tsk_realloc(self->rtp.ptr, (packet_size + H264_FUA_HEADER_SIZE)))){
 					TSK_DEBUG_ERROR("Failed to allocate new buffer");
 					return;
 				}
@@ -364,7 +389,7 @@ void tdav_codec_h264_rtp_callback(struct tdav_codec_h264_common_s *self, const v
 			if(TMEDIA_CODEC_VIDEO(self)->out.callback){
 				TMEDIA_CODEC_VIDEO(self)->out.result.buffer.ptr = self->rtp.ptr;
 				TMEDIA_CODEC_VIDEO(self)->out.result.buffer.size = (packet_size + H264_FUA_HEADER_SIZE);
-				TMEDIA_CODEC_VIDEO(self)->out.result.duration = (3003* (30/TMEDIA_CODEC_VIDEO(self)->out.fps));
+				TMEDIA_CODEC_VIDEO(self)->out.result.duration =  (uint32_t)((1./(double)TMEDIA_CODEC_VIDEO(self)->out.fps) * TMEDIA_CODEC(self)->plugin->rate);
 				TMEDIA_CODEC_VIDEO(self)->out.result.last_chunck = (size == 0);
 				TMEDIA_CODEC_VIDEO(self)->out.callback(&TMEDIA_CODEC_VIDEO(self)->out.result);
 			}

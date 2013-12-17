@@ -127,9 +127,13 @@ tsip_header_P_Preferred_Identity_t *tsip_header_P_Preferred_Identity_parse(const
 	const char *eof = pe;
 	tsip_header_P_Preferred_Identity_t *hdr_pi = tsip_header_P_Preferred_Identity_create_null();
 	
-	const char *tag_start;
+	const char *tag_start = tsk_null;
 
 	%%write data;
+	(void)(eof);
+	(void)(tsip_machine_parser_header_P_Preferred_Identity_first_final);
+	(void)(tsip_machine_parser_header_P_Preferred_Identity_error);
+	(void)(tsip_machine_parser_header_P_Preferred_Identity_en_main);
 	%%write init;
 	%%write exec;
 	

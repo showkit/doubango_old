@@ -1,8 +1,5 @@
-/*
-* Copyright (C) 2010-2011 Mamadou Diop.
-*
-* Contact: Mamadou Diop <diopmamadou(at)doubango[dot]org>
-*	
+/* Copyright (C) 2010-2013 Mamadou Diop.
+* Copyright (C) 2013 Doubango Telecom <http://doubango.org>
 * This file is part of Open Source Doubango Framework.
 *
 * DOUBANGO is free software: you can redistribute it and/or modify
@@ -22,10 +19,6 @@
 
 /**@file tsk_object.h
  * @brief Base object implementation.
- *
- * @author Mamadou Diop <diopmamadou(at)doubango[dot]org>
- *
-
  */
 #ifndef TSK_OBJECT_H
 #define TSK_OBJECT_H
@@ -52,7 +45,7 @@ typedef void tsk_object_t;
  * <b>Very Important</b>: Mutexes, Semaphores and CondVars are not well-defined objects. You should never use this macro to destroy them.
  * @param	self	The object to free or unref. 
 **/
-#define TSK_OBJECT_SAFE_FREE(self)		if(self) tsk_object_unref(self), self = tsk_null
+#define TSK_OBJECT_SAFE_FREE(self)		if((self)) tsk_object_unref((self)), (self) = tsk_null
 
 #define TSK_OBJECT_SAFE_FREE_ARRAY(self, count) { \
 	int __i; \
@@ -85,7 +78,7 @@ typedef void tsk_object_t;
 */
 #define TSK_DECLARE_OBJECT \
 	const void* __def__;  /**< Opaque data holding a pointer to the actual meta-data(size, constructor, destructor and comparator) */ \
-	tsk_size_t	refCount /**< Reference counter. */
+	long	refCount /**< Reference counter. */
 
 /**@ingroup tsk_object_group
 * Internal macro to get the definition of the object.

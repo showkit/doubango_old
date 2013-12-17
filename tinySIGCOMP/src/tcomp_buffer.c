@@ -52,7 +52,16 @@ tcomp_buffer_t;
 
 tcomp_buffer_handle_t* tcomp_buffer_create(const void* data, tsk_size_t len)
 {
-	return tsk_object_new(tcomp_buffer_def_t, data, len);
+	tcomp_buffer_t* buffer;
+	if((buffer = tsk_object_new(tcomp_buffer_def_t))){
+		buffer->owner = tsk_true;
+		// The P-bit controls the order in which bits are passed from the dispatcher to the INPUT instructions.
+		buffer->P_BIT = TCOMP_P_BIT_MSB_TO_LSB;
+		if(data && len){
+			tcomp_buffer_appendBuff(buffer, data, len);
+		}
+	}
+	return buffer;
 }
 
 tcomp_buffer_handle_t* tcomp_buffer_create_null()
@@ -123,6 +132,10 @@ const uint8_t* tcomp_buffer_getReadOnlyBufferAtPos(const tcomp_buffer_handle_t* 
 uint8_t* tcomp_buffer_getBufferAtPos(const tcomp_buffer_handle_t* handle, tsk_size_t position)
 {
 	if(handle){
+		if(position && ((tcomp_buffer_t*)handle)->size <= position){
+			TSK_DEBUG_ERROR("%u <= %u", ((tcomp_buffer_t*)handle)->size, position);
+			return tsk_null;
+		}
 		return (((tcomp_buffer_t*)handle)->lpbuffer + position);
 	}
 	else{
@@ -155,7 +168,7 @@ tsk_size_t tcomp_buffer_getRemainingBits(const tcomp_buffer_handle_t* handle) /*
 {
 	if(handle){
 		tcomp_buffer_t* buffer = (tcomp_buffer_t*)handle;
-		tsk_size_t result = ((buffer->size * 8) - ((buffer->index_bytes * 8) + buffer->index_bits));
+		tsk_ssize_t result = ((buffer->size * 8) - ((buffer->index_bytes * 8) + buffer->index_bits));
 		return (result < 0) ? 0: result;
 	}
 	else{
@@ -197,7 +210,7 @@ uint8_t* tcomp_buffer_readBytes(tcomp_buffer_handle_t* handle, tsk_size_t length
 * @param length The length of the buffer to read.
 * @retval All bits as a 2-bytes integer value
 */
-uint16_t tcomp_buffer_readLsbToMsb(tcomp_buffer_handle_t* handle, tsk_size_t length)
+uint32_t tcomp_buffer_readLsbToMsb(tcomp_buffer_handle_t* handle, tsk_size_t length)
 {
 	// UDV Memory is always MSB first
 	// MSB  <-- LSB
@@ -207,7 +220,7 @@ uint16_t tcomp_buffer_readLsbToMsb(tcomp_buffer_handle_t* handle, tsk_size_t len
 		tcomp_buffer_t* buffer = (tcomp_buffer_t*)handle;
 		uint8_t pos = 0;
 		char* end;
-		uint16_t result_val = 0;
+		uint32_t result_val = 0;
 		char result_str[16]; memset(result_str, 0, 16);
 		while(pos < length){
 			result_str[pos++] = (buffer->lpbuffer[buffer->index_bytes]
@@ -219,7 +232,7 @@ uint16_t tcomp_buffer_readLsbToMsb(tcomp_buffer_handle_t* handle, tsk_size_t len
 		}
 		
 		end = (result_str+length);
-		result_val = (uint16_t)strtol(result_str, &end, 2);
+		result_val = (uint32_t)strtol(result_str, &end, 2);
 
 		return result_val;
 	}
@@ -235,7 +248,7 @@ uint16_t tcomp_buffer_readLsbToMsb(tcomp_buffer_handle_t* handle, tsk_size_t len
 * @param length The length of the buffer to read.
 * @retval All bits as a 2-bytes integer value
 */
-uint16_t tcomp_buffer_readMsbToLsb(tcomp_buffer_handle_t* handle, tsk_size_t length)
+uint32_t tcomp_buffer_readMsbToLsb(tcomp_buffer_handle_t* handle, tsk_size_t length)
 {
 	// UDV Memory is always MSB first
 	// MSB  --> LSB
@@ -244,7 +257,7 @@ uint16_t tcomp_buffer_readMsbToLsb(tcomp_buffer_handle_t* handle, tsk_size_t len
 		tcomp_buffer_t* buffer = (tcomp_buffer_t*)handle;
 		uint8_t pos = 0;
 		char* end;
-		uint16_t result_val = 0;
+		uint32_t result_val = 0;
 		char result_str[16]; memset(result_str, 0, 16);
 
 		while(pos < length){
@@ -257,7 +270,7 @@ uint16_t tcomp_buffer_readMsbToLsb(tcomp_buffer_handle_t* handle, tsk_size_t len
 		}
 		
 		end = (result_str + length);
-		result_val = (uint16_t)strtol(result_str, &end, 2);
+		result_val = (uint32_t)strtol(result_str, &end, 2);
 		
 		return result_val;
 	}
@@ -289,7 +302,7 @@ void tcomp_buffer_discardBits(tcomp_buffer_handle_t* handle)
 * @param handle SigComp handle holding the internal buffer.
 * @param count The number of bytes to discard.
 */
-void tcomp_buffer_discardLastBytes(tcomp_buffer_handle_t* handle, uint16_t count)
+void tcomp_buffer_discardLastBytes(tcomp_buffer_handle_t* handle, uint32_t count)
 {
 	if(handle){
 		tcomp_buffer_t* buffer = (tcomp_buffer_t*)handle;
@@ -321,11 +334,11 @@ void tcomp_buffer_allocBuff(tcomp_buffer_handle_t* handle, tsk_size_t size)
 			TSK_DEBUG_WARN("Cannot allocate zero bytes.");
 			return;
 		}
-		tsk_free((void**)&(buffer->lpbuffer));
-
 		buffer->index_bits = buffer->index_bytes = 0;
-		buffer->lpbuffer = (uint8_t*) tsk_calloc(1, size );
-		buffer->size = size;
+		buffer->size = 0;
+		if((buffer->lpbuffer = tsk_realloc(buffer->lpbuffer, size))){
+			buffer->size = size;
+		}
 	}
 	else{
 		TSK_DEBUG_ERROR("Null SigComp handle");
@@ -541,7 +554,7 @@ uint64_t tcomp_buffer_createHash(const void *data, tsk_size_t len)
 * @param handle SigComp handle holding the internal buffer to print.
 * @param size The number of bytes to print.
 */
-void tcomp_buffer_nprint(tcomp_buffer_handle_t* handle, tsk_size_t size)
+void tcomp_buffer_nprint(const tcomp_buffer_handle_t* handle, tsk_ssize_t size)
 {
 #if defined(_DEBUG) || defined(DEBUG)
 
@@ -554,7 +567,7 @@ void tcomp_buffer_nprint(tcomp_buffer_handle_t* handle, tsk_size_t size)
 
 		for(i = 0; i < tsk_size_to_print; i+=2){
 			char s[10]; 
-			uint16_t value;
+			uint32_t value;
 			memset(s, 0, 10);
 			
 			if((i+1) == tsk_size_to_print){
@@ -577,7 +590,7 @@ void tcomp_buffer_nprint(tcomp_buffer_handle_t* handle, tsk_size_t size)
 			}
 			printf("%s ", s);
 		}
-		printf("\n\n");
+		printf("\n");
 	}
 	else{
 		TSK_DEBUG_ERROR("Null SigComp handle");
@@ -619,25 +632,8 @@ void tcomp_buffer_reset(tcomp_buffer_handle_t* handle)
 static tsk_object_t* tcomp_buffer_ctor(tsk_object_t *self, va_list * app)
 {
 	tcomp_buffer_t* buffer = self;
-	const void* data = va_arg(*app, const void *);
-	tsk_size_t len = va_arg(*app, tsk_size_t);
-
 	if(buffer){
-		buffer->owner = 1;
-
-		/*
-		* The P-bit controls the order in which bits are passed from the dispatcher to the INPUT instructions.
-		*/
-		buffer->P_BIT = TCOMP_P_BIT_MSB_TO_LSB;
-
-		if(data && len){
-			tcomp_buffer_appendBuff(buffer, data, len);
-		}
 	}
-	else{
-		TSK_DEBUG_ERROR("Cannot create new SigComp handle");
-	}
-	
 	return self;
 }
 

@@ -103,9 +103,13 @@ tsip_header_Allow_t *tsip_header_Allow_parse(const char *data, tsk_size_t size)
 	const char *eof = pe;
 	tsip_header_Allow_t *hdr_allow = tsip_header_Allow_create();
 	
-	const char *tag_start;
+	const char *tag_start = tsk_null;
 
 	%%write data;
+	(void)(eof);
+	(void)(void)(tsip_machine_parser_header_Allow_first_final);
+	(void)(void)(tsip_machine_parser_header_Allow_error);
+	(void)(void)(tsip_machine_parser_header_Allow_en_main);
 	%%write init;
 	%%write exec;
 	

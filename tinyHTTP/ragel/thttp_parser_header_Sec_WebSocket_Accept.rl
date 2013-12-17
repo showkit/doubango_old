@@ -36,8 +36,8 @@
 	machine thttp_machine_parser_header_Sec_WebSocket_Accept;
 
 	# Includes
-	include thttp_machine_utils "./thttp_machine_utils.rl";
-	include thttp_machine_ws "./thttp_machine_ws.rl";
+	include thttp_machine_utils "./ragel/thttp_machine_utils.rl";
+	include thttp_machine_ws "./ragel/thttp_machine_ws.rl";
 
 	action tag { tag_start = p; }
 	action eob { }
@@ -82,9 +82,13 @@ thttp_header_Sec_WebSocket_Accept_t *thttp_header_Sec_WebSocket_Accept_parse(con
 	const char *eof = pe;
 	thttp_header_Sec_WebSocket_Accept_t *hdr_Sec_WebSocket_Accept = thttp_header_Sec_WebSocket_Accept_create_null();
 	
-	const char *tag_start;
+	const char *tag_start = tsk_null;
 
 	%%write data;
+	(void)(eof);
+	(void)(thttp_machine_parser_header_Sec_WebSocket_Accept_first_final);
+	(void)(thttp_machine_parser_header_Sec_WebSocket_Accept_error);
+	(void)(thttp_machine_parser_header_Sec_WebSocket_Accept_en_main);
 	%%write init;
 	%%write exec;
 	

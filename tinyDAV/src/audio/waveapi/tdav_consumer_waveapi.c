@@ -154,7 +154,7 @@ static int play_wavehdr(tdav_consumer_waveapi_t* consumer, LPWAVEHDR lpHdr)
 	return 0;
 }
 
-static void *__playback_thread(void *param)
+static void* TSK_STDCALL __playback_thread(void *param)
 {
 	tdav_consumer_waveapi_t* consumer = (tdav_consumer_waveapi_t*)param;  
 	DWORD dwEvent;
@@ -205,10 +205,10 @@ int tdav_consumer_waveapi_prepare(tmedia_consumer_t* self, const tmedia_codec_t*
 		TSK_DEBUG_ERROR("Invalid parameter");
 		return -1;
 	}
-	
-	TMEDIA_CONSUMER(consumer)->audio.ptime = codec->plugin->audio.ptime;
-	TMEDIA_CONSUMER(consumer)->audio.in.channels = codec->plugin->audio.channels;
-	TMEDIA_CONSUMER(consumer)->audio.in.rate = codec->plugin->rate;
+
+	TMEDIA_CONSUMER(consumer)->audio.ptime = TMEDIA_CODEC_PTIME_AUDIO_DECODING(codec);
+	TMEDIA_CONSUMER(consumer)->audio.in.channels = TMEDIA_CODEC_CHANNELS_AUDIO_DECODING(codec);
+	TMEDIA_CONSUMER(consumer)->audio.in.rate = TMEDIA_CODEC_RATE_DECODING(codec);
 	
 	/* codec should have ptime */
 	
@@ -226,7 +226,7 @@ int tdav_consumer_waveapi_prepare(tmedia_consumer_t* self, const tmedia_codec_t*
 	consumer->bytes_per_notif = ((consumer->wfx.nAvgBytesPerSec * TMEDIA_CONSUMER(consumer)->audio.ptime)/1000);
 
 	/* create buffers */
-	for(i = 0; i< sizeof(consumer->hWaveHeaders)/sizeof(LPWAVEHDR); i++){
+	for(i = 0; i< sizeof(consumer->hWaveHeaders)/sizeof(consumer->hWaveHeaders[0]); i++){
 		create_wavehdr(consumer, i);
 	}
 
@@ -265,7 +265,7 @@ int tdav_consumer_waveapi_start(tmedia_consumer_t* self)
 	 }
 
 	 /* write */
-	 for(i = 0; i< sizeof(consumer->hWaveHeaders)/sizeof(LPWAVEHDR); i++){
+	 for(i = 0; i< sizeof(consumer->hWaveHeaders)/sizeof(consumer->hWaveHeaders[0]); i++){
 		write_wavehdr(consumer, i);
 	}
 

@@ -90,9 +90,13 @@ tsip_header_Content_Length_t *tsip_header_Content_Length_parse(const char *data,
 	const char *eof = pe;
 	tsip_header_Content_Length_t *hdr_clength = tsip_header_Content_Length_create(0);
 	
-	const char *tag_start;
+	const char *tag_start = tsk_null;
 
 	%%write data;
+	(void)(eof);
+	(void)(tsip_machine_parser_header_Content_Length_first_final);
+	(void)(tsip_machine_parser_header_Content_Length_error);
+	(void)(tsip_machine_parser_header_Content_Length_en_main);
 	%%write init;
 	%%write exec;
 	

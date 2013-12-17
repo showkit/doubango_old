@@ -40,7 +40,7 @@ TMEDIA_BEGIN_DECLS
 #define TMEDIA_CONSUMER_BITS_PER_SAMPLE_DEFAULT		16
 #define TMEDIA_CONSUMER_CHANNELS_DEFAULT			2
 #define TMEDIA_CONSUMER_RATE_DEFAULT				8000
-#define TMEDIA_CONSUMER_PTIME_DEFAULT				20
+
 
 /**Max number of plugins (consumer types) we can create */
 #if !defined(TMED_CONSUMER_MAX_PLUGINS)
@@ -96,6 +96,12 @@ typedef struct tmedia_consumer_s
 	tsk_bool_t is_started;
 	tsk_bool_t is_prepared;
 	uint64_t session_id;
+
+	struct{
+		enum tmedia_codec_id_e codec_id;
+		// other options to be added
+	} decoder;
+
 	const struct tmedia_consumer_plugin_def_s* plugin;
 }
 tmedia_consumer_t;

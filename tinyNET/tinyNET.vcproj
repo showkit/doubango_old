@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="Windows-1252"?>
 <VisualStudioProject
 	ProjectType="Visual C++"
-	Version="9.00"
+	Version="9,00"
 	Name="tinyNET"
 	ProjectGUID="{7522A458-92F4-4259-B906-E84C2A65D9F1}"
 	RootNamespace="tinyNET"
@@ -42,14 +42,14 @@
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				AdditionalIncludeDirectories="src;&quot;..\thirdparties\win32\include&quot;;&quot;..\tinySAK\src&quot;"
-				PreprocessorDefinitions="DEBUG_LEVEL=DEBUG_LEVEL_INFO;TNET_HAVE_OPENSSL_H=1;WIN32;_WIN32_WINNT=0x0501;_DEBUG;_WINDOWS;_USRDLL;TINYNET_EXPORTS"
+				PreprocessorDefinitions="DEBUG_LEVEL=DEBUG_LEVEL_INFO;HAVE_OPENSSL=1;WIN32;_WIN32_WINNT=0x0501;_DEBUG;_WINDOWS;_USRDLL;TINYNET_EXPORTS"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
 				WarnAsError="true"
-				DebugInformationFormat="4"
+				DebugInformationFormat="1"
 				CompileAs="1"
 			/>
 			<Tool
@@ -116,10 +116,10 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				Optimization="2"
-				EnableIntrinsicFunctions="false"
+				Optimization="3"
+				EnableIntrinsicFunctions="true"
 				AdditionalIncludeDirectories="src;&quot;..\thirdparties\win32\include&quot;;&quot;..\tinySAK\src&quot;"
-				PreprocessorDefinitions="TNET_HAVE_OPENSSL_H=1;WIN32;NDEBUG;_WINDOWS;_USRDLL;TINYNET_EXPORTS"
+				PreprocessorDefinitions="DEBUG_LEVEL=DEBUG_LEVEL_ERROR;HAVE_OPENSSL=1;WIN32;NDEBUG;_WINDOWS;_USRDLL;TINYNET_EXPORTS"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="false"
 				UsePrecompiledHeader="0"
@@ -389,6 +389,10 @@
 				Name="tls"
 				>
 				<File
+					RelativePath=".\src\tls\tnet_dtls.c"
+					>
+				</File>
+				<File
 					RelativePath=".\src\tls\tnet_tls.c"
 					>
 				</File>
@@ -617,6 +621,10 @@
 				Name="tls"
 				>
 				<File
+					RelativePath=".\src\tls\tnet_dtls.h"
+					>
+				</File>
+				<File
 					RelativePath=".\src\tls\tnet_tls.h"
 					>
 				</File>
@@ -631,6 +639,14 @@
 			</File>
 			<File
 				RelativePath=".\ragel\tnet_dns_resolvconf.rl"
+				>
+			</File>
+		</Filter>
+		<Filter
+			Name="resources(*.rc)"
+			>
+			<File
+				RelativePath=".\version.rc"
 				>
 			</File>
 		</Filter>

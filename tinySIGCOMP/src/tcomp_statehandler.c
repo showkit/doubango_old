@@ -40,7 +40,7 @@ static int pred_find_compartment_by_id(const tsk_list_item_t *item, const void *
 {
 	if(item && item->data){
 		tcomp_compartment_t *compartment = item->data;
-		uint64_t res = (compartment->identifier - *((uint64_t*)id));
+		int64_t res = (compartment->identifier - *((int64_t*)id));
 		return res > 0 ? (int)1 : (res < 0 ? (int)-1 : (int)0);
 	}
 	return -1;
@@ -50,7 +50,47 @@ static int pred_find_compartment_by_id(const tsk_list_item_t *item, const void *
 */
 tcomp_statehandler_t* tcomp_statehandler_create()
 {
-	return tsk_object_new(tcomp_statehandler_def_t);
+	tcomp_statehandler_t* statehandler;
+	if((statehandler = tsk_object_new(tcomp_statehandler_def_t))){
+		/* RFC 3320 - 3.3.  SigComp Parameters */
+		statehandler->sigcomp_parameters = tcomp_params_create();
+		tcomp_params_setDmsValue(statehandler->sigcomp_parameters, SIP_RFC5049_DECOMPRESSION_MEMORY_SIZE);
+		tcomp_params_setSmsValue(statehandler->sigcomp_parameters, SIP_RFC5049_STATE_MEMORY_SIZE);
+		tcomp_params_setCpbValue(statehandler->sigcomp_parameters, SIP_RFC5049_CYCLES_PER_BIT);
+
+		if(!(statehandler->dictionaries = tsk_list_create())){
+			TSK_OBJECT_SAFE_FREE(statehandler);
+			goto bail;
+		}
+		if(!(statehandler->compartments = tsk_list_create())){
+			TSK_OBJECT_SAFE_FREE(statehandler);
+			goto bail;
+		}
+		statehandler->sigcomp_parameters->SigComp_version = SIP_RFC5049_SIGCOMP_VERSION;
+#if TCOMP_USE_ONLY_ACKED_STATES
+		statehandler->useOnlyACKedStates = tsk_true;
+#endif
+	}
+bail:
+	return statehandler;
+}
+
+int tcomp_statehandler_setUseOnlyACKedStates(tcomp_statehandler_t* self, tsk_bool_t useOnlyACKedStates)
+{
+	tsk_list_item_t* item;
+	if(!self){
+		TSK_DEBUG_ERROR("Invalid parameter");
+		return -1;
+	}
+	self->useOnlyACKedStates = useOnlyACKedStates;
+
+	tsk_safeobj_lock(self);
+	tsk_list_foreach(item, self->compartments){
+		tcomp_compartment_setUseOnlyACKedStates((tcomp_compartment_t*)item->data, self->useOnlyACKedStates);
+	}
+	tsk_safeobj_unlock(self);
+
+	return 0;
 }
 
 tcomp_compartment_t *tcomp_statehandler_getCompartment(const tcomp_statehandler_t *statehandler, uint64_t id)
@@ -68,7 +108,7 @@ tcomp_compartment_t *tcomp_statehandler_getCompartment(const tcomp_statehandler_
 
 	item_const = tsk_list_find_item_by_pred(statehandler->compartments, pred_find_compartment_by_id, &id);
 	if(!item_const || !(result = item_const->data)){
-		newcomp = tcomp_compartment_create(id, tcomp_params_getParameters(statehandler->sigcomp_parameters));
+		newcomp = tcomp_compartment_create(id, tcomp_params_getParameters(statehandler->sigcomp_parameters), statehandler->useOnlyACKedStates);
 		result = newcomp;
 		tsk_list_push_back_data(statehandler->compartments, ((void**) &newcomp));
 	}
@@ -117,9 +157,9 @@ tsk_bool_t tcomp_statehandler_compartmentExist(tcomp_statehandler_t *statehandle
 }
 
 
-uint16_t tcomp_statehandler_findState(tcomp_statehandler_t *statehandler, const tcomp_buffer_handle_t *partial_identifier, tcomp_state_t** lpState)
+uint32_t tcomp_statehandler_findState(tcomp_statehandler_t *statehandler, const tcomp_buffer_handle_t *partial_identifier, tcomp_state_t** lpState)
 {
-	uint16_t count = 0;
+	uint32_t count = 0;
 	tsk_list_item_t *item;
 
 	if(!statehandler){
@@ -134,7 +174,7 @@ uint16_t tcomp_statehandler_findState(tcomp_statehandler_t *statehandler, const 
 	//
 	tsk_list_foreach(item, statehandler->compartments){
 		tcomp_compartment_t *compartment = item->data;
-		count = tcomp_compartment_findState(compartment, partial_identifier, lpState);
+		count += tcomp_compartment_findState(compartment, partial_identifier, lpState);
 	}
 	
 	if(count){
@@ -160,7 +200,7 @@ bail:
 void tcomp_statehandler_handleResult(tcomp_statehandler_t *statehandler, tcomp_result_t **lpResult)
 {
 	tcomp_compartment_t *lpCompartment;
-	uint16_t compartment_total_size;
+	uint32_t compartment_total_size;
 	uint8_t i;
 
 	if(!statehandler){
@@ -184,7 +224,7 @@ void tcomp_statehandler_handleResult(tcomp_statehandler_t *statehandler, tcomp_r
 	/*
 	* Find corresponding compartment (only if !S)
 	*/
-	if(lpCompartment = tcomp_statehandler_getCompartment(statehandler, (*lpResult)->compartmentId)){
+	if((lpCompartment = tcomp_statehandler_getCompartment(statehandler, (*lpResult)->compartmentId))){
 		compartment_total_size = lpCompartment->total_memory_size;
 	}
 	else{
@@ -196,16 +236,21 @@ void tcomp_statehandler_handleResult(tcomp_statehandler_t *statehandler, tcomp_r
 	* Request state creation now we have the corresponding compartement.
 	*/
 	if(tcomp_result_getTempStatesToCreateSize(*lpResult)){
+		uint8_t count;
 		/* Check compartment allocated size*/
 		if(!compartment_total_size){
 			goto compartment_free_states;
 		}
+		
+		count = tcomp_result_getTempStatesToCreateSize(*lpResult);
 
 		// FIXME: lock
-		for (i = 0; i < tcomp_result_getTempStatesToCreateSize(*lpResult); i++)
+		for (i = 0; i < count; i++)
 		{
-			tcomp_state_t **lpState =  ((*lpResult)->statesToCreate + i);
-			if(!lpState || !*lpState) continue;
+			tcomp_state_t **lpState =  &((*lpResult)->statesToCreate[i]);
+			if(!lpState || !*lpState){
+				continue;
+			}
 
 			/*
 			* If the state creation request needs more state memory than the
@@ -271,46 +316,65 @@ bail: ;
 
 tsk_bool_t tcomp_statehandler_handleNack(tcomp_statehandler_t *statehandler, const tcomp_nackinfo_t * nackinfo)
 {
-	tcomp_buffer_handle_t *sha_id;
+	tcomp_buffer_handle_t* sha_id;
 	tsk_list_item_t *item;
+	tsk_bool_t found = tsk_false;
 	if(!statehandler){
 		TSK_DEBUG_ERROR("Invalid parameter");
 		return tsk_false;
 	}
 
-	tcomp_buffer_referenceBuff(&sha_id, ((tcomp_nackinfo_t*)nackinfo)->sha1, TSK_SHA1_DIGEST_SIZE);
+	if(!(sha_id = tcomp_buffer_create_null())){
+		TSK_DEBUG_ERROR("Failed to create buffer handle");
+		return tsk_false;
+	}
+
+	tcomp_buffer_referenceBuff(sha_id, ((tcomp_nackinfo_t*)nackinfo)->sha1, TSK_SHA1_DIGEST_SIZE);
 
 	tsk_list_foreach(item, statehandler->compartments)
 	{
 		tcomp_compartment_t* lpCompartement = item->data;
-		if(tcomp_compartment_hasNack(lpCompartement, &sha_id))
+		if(tcomp_compartment_hasNack(lpCompartement, sha_id))
 		{
 			// this compartment is responsible for this nack
 			switch(nackinfo->reasonCode)
 			{
-			case NACK_STATE_NOT_FOUND:
-				{
-					// Next commented because in this version remote state ids are never saved.
-					// Only the ghost has information on last partial state id to use --> reset the ghost
-					/*SigCompState* lpState = NULL;
-					lpCompartement->findState(&nack_info->details, &lpState);
-					if(lpState)
+				case NACK_STATE_NOT_FOUND:
 					{
-						lpCompartement->freeState(lpState);
-					}*/
-					tcomp_compartment_freeGhostState(lpCompartement);
-				}
-				break;
+						// Next commented because in this version remote state ids are never saved.
+						// Only the ghost has information on last partial state id to use --> reset the ghost
+						//SigCompState* lpState = NULL;
+						//lpCompartement->findState(&nack_info->details, &lpState);
+						//if(lpState)
+						//{
+						//	lpCompartement->freeState(lpState);
+						//}
+						tcomp_compartment_freeGhostState(lpCompartement);
+					}
+					break;
 
-			default:
-				{
-					tcomp_compartment_clearStates(lpCompartement);
-				}
-				break;
+				default:
+					{
+						tcomp_compartment_freeGhostState(lpCompartement);
+						tcomp_compartment_clearStates(lpCompartement);
+					}
+					break;
 			}
+			TSK_DEBUG_INFO("Compartment has NACK :)");
+			tcomp_buffer_print(sha_id);
+			found = tsk_true;
 		}
 	}
-	return tsk_true;
+
+	if(!found)
+	{
+		TSK_DEBUG_ERROR("Compartments do not have NACK with id=");
+		tcomp_buffer_print(sha_id);
+	}
+
+	TSK_OBJECT_SAFE_FREE(sha_id);
+
+	return found;
 }
 
 int tcomp_statehandler_addSipSdpDictionary(tcomp_statehandler_t *statehandler)
@@ -367,17 +431,6 @@ static tsk_object_t* tcomp_statehandler_ctor(tsk_object_t * self, va_list * app)
 	if(statehandler){
 		/* Initialize safeobject */
 		tsk_safeobj_init(statehandler);
-		
-		/* RFC 3320 - 3.3.  SigComp Parameters */
-		statehandler->sigcomp_parameters = tcomp_params_create();
-		tcomp_params_setDmsValue(statehandler->sigcomp_parameters, SIP_RFC5049_DECOMPRESSION_MEMORY_SIZE);
-		tcomp_params_setSmsValue(statehandler->sigcomp_parameters, SIP_RFC5049_STATE_MEMORY_SIZE);
-		tcomp_params_setCpbValue(statehandler->sigcomp_parameters, SIP_RFC5049_CYCLES_PER_BIT);
-	
-		statehandler->dictionaries = tsk_list_create();
-		statehandler->compartments = tsk_list_create();
-
-		statehandler->sigcomp_parameters->SigComp_version = SIP_RFC5049_SIGCOMP_VERSION;
 	}
 	else{
 		TSK_DEBUG_ERROR("Null SigComp state handler.");

@@ -92,9 +92,13 @@ tmsrp_header_Min_Expires_t *tmsrp_header_Min_Expires_parse(const char *data, tsk
 	const char *eof = pe;
 	tmsrp_header_Min_Expires_t *hdr_Min_Expires = tmsrp_header_Min_Expires_create_null();
 	
-	const char *tag_start;
+	const char *tag_start = tsk_null;
 
 	%%write data;
+	(void)(eof);
+	(void)(tmsrp_machine_parser_header_Min_Expires_first_final);
+	(void)(tmsrp_machine_parser_header_Min_Expires_error);
+	(void)(tmsrp_machine_parser_header_Min_Expires_en_main);
 	%%write init;
 	%%write exec;
 	

@@ -31,6 +31,7 @@
 
 #include "tinysip/dialogs/tsip_dialog_layer.h"
 #include "tinysip/transactions/tsip_transac_layer.h"
+#include "tinysip/transports/tsip_transport_layer.h"
 
 #include "tinysip/transactions/tsip_transac_nict.h"
 
@@ -52,10 +53,37 @@
 #include "tsk_time.h"
 
 int tsip_dialog_update_challenges(tsip_dialog_t *self, const tsip_response_t* response, tsk_bool_t acceptNewVector);
+int tsip_dialog_add_session_headers(const tsip_dialog_t *self, tsip_request_t* request);
 int tsip_dialog_add_common_headers(const tsip_dialog_t *self, tsip_request_t* request);
 
-extern tsip_uri_t* tsip_stack_get_pcscf_uri(const tsip_stack_t *self, tsk_bool_t lr);
+extern tsip_uri_t* tsip_stack_get_pcscf_uri(const tsip_stack_t *self, tnet_socket_type_t type, tsk_bool_t lr);
 extern tsip_uri_t* tsip_stack_get_contacturi(const tsip_stack_t *self, const char* protocol);
+
+#define TSIP_DIALOG_ADD_HEADERS(headers) {\
+		const tsk_list_item_t* item;\
+		tsk_list_foreach(item, headers){ \
+			if(!TSK_PARAM(item->data)->tag){ \
+				/* 'Route' is special header as it's used to find next destination address */ \
+				if(tsk_striequals(TSK_PARAM(item->data)->name, "route")){ \
+					tsip_uri_t* route_uri; \
+					char* route_uri_str = tsk_strdup(TSK_PARAM(item->data)->value); \
+					tsk_strunquote_2(&route_uri_str, '<', '>'); \
+					route_uri = tsip_uri_parse(route_uri_str, tsk_strlen(route_uri_str)); \
+					if(route_uri){ \
+						tsip_message_add_headers(request, \
+							TSIP_HEADER_ROUTE_VA_ARGS(route_uri), \
+							tsk_null); \
+						TSK_OBJECT_SAFE_FREE(route_uri); \
+					} \
+					TSK_FREE(route_uri_str); \
+				} \
+				else{ \
+					TSIP_MESSAGE_ADD_HEADER(request, TSIP_HEADER_DUMMY_VA_ARGS(TSK_PARAM(item->data)->name, TSK_PARAM(item->data)->value)); \
+				} \
+			} \
+		}\
+	}
+
 
 tsip_request_t *tsip_dialog_request_new(const tsip_dialog_t *self, const char* method)
 {
@@ -205,7 +233,13 @@ tsip_request_t *tsip_dialog_request_new(const tsip_dialog_t *self, const char* m
 					request->line.request.request_type == tsip_PUBLISH || 
 					request->line.request.request_type == tsip_REGISTER){
 					/**** with expires */
-					tsk_sprintf(&contact, "m: <%s:%s@%s:%d>;expires=%d\r\n", "sip", from_uri->user_name, "127.0.0.1", 5060, TSK_TIME_MS_2_S(self->expires));
+					tsk_sprintf(&contact, "m: <%s:%s@%s:%d>;expires=%d\r\n", 
+						"sip", 
+						from_uri->user_name,
+						"127.0.0.1", 
+						5060,
+						
+						TSK_TIME_MS_2_S(self->expires));
 				}
 				else{
 					/**** without expires */
@@ -216,7 +250,22 @@ tsip_request_t *tsip_dialog_request_new(const tsip_dialog_t *self, const char* m
 						*/
 						TSIP_MESSAGE_ADD_HEADER(request, TSIP_HEADER_EXPIRES_VA_ARGS(TSK_TIME_MS_2_S(self->expires)));
 					}
-					tsk_sprintf(&contact, "m: <%s:%s@%s:%d>\r\n", "sip", from_uri->user_name, "127.0.0.1", 5060);
+					tsk_sprintf(&contact, "m: <%s:%s@%s:%d%s%s%s%s%s%s%s%s%s>\r\n", 
+							"sip", 
+							from_uri->user_name, 
+							"127.0.0.1", 
+							5060,
+
+							self->ss->ws.src.host ? ";" : "",
+							self->ss->ws.src.host ? "ws-src-ip=" : "",
+							self->ss->ws.src.host ? self->ss->ws.src.host : "",
+							self->ss->ws.src.port[0] ? ";" : "",
+							self->ss->ws.src.port[0] ? "ws-src-port=" : "",
+							self->ss->ws.src.port[0] ? self->ss->ws.src.port : "",
+							self->ss->ws.src.proto ? ";" : "",
+							self->ss->ws.src.proto ? "ws-src-proto=" : "",
+							self->ss->ws.src.proto ? self->ss->ws.src.proto : ""
+						);
 				}
 				hdr_contacts = tsip_header_Contact_parse(contact, tsk_strlen(contact));
 				if(!TSK_LIST_IS_EMPTY(hdr_contacts)){
@@ -351,7 +400,7 @@ tsip_request_t *tsip_dialog_request_new(const tsip_dialog_t *self, const char* m
 				*/
 #if _DEBUG && defined(SDS_HACK)/* FIXME: remove this */
 				/* Ericsson SDS hack (INVITE with Proxy-CSCF as First route fail) */
-#else
+#elif 0
 				tsip_uri_t *uri = tsip_stack_get_pcscf_uri(TSIP_DIALOG_GET_STACK(self), tsk_true);
 				// Proxy-CSCF as first route
 				if(uri){
@@ -367,19 +416,11 @@ tsip_request_t *tsip_dialog_request_new(const tsip_dialog_t *self, const char* m
 		}
 	}
 
-	/* Add headers associated to the dialog's session */
-	tsk_list_foreach(item, self->ss->headers){
-		if(!TSK_PARAM(item->data)->tag){
-			TSIP_MESSAGE_ADD_HEADER(request, TSIP_HEADER_DUMMY_VA_ARGS(TSK_PARAM(item->data)->name, TSK_PARAM(item->data)->value));
-		}
-	}
+	/* Add headers associated to the session */
+	tsip_dialog_add_session_headers(self, request);
 
 	/* Add headers associated to the dialog's stack */
-	tsk_list_foreach(item, self->ss->stack->headers){
-		if(!TSK_PARAM(item->data)->tag){
-			TSIP_MESSAGE_ADD_HEADER(request, TSIP_HEADER_DUMMY_VA_ARGS(TSK_PARAM(item->data)->name, TSK_PARAM(item->data)->value));
-		}
-	}
+	TSIP_DIALOG_ADD_HEADERS(self->ss->stack->headers);
 
 	/* Add common headers */
 	tsip_dialog_add_common_headers(self, request);
@@ -393,6 +434,10 @@ tsip_request_t *tsip_dialog_request_new(const tsip_dialog_t *self, const char* m
 
 	/* Remote Address: Used if "Server mode" otherwise Proxy-CSCF will be used  */
 	request->remote_addr = self->remote_addr;
+	/* Connected FD */
+	if(request->local_fd <= 0) {
+		request->local_fd = self->connected_fd;
+	}
 
 	TSK_OBJECT_SAFE_FREE(request_uri);
 	TSK_OBJECT_SAFE_FREE(from_uri);
@@ -421,22 +466,43 @@ int tsip_dialog_request_send(const tsip_dialog_t *self, tsip_request_t* request)
 				As this is an outgoing request ==> It shall be a client transaction (NICT or ICT).
 				For server transactions creation see @ref tsip_dialog_response_send.
 			*/
-			tsip_transac_t *transac = tsip_transac_layer_new(layer, tsk_true, request, TSIP_DIALOG(self));
+			static const tsk_bool_t isCT = tsk_true;
+			tsip_transac_t* transac;
+			tsip_transac_dst_t* dst;
+			
 
-			/* Set the transaction's dialog. All events comming from the transaction (timeouts, errors ...) will be signaled to this dialog.
-			*/
+			if(TSIP_STACK_MODE_IS_CLIENT(TSIP_DIALOG_GET_STACK(self))){
+				const tsip_transport_t* transport = tsip_transport_layer_find_by_idx(TSIP_DIALOG_GET_STACK(self)->layer_transport, TSIP_DIALOG_GET_STACK(self)->network.transport_idx_default);
+				if(!transport){
+					TSK_DEBUG_ERROR("Failed to find a valid default transport [%d]", TSIP_DIALOG_GET_STACK(self)->network.transport_idx_default);
+				}
+				else{
+					request->dst_net_type = transport->type;
+				}
+			}
+			dst = tsip_transac_dst_dialog_create(TSIP_DIALOG(self));
+			transac = tsip_transac_layer_new(
+				layer, 
+				isCT,
+				request, 
+				dst
+			);
+			TSK_OBJECT_SAFE_FREE(dst);
+
+			/* Set the transaction's dialog. All events comming from the transaction (timeouts, errors ...) will be signaled to this dialog */
 			if(transac){
 				switch(transac->type)
 				{
-				case tsip_ict:
-				case tsip_nict:
-					{
-						/* Start the newly create IC/NIC transaction */
-						ret = tsip_transac_start(transac, request);
-						break;
-					}
+					case tsip_transac_type_ict:
+					case tsip_transac_type_nict:
+						{
+							/* Start the newly create IC/NIC transaction */
+							ret = tsip_transac_start(transac, request);
+							break;
+						}
+                    default: break;
 				}
-				tsk_object_unref(transac);
+				TSK_OBJECT_SAFE_FREE(transac);
 			}
 		}
 	}
@@ -481,6 +547,10 @@ tsip_response_t *tsip_dialog_response_new(tsip_dialog_t *self, short status, con
 			/* should be added in this field instead of 'Contact' or 'Via' headers
 			* it's up to the transport layer to copy it to these headers */
 			response->sigcomp_id = tsk_strdup(self->ss->sigcomp_id);
+		}
+		/* Connected FD */
+		if(response->local_fd <= 0) {
+			response->local_fd = self->connected_fd;
 		}
 		/* Remote Addr: used to send requests if "Server Mode" otherwise Proxy-CSCF address will be used */
 		self->remote_addr = request->remote_addr;
@@ -544,7 +614,7 @@ int tsip_dialog_apply_action(tsip_message_t* message, const tsip_action_t* actio
  *
  * @return	Zero if succeed and no-zero error code otherwise. 
 **/
-int64_t tsip_dialog_get_newdelay(tsip_dialog_t *self, const tsip_response_t* response)
+int64_t tsip_dialog_get_newdelay(tsip_dialog_t *self, const tsip_message_t* message)
 {
 	int64_t expires = self->expires;
 	int64_t newdelay = expires;	/* default value */
@@ -553,9 +623,9 @@ int64_t tsip_dialog_get_newdelay(tsip_dialog_t *self, const tsip_response_t* res
 
 	/*== NOTIFY with subscription-state header with expires parameter. 
 	*/
-	if(TSIP_RESPONSE_IS_TO_NOTIFY(response)){
+	if(TSIP_REQUEST_IS_NOTIFY(message)){
 		const tsip_header_Subscription_State_t *hdr_state;
-		if((hdr_state = (const tsip_header_Subscription_State_t*)tsip_message_get_header(response, tsip_htype_Subscription_State))){
+		if((hdr_state = (const tsip_header_Subscription_State_t*)tsip_message_get_header(message, tsip_htype_Subscription_State))){
 			if(hdr_state->expires >0){
 				expires = TSK_TIME_S_2_MS(hdr_state->expires);
 				goto compute;
@@ -565,14 +635,14 @@ int64_t tsip_dialog_get_newdelay(tsip_dialog_t *self, const tsip_response_t* res
 
 	/*== Expires header.
 	*/
-	if((hdr = tsip_message_get_header(response, tsip_htype_Expires))){
+	if((hdr = tsip_message_get_header(message, tsip_htype_Expires))){
 		expires = TSK_TIME_S_2_MS(((const tsip_header_Expires_t*)hdr)->delta_seconds);
 		goto compute;
 	}
 
 	/*== Contact header.
 	*/
-	for(i=0; (hdr = tsip_message_get_headerAt(response, tsip_htype_Contact, i)); i++){
+	for(i=0; (hdr = tsip_message_get_headerAt(message, tsip_htype_Contact, i)); i++){
 		const tsip_header_Contact_t* contact = (const tsip_header_Contact_t*)hdr;
 		if(contact && contact->uri)
 		{
@@ -652,9 +722,9 @@ int tsip_dialog_update(tsip_dialog_t *self, const tsip_response_t* response)
 
 			/* 1xx */
 			if(code <= 199){
-				if(tsk_strempty(response->To->tag)){
-					TSK_DEBUG_ERROR("Invalid tag  parameter");
-					return -1;
+				if(tsk_strnullORempty(response->To->tag)){
+					TSK_DEBUG_WARN("Invalid tag  parameter");
+					return 0;
 				}
 				state = tsip_early;
 			}
@@ -732,7 +802,7 @@ int tsip_dialog_update_2(tsip_dialog_t *self, const tsip_request_t* invite)
 	}
 
 	/* cseq + tags + remote-uri */
-	tsk_strupdate(&self->tag_remote, invite->From?invite->From->tag:"showkit");
+	tsk_strupdate(&self->tag_remote, invite->From?invite->From->tag:"doubango");
 	/* self->cseq_value = invite->CSeq ? invite->CSeq->seq : self->cseq_value; */
 	if(invite->From && invite->From->uri){
 		TSK_OBJECT_SAFE_FREE(self->uri_remote);
@@ -854,6 +924,9 @@ int tsip_dialog_update_challenges(tsip_dialog_t *self, const tsip_response_t* re
 					WWW_Authenticate->algorithm, 
 					WWW_Authenticate->qop)))
 			{
+				if(TSIP_DIALOG_GET_SS(self)->auth_ha1 && TSIP_DIALOG_GET_SS(self)->auth_impi){
+					tsip_challenge_set_cred(challenge, TSIP_DIALOG_GET_SS(self)->auth_impi, TSIP_DIALOG_GET_SS(self)->auth_ha1);
+				}
 				tsk_list_push_back_data(self->challenges, (void**)&challenge);
 			}
 			else{
@@ -905,6 +978,9 @@ int tsip_dialog_update_challenges(tsip_dialog_t *self, const tsip_response_t* re
 					Proxy_Authenticate->algorithm, 
 					Proxy_Authenticate->qop)))
 			{
+				if(TSIP_DIALOG_GET_SS(self)->auth_ha1 && TSIP_DIALOG_GET_SS(self)->auth_impi){
+					tsip_challenge_set_cred(challenge, TSIP_DIALOG_GET_SS(self)->auth_impi, TSIP_DIALOG_GET_SS(self)->auth_ha1);
+				}
 				tsk_list_push_back_data(self->challenges, (void**)&challenge);
 			}
 			else{
@@ -914,7 +990,17 @@ int tsip_dialog_update_challenges(tsip_dialog_t *self, const tsip_response_t* re
 		}
 	}	
 	return 0;
+}
 
+int tsip_dialog_add_session_headers(const tsip_dialog_t *self, tsip_request_t* request)
+{
+	if(!self || !request){
+		TSK_DEBUG_ERROR("Invalid parameter");
+		return -1;
+	}
+
+	TSIP_DIALOG_ADD_HEADERS(self->ss->headers);
+	return 0;
 }
 
 int tsip_dialog_add_common_headers(const tsip_dialog_t *self, tsip_request_t* request)
@@ -924,6 +1010,7 @@ int tsip_dialog_add_common_headers(const tsip_dialog_t *self, tsip_request_t* re
 	const char* netinfo = tsk_null;
 
 	if(!self || !request){
+		TSK_DEBUG_ERROR("Invalid parameter");
 		return -1;
 	}
 
@@ -933,7 +1020,7 @@ int tsip_dialog_add_common_headers(const tsip_dialog_t *self, tsip_request_t* re
 	//
 	//	P-Preferred-Identity
 	//
-	if(preferred_identity){
+	if(preferred_identity && TSIP_STACK_MODE_IS_CLIENT(TSIP_DIALOG_GET_STACK(self))){
 		/*	3GPP TS 33.978 6.2.3.1 Procedures at the UE
 			The UE shall use the temporary public user identity (IMSI-derived IMPU, cf. section 6.1.2) only in registration
 			messages (i.e. initial registration, re-registration or de-registration), but not in any other type of SIP requests.
@@ -980,7 +1067,7 @@ int tsip_dialog_add_common_headers(const tsip_dialog_t *self, tsip_request_t* re
 					TSIP_MESSAGE_ADD_HEADER(request, TSIP_HEADER_P_ACCESS_NETWORK_INFO_VA_ARGS(netinfo));
 					break;
 				}
-            default:break;
+            default: break;
 		}
 	}
 
@@ -989,6 +1076,7 @@ int tsip_dialog_add_common_headers(const tsip_dialog_t *self, tsip_request_t* re
 
 int tsip_dialog_init(tsip_dialog_t *self, tsip_dialog_type_t type, const char* call_id, tsip_ssession_t* ss, tsk_fsm_state_id curr, tsk_fsm_state_id term)
 {
+	static tsip_dialog_id_t unique_id = 0;
 	if(self){
 		if(self->initialized){
 			TSK_DEBUG_WARN("Dialog already initialized.");
@@ -997,6 +1085,8 @@ int tsip_dialog_init(tsip_dialog_t *self, tsip_dialog_type_t type, const char* c
 
 		self->state = tsip_initial;
 		self->type = type;
+		self->id = ++unique_id;
+		self->connected_fd = TNET_INVALID_FD;
 		if(!self->record_routes){
 			self->record_routes = tsk_list_create();
 		}
@@ -1066,15 +1156,18 @@ int tsip_dialog_init(tsip_dialog_t *self, tsip_dialog_type_t type, const char* c
 int tsip_dialog_fsm_act(tsip_dialog_t* self, tsk_fsm_action_id action_id, const tsip_message_t* message, const tsip_action_handle_t* action)
 {
 	int ret;
+	tsip_dialog_t* copy;
 	if(!self || !self->fsm){
 		TSK_DEBUG_ERROR("Invalid parameter.");
 		return -1;
 	}
 
 	tsk_safeobj_lock(self);
-	ret = tsip_dialog_set_curr_action(self, action);
-	ret = tsk_fsm_act(self->fsm, action_id, self, message, self, message, action);
-	tsk_safeobj_unlock(self);
+	copy = tsk_object_ref(self); /* keep a copy because tsk_fsm_act() could destroy the dialog */
+	ret = tsip_dialog_set_curr_action(copy, action);
+	ret = tsk_fsm_act(copy->fsm, action_id, copy, message, copy, message, action);
+	tsk_safeobj_unlock(copy);
+	tsk_object_unref(copy);
 
 	return ret;
 }
@@ -1092,6 +1185,16 @@ tsk_bool_t tsip_dialog_keep_action(const tsip_dialog_t* self, const tsip_respons
 			(code == 422 || code == 423);
 	}
 	return tsk_false;
+}
+
+int tsip_dialog_set_connected_fd(tsip_dialog_t* self, tnet_fd_t fd)
+{
+	if(!self){
+		TSK_DEBUG_ERROR("Invalid parameter");
+		return -1;
+	}
+	self->connected_fd = fd;
+	return 0;
 }
 
 int tsip_dialog_set_curr_action(tsip_dialog_t* self, const tsip_action_t* action)
@@ -1153,13 +1256,15 @@ int tsip_dialog_get_lasterror(const tsip_dialog_t* self, short *code, const char
 int tsip_dialog_hangup(tsip_dialog_t *self, const tsip_action_t* action)
 {
 	if(self){
-		if(self->state == tsip_established){
+		// CANCEL should only be sent for INVITE dialog
+		if(self->type != tsip_dialog_INVITE || self->state == tsip_established){
 			return tsip_dialog_fsm_act(self, tsip_atype_hangup, tsk_null, action);
 		}
 		else{
 			return tsip_dialog_fsm_act(self, tsip_atype_cancel, tsk_null, action);
 		}
 	}
+	TSK_DEBUG_ERROR("Invalid parameter");
 	return -1;
 }
 
@@ -1168,6 +1273,16 @@ int tsip_dialog_shutdown(tsip_dialog_t *self, const tsip_action_t* action)
 	if(self){
 		return tsip_dialog_fsm_act(self, tsip_atype_shutdown, tsk_null, action);
 	}
+	TSK_DEBUG_ERROR("Invalid parameter");
+	return -1;
+}
+
+int tsip_dialog_signal_transport_error(tsip_dialog_t *self)
+{
+	if(self){
+		return tsip_dialog_fsm_act(self, tsip_atype_transport_error, tsk_null, tsk_null);
+	}
+	TSK_DEBUG_ERROR("Invalid parameter");
 	return -1;
 }
 
@@ -1201,6 +1316,9 @@ int tsip_dialog_deinit(tsip_dialog_t *self)
 		
 		/* Cancel all transactions associated to this dialog (do it here before the dialog becomes unsafe) */
 		tsip_transac_layer_cancel_by_dialog(TSIP_DIALOG_GET_STACK(self)->layer_transac, self);
+
+		/* Remove the dialog from the Stream peers */
+		tsip_dialog_layer_remove_callid_from_stream_peers(TSIP_DIALOG_GET_STACK(self)->layer_dialog, self->callid);
 		
 		TSK_OBJECT_SAFE_FREE(self->ss);
 		TSK_OBJECT_SAFE_FREE(self->curr_action);

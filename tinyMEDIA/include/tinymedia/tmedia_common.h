@@ -32,6 +32,7 @@
 
 #include "tinymedia_config.h"
 
+#include "tsk_plugin.h"
 #include "tsk_object.h"
 
 TMEDIA_BEGIN_DECLS
@@ -52,9 +53,11 @@ typedef enum tmedia_type_e
 	tmedia_t38 = (0x01 << 5),
 	tmedia_t140 = (0x01 << 6),
     tmedia_data = (0x01 << 7),
+
 	tmedia_msrp = (tmedia_chat | tmedia_file),
 	tmedia_audiovideo = (tmedia_audio | tmedia_video),
     tmedia_audiovideodata = (tmedia_audio | tmedia_video | tmedia_data),
+
 	tmedia_all = 0xff
 }
 tmedia_type_t;
@@ -127,12 +130,27 @@ typedef enum tmedia_pref_video_size_s
 	tmedia_pref_video_size_4cif, // 704 x 576
 	tmedia_pref_video_size_svga, // 800 x 600
 	tmedia_pref_video_size_480p, // 852 x 480
-    tmedia_pref_video_size_dvga, // 960 x 640
+	tmedia_pref_video_size_dvga, // 960 x 540
 	tmedia_pref_video_size_720p, // 1280 x 720
 	tmedia_pref_video_size_16cif, // 1408 x 1152
 	tmedia_pref_video_size_1080p, // 1920 x 1080
+	tmedia_pref_video_size_2160p, // 3840 x 2160
+    tmedia_pref_video_size_notfound
 }
 tmedia_pref_video_size_t;
+
+typedef enum tmedia_rtcweb_type_e
+{
+	tmedia_rtcweb_type_none,
+	tmedia_rtcweb_type_firefox,
+	tmedia_rtcweb_type_chrome,
+	tmedia_rtcweb_type_ie,
+	tmedia_rtcweb_type_safari,
+	tmedia_rtcweb_type_opera,
+	tmedia_rtcweb_type_ericsson,
+	tmedia_rtcweb_type_doubango
+}
+tmedia_rtcweb_type_t;
 
 typedef enum tmedia_video_encode_result_type_e
 {
@@ -175,7 +193,7 @@ typedef enum tmedia_video_decode_result_type_e
 	tmedia_video_decode_result_type_none,
 
 	tmedia_video_decode_result_type_error,
-	tmedia_video_decode_result_type_success,
+	tmedia_video_decode_result_type_idr,
 }
 tmedia_video_decode_result_type_t;
 
@@ -222,15 +240,30 @@ typedef enum tmedia_bandwidth_level_e
 }
 tmedia_bandwidth_level_t;
 
+typedef enum tmedia_ro_type_e
+{
+	tmedia_ro_type_none = 0x00,
+	tmedia_ro_type_offer = (0x01 << 0),
+	tmedia_ro_type_answer = (0x01 << 1),
+	tmedia_ro_type_provisional = tmedia_ro_type_answer | (0x01 << 2),
+}
+tmedia_ro_type_t;
+
+TINYMEDIA_API tsk_size_t tmedia_plugin_register(struct tsk_plugin_s* plugin, enum tsk_plugin_def_type_e type, enum tsk_plugin_def_media_type_e media);
+TINYMEDIA_API tsk_size_t tmedia_plugin_unregister(struct tsk_plugin_s* plugin, enum tsk_plugin_def_type_e type, enum tsk_plugin_def_media_type_e media);
 TINYMEDIA_API tmedia_type_t tmedia_type_from_sdp(const struct tsdp_message_s* sdp);
 TINYMEDIA_API int tmedia_parse_rtpmap(const char* rtpmap, char** name, int32_t* rate, int32_t* channels);
 TINYMEDIA_API int tmedia_video_get_size(tmedia_pref_video_size_t pref_vs, unsigned *width, unsigned *height);
+TINYMEDIA_API tmedia_pref_video_size_t tmedia_video_get_size_enum(unsigned width, unsigned height);
 TINYMEDIA_API int tmedia_video_get_closest_cif_size(tmedia_pref_video_size_t pref_vs, tmedia_pref_video_size_t *cif_vs);
 TINYMEDIA_API int tmedia_parse_video_fmtp(const char* fmtp, tmedia_pref_video_size_t pref_vs, unsigned* width, unsigned* height, unsigned* fps);
 TINYMEDIA_API int tmedia_parse_video_imageattr(const char* imageattr, tmedia_pref_video_size_t pref_vs, unsigned* in_width, unsigned* in_height, unsigned* out_width, unsigned* out_height);
 TINYMEDIA_API char* tmedia_get_video_fmtp(tmedia_pref_video_size_t pref_vs);
 TINYMEDIA_API char* tmedia_get_video_imageattr(tmedia_pref_video_size_t pref_vs, unsigned in_width, unsigned in_height, unsigned out_width, unsigned out_height);
 TINYMEDIA_API int tmedia_get_video_quality(tmedia_bandwidth_level_t bl);
+TINYMEDIA_API int32_t tmedia_get_video_bandwidth_kbps(unsigned width, unsigned height, unsigned fps, unsigned motion_rank);
+TINYMEDIA_API int32_t tmedia_get_video_bandwidth_kbps_2(unsigned width, unsigned height, unsigned fps);
+TINYMEDIA_API int32_t tmedia_get_video_bandwidth_kbps_3();
 #define tmedia_get_video_qscale tmedia_get_video_quality
 
 TMEDIA_END_DECLS

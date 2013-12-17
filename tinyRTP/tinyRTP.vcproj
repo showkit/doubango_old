@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="Windows-1252"?>
 <VisualStudioProject
 	ProjectType="Visual C++"
-	Version="9.00"
+	Version="9,00"
 	Name="tinyRTP"
 	ProjectGUID="{99B7D02F-8C70-4B45-AF3C-92313C3CEE15}"
 	RootNamespace="tinyRTP"
@@ -41,7 +41,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="include;..\tinySAK\src;..\tinyNET\src;..\thirdparties\win32\include"
+				AdditionalIncludeDirectories="include;..\tinySAK\src;..\tinyNET\src;..\tinyMEDIA\include;..\thirdparties\win32\include"
 				PreprocessorDefinitions="DEBUG_LEVEL=DEBUG_LEVEL_INFO;HAVE_SRTP=1;WIN32;_DEBUG;_WINDOWS;_USRDLL;TINYRTP_EXPORTS"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -49,7 +49,7 @@
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
 				WarnAsError="true"
-				DebugInformationFormat="4"
+				DebugInformationFormat="1"
 				CompileAs="1"
 			/>
 			<Tool
@@ -63,7 +63,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="ws2_32.lib $(OutDir)\tinySAK.lib $(OutDir)\tinyNET.lib &quot;..\thirdparties\win32\lib\srtp\libsrtp.a&quot; ..\thirdparties\win32\lib\libgcc.a"
+				AdditionalDependencies="ws2_32.lib $(OutDir)\tinySAK.lib $(OutDir)\tinyNET.lib $(OutDir)\tinyMEDIA.lib &quot;..\thirdparties\win32\lib\srtp\libsrtp.a&quot; ..\thirdparties\win32\lib\libgcc.a"
 				LinkIncremental="2"
 				GenerateDebugInformation="true"
 				SubSystem="2"
@@ -116,9 +116,9 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				Optimization="2"
-				EnableIntrinsicFunctions="false"
-				AdditionalIncludeDirectories="..\thirdparties\win32\include;include;..\tinySAK\src;..\tinyNET\src"
+				Optimization="3"
+				EnableIntrinsicFunctions="true"
+				AdditionalIncludeDirectories="..\thirdparties\win32\include;include;..\tinySAK\src;..\tinyNET\src;..\tinyMEDIA\include"
 				PreprocessorDefinitions="HAVE_SRTP=1;WIN32;NDEBUG;_WINDOWS;_USRDLL;TINYRTP_EXPORTS"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="false"
@@ -139,7 +139,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="ws2_32.lib $(OutDir)\tinySAK.lib $(OutDir)\tinyNET.lib &quot;..\thirdparties\win32\lib\srtp\libsrtp.a&quot; &quot;..\thirdparties\win32\lib\libgcc.a&quot;"
+				AdditionalDependencies="ws2_32.lib $(OutDir)\tinySAK.lib $(OutDir)\tinyNET.lib $(OutDir)\tinyMEDIA.lib &quot;..\thirdparties\win32\lib\srtp\libsrtp.a&quot; &quot;..\thirdparties\win32\lib\libgcc.a&quot;"
 				LinkIncremental="1"
 				IgnoreDefaultLibraryNames="MSVCRTD"
 				GenerateDebugInformation="false"
@@ -369,6 +369,14 @@
 				Name="rtsp"
 				>
 			</Filter>
+		</Filter>
+		<Filter
+			Name="resources(*.rc)"
+			>
+			<File
+				RelativePath=".\version.rc"
+				>
+			</File>
 		</Filter>
 	</Files>
 	<Globals>

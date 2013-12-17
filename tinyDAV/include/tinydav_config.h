@@ -29,12 +29,19 @@
 
 // Windows (XP/Vista/7/CE and Windows Mobile) macro definition
 #if defined(WIN32)|| defined(_WIN32) || defined(_WIN32_WCE)
-#	define TDAV_UNDER_WINDOWS			1
+#	define TDAV_UNDER_WINDOWS	1
+#	if defined(WINAPI_FAMILY) && (WINAPI_FAMILY == WINAPI_FAMILY_PHONE_APP || WINAPI_FAMILY == WINAPI_FAMILY_APP)
+#		define TDAV_UNDER_WINDOWS_RT			1
+#		if WINAPI_FAMILY == WINAPI_FAMILY_PHONE_APP
+#			define TDAV_UNDER_WINDOWS_PHONE		1
+#		endif
+#	endif
 #endif
 
 // OS X or iOS
 #if defined(__APPLE__)
 #	define TDAV_UNDER_APPLE				1
+#   include <TargetConditionals.h>
 #endif
 #if TARGET_OS_MAC
 #	define TDAV_UNDER_MAC				1
@@ -52,14 +59,14 @@
 #endif
 
 // Mobile
-#if defined(_WIN32_WCE) || defined(ANDROID) // iOS (not true)=> || defined(IOS)
+#if defined(_WIN32_WCE) || defined(ANDROID) || TDAV_UNDER_IPHONE || TDAV_UNDER_IPHONE_SIMULATOR
 #	define TDAV_UNDER_MOBILE	1
 #endif
 
 #if (TDAV_UNDER_WINDOWS || defined(__SYMBIAN32__)) && defined(TINYDAV_EXPORTS)
 # 	define TINYDAV_API		__declspec(dllexport)
-# 	define TINYDAV_GEXTERN __declspec(dllexport)
-#elif (TDAV_UNDER_WINDOWS || defined(__SYMBIAN32__)) && defined(TINYDAV_IMPORTS)
+# 	define TINYDAV_GEXTERN extern __declspec(dllexport)
+#elif (TDAV_UNDER_WINDOWS || defined(__SYMBIAN32__)) && !defined(TINYDAV_IMPORTS_IGNORE)
 # 	define TINYDAV_API __declspec(dllimport)
 # 	define TINYDAV_GEXTERN __declspec(dllimport)
 #else
@@ -80,7 +87,9 @@
 #if HAVE_FFMPEG // FFMPeg warnings (treated as errors)
 #	pragma warning (disable:4244) 
 #endif
+#	if !defined(__cplusplus)
 #	define inline __inline
+#	endif
 #	define _CRT_SECURE_NO_WARNINGS
 #endif
 
@@ -96,7 +105,7 @@
 #endif
 
 #if HAVE_CONFIG_H
-	#include "../config.h"
+	#include <config.h>
 #endif
 
 #endif // TINYDAV_CONFIG_H

@@ -35,36 +35,30 @@ bool SipStack::g_bInitialized = false;
 static int stack_callback(const tsip_event_t *sipevent);
 static int session_handle_event(const tsip_event_t *sipevent);
 
-/* === default values === */
-#ifndef DEFAULT_LOCAL_IP
-//#	ifdef ANDROID /* On the emulator */
-//#		define DEFAULT_LOCAL_IP	"10.0.2.15"
-//#	else
-#		define DEFAULT_LOCAL_IP	TNET_SOCKET_HOST_ANY
-//#	endif
-#endif
-
 SipStack::SipStack(SipCallback* pCallback, const char* realm_uri, const char* impi_uri, const char* impu_uri)
 :SafeObject()
 {
 	m_pDebugCallback = tsk_null;
 	m_pCallback = pCallback;
 
-	/* Initialize network and media layers */
+	// Initialize network and media layers
+    // i.e. initializes plugins, loads dlls
 	if(!SipStack::initialize()){
 		return;// isValid() will be false
 	}
-
-	/* Creates stack handle */
+    tmedia_defaults_set_ice_enabled(true);
+    tmedia_defaults_set_icestun_enabled(true);
+    tmedia_defaults_set_srtp_mode(tmedia_srtp_mode_none);
+    tmedia_defaults_set_stun_server("stun.l.google.com", 19302, "stun-user@showk.it", "stun-password");
+    
+	// Creates stack handle
 	m_pHandle = tsip_stack_create(stack_callback, realm_uri, impi_uri, impu_uri,
-			TSIP_STACK_SET_LOCAL_IP(DEFAULT_LOCAL_IP),
 			TSIP_STACK_SET_USERDATA(this), /* used as context (useful for server-initiated requests) */
 			TSIP_STACK_SET_NULL());
 }
 
 SipStack::~SipStack()
 {
-    TSK_DEBUG_INFO("SipStack::~SipStack()");
 	this->stop();
 
 	/* Destroy stack handle */
@@ -73,7 +67,6 @@ SipStack::~SipStack()
 
 bool SipStack::start()
 {
-    TSK_DEBUG_INFO("SipStack::start()");
 	bool ret = (tsip_stack_start(m_pHandle) == 0);
 	return ret;
 }
@@ -98,6 +91,14 @@ bool SipStack::setDebugCallback(DDebugCallback* pCallback)
 	}
 
 	return true;
+}
+
+bool SipStack::setDisplayName(const char* display_name)
+{
+	int ret = tsip_stack_set(m_pHandle,
+		TSIP_STACK_SET_DISPLAY_NAME(display_name),
+		TSIP_STACK_SET_NULL());
+	return (ret == 0);
 }
 
 bool SipStack::setRealm(const char* realm_uri)
@@ -152,18 +153,18 @@ bool SipStack::setProxyCSCF(const char* fqdn, unsigned short port, const char* t
 			TSIP_STACK_SET_NULL()) == 0);
 }
 
-bool SipStack::setLocalIP(const char* ip)
+bool SipStack::setLocalIP(const char* ip, const char* transport/*=tsk_null*/)
 {
 	return (tsip_stack_set(m_pHandle,
-		TSIP_STACK_SET_LOCAL_IP(ip),
+		TSIP_STACK_SET_LOCAL_IP_2(transport, ip),
 		TSIP_STACK_SET_NULL()) == 0);
 }
 
-bool SipStack::setLocalPort(unsigned short port)
+bool SipStack::setLocalPort(unsigned short port, const char* transport/*=tsk_null*/)
 {
 	unsigned _port = port;//promote
 	return (tsip_stack_set(m_pHandle,
-		TSIP_STACK_SET_LOCAL_PORT(_port),
+		TSIP_STACK_SET_LOCAL_PORT_2(transport, _port),
 		TSIP_STACK_SET_NULL()) == 0);
 }
 
@@ -209,10 +210,10 @@ bool SipStack::setAoR(const char* ip, int port)
 		TSIP_STACK_SET_NULL()) == 0);
 }
 
-bool SipStack::setModeServer()
+bool SipStack::setMode(enum tsip_stack_mode_e mode)
 {
 	return (tsip_stack_set(m_pHandle,
-		TSIP_STACK_SET_MODE_SERVER(),
+		TSIP_STACK_SET_MODE(mode),
 		TSIP_STACK_SET_NULL()) == 0); 
 }
 
@@ -238,6 +239,14 @@ bool SipStack::removeSigCompCompartment(const char* compId)
 		TSIP_STACK_SET_NULL()) == 0);
 }
 
+bool SipStack::setSTUNEnabledForICE(bool enabled)
+{
+	tsk_bool_t _enabled = enabled ? tsk_true : tsk_false;
+	return (tsip_stack_set(m_pHandle,
+		TSIP_STACK_SET_ICE_STUN_ENABLED(_enabled),
+		TSIP_STACK_SET_NULL()) == 0);
+}
+
 bool SipStack::setSTUNServer(const char* ip, unsigned short port)
 {
 	unsigned _port = port;//promote
@@ -253,18 +262,32 @@ bool SipStack::setSTUNCred(const char* login, const char* password)
 		TSIP_STACK_SET_NULL()) == 0);
 }
 
+bool SipStack::setSTUNEnabled(bool enabled)
+{
+	tsk_bool_t _enabled = enabled ? tsk_true : tsk_false;
+	return (tsip_stack_set(m_pHandle,
+		TSIP_STACK_SET_STUN_ENABLED(_enabled),
+		TSIP_STACK_SET_NULL()) == 0);
+}
+
 bool SipStack::setTLSSecAgree(bool enabled)
 {
-	tsk_bool_t _enable = enabled;
+	tsk_bool_t _enable = enabled ? tsk_true : tsk_false;
 	return (tsip_stack_set(m_pHandle,
 		TSIP_STACK_SET_SECAGREE_TLS(_enable),
 		TSIP_STACK_SET_NULL()) == 0);
 }
 
-bool SipStack::setSSLCretificates(const char* privKey, const char* pubKey, const char* caKey)
+/*@deprecated: typo  */
+bool SipStack::setSSLCretificates(const char* privKey, const char* pubKey, const char* caKey, bool verify/* = false*/)
+{
+	return setSSLCertificates(privKey, pubKey, caKey, verify);
+}
+
+bool SipStack::setSSLCertificates(const char* privKey, const char* pubKey, const char* caKey, bool verify/* = false*/)
 {
 	return (tsip_stack_set(m_pHandle,
-		TSIP_STACK_SET_TLS_CERTS(caKey, pubKey, privKey),
+		TSIP_STACK_SET_TLS_CERTS_2(caKey, pubKey, privKey, (verify ? tsk_true : tsk_false)),
 		TSIP_STACK_SET_NULL()) == 0);
 }
 
@@ -342,6 +365,13 @@ char* SipStack::dnsSrv(const char* service, unsigned short* OUTPUT)
 	}
 }
 
+bool SipStack::setMaxFDs(unsigned max_fds)
+{
+	return (tsip_stack_set(m_pHandle,
+		TSIP_STACK_SET_MAX_FDS(max_fds),
+		TSIP_STACK_SET_NULL()) == 0);
+}
+
 char* SipStack::getLocalIPnPort(const char* protocol, unsigned short* OUTPUT)
 {
 	tnet_ip_t ip;
@@ -380,7 +410,6 @@ bool SipStack::isValid()
 
 bool SipStack::stop()
 {
-    TSK_DEBUG_INFO("SipStack::stop() ( tsip_stack_stop(%p) )", m_pHandle);
 	int ret = tsip_stack_stop(m_pHandle);
 	return (ret == 0);
 }
@@ -395,6 +424,8 @@ bool SipStack::initialize()
 			TSK_DEBUG_ERROR("tnet_startup failed with error code=%d", ret);
 			return false;
 		}
+        
+        // registers all the plugins, loads dlls
 		if((ret = tdav_init())){
 			TSK_DEBUG_ERROR("tdav_init failed with error code=%d", ret);
 			return false;
@@ -419,7 +450,7 @@ void SipStack::setCodecs(tdav_codec_id_t codecs)
 	tdav_set_codecs(codecs);
 }
 
-void SipStack::setCodecs_2(int codecs) // For stupid languages
+void SipStack::setCodecs_2(int64_t codecs) // For stupid languages
 {
 	SipStack::setCodecs((tdav_codec_id_t)codecs);
 }

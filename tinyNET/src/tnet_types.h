@@ -35,7 +35,9 @@
 #if TNET_UNDER_WINDOWS
 #	include	<winsock2.h>
 #	include	<ws2tcpip.h>
-#	include <iphlpapi.h>
+#	if !TNET_UNDER_WINDOWS_RT
+#		include <iphlpapi.h>
+#	endif
 #else
 #	include <sys/types.h>
 #	include <sys/socket.h>
@@ -104,9 +106,10 @@ typedef enum tnet_dtls_hash_type_e
 }
 tnet_dtls_hash_type_t;
 
+// Hash names are case-insensitive but use lower case values because of https://bugzilla.mozilla.org/show_bug.cgi?id=828027
 static const char* TNET_DTLS_HASH_NAMES[TNET_DTLS_HASH_TYPE_MAX] =
 {
-	"UNKNOWN", "MD5", "SHA-1", "SHA-256", "SHA-512"
+	"UNKNOWN", "md5", "sha-1", "sha-256", "sha-512"
 };
 
 #if TNET_UNDER_WINDOWS
@@ -117,8 +120,23 @@ static const char* TNET_DTLS_HASH_NAMES[TNET_DTLS_HASH_TYPE_MAX] =
 #	define TNET_ERROR_INTR					WSAEINTR
 #	define TNET_ERROR_ISCONN				WSAEISCONN
 #	define TNET_ERROR_EAGAIN				TNET_ERROR_WOULDBLOCK /* WinSock FIX */
-#	if defined(_WIN32_WCE)
-#		define tnet_gai_strerror(...)		"FIXME"
+#	if TNET_UNDER_WINDOWS_RT /* gai_strerrorA() links against FormatMessageA which is not allowed on the store */
+		static TNET_INLINE const char* tnet_gai_strerror(int ecode)
+		{
+			static char aBuff[1024] = {0};
+			
+			WCHAR *wBuff = gai_strerrorW(ecode);
+			int len;
+			if((len = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, wBuff, wcslen(wBuff), aBuff, sizeof(aBuff) - 1, NULL, NULL)) > 0)
+			{
+				aBuff[len] = '\0';
+			}
+			else
+			{
+				aBuff[0] = '\0';
+			}
+			return aBuff;
+		}
 #	else
 #		define tnet_gai_strerror			gai_strerrorA
 #	endif

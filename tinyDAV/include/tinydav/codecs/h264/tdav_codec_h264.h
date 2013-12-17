@@ -32,7 +32,7 @@
 
 #include "tinydav_config.h"
 
-#if HAVE_FFMPEG && (!defined(HAVE_H264) || HAVE_H264)
+#if HAVE_FFMPEG || HAVE_H264_PASSTHROUGH
 
 #include "tinydav/codecs/h264/tdav_codec_h264_common.h"
 
@@ -40,26 +40,29 @@ TDAV_BEGIN_DECLS
 
 extern struct h264cb_s
 {
-
+    
     void (*action_bw_up_cb)(void* data);
     void (*action_bw_down_cb)(void* data);
     void (*action_encode_idr_cb)(void* data);
     void *cb_data;
-
+    
     float aspect ;
-
+    
 } h264_callback_s;
 
 TINYDAV_GEXTERN const tmedia_codec_plugin_def_t *tdav_codec_h264_base_plugin_def_t;
 TINYDAV_GEXTERN const tmedia_codec_plugin_def_t *tdav_codec_h264_main_plugin_def_t;
 
+tsk_bool_t tdav_codec_ffmpeg_h264_is_supported();
+tsk_bool_t tdav_codec_passthrough_h264_is_supported();
+
 static inline tsk_bool_t tdav_codec_h264_is_ffmpeg_plugin(const tmedia_codec_plugin_def_t *plugin)
 {
-	return(plugin && ((plugin ==  (tmedia_codec_plugin_def_t*)tdav_codec_h264_base_plugin_def_t) || (plugin == (tmedia_codec_plugin_def_t*)tdav_codec_h264_main_plugin_def_t)));
+	return(plugin && ((plugin == tdav_codec_h264_base_plugin_def_t) || (plugin == tdav_codec_h264_main_plugin_def_t)));
 }
 
 TDAV_END_DECLS
 
-#endif /* HAVE_FFMPEG */
+#endif /* HAVE_FFMPEG || HAVE_H264_PASSTHROUGH */
 
 #endif /* TINYDAV_CODEC_H264_H */

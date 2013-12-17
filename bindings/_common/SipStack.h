@@ -22,6 +22,8 @@
 #ifndef TINYWRAP_SIPSTACK_H
 #define TINYWRAP_SIPSTACK_H
 
+#include "tinyWRAP_config.h"
+
 #include "SipCallback.h"
 #include "SafeObject.h"
 
@@ -30,7 +32,7 @@
 
 class DDebugCallback;
 
-class SipStack: public SafeObject
+class TINYWRAP_API SipStack: public SafeObject
 {
 public: /* ctor() and dtor() */
 	SipStack(SipCallback* pCallback, const char* realm_uri, const char* impi_uri, const char* impu_uri);
@@ -39,6 +41,7 @@ public: /* ctor() and dtor() */
 public: /* API functions */
 	bool start();
 	bool setDebugCallback(DDebugCallback* pCallback);
+	bool setDisplayName(const char* display_name);
 	bool setRealm(const char* realm_uri);
 	bool setIMPI(const char* impi);
 	bool setIMPU(const char* impu_uri);
@@ -46,8 +49,8 @@ public: /* API functions */
 	bool setAMF(const char* amf);
 	bool setOperatorId(const char* opid);
 	bool setProxyCSCF(const char* fqdn, unsigned short port, const char* transport, const char* ipversion);
-	bool setLocalIP(const char* ip);
-	bool setLocalPort(unsigned short port);
+	bool setLocalIP(const char* ip, const char* transport=tsk_null);
+	bool setLocalPort(unsigned short port, const char* transport=tsk_null);
 	bool setEarlyIMS(bool enabled);
 	bool addHeader(const char* name, const char* value);
 	bool removeHeader(const char* name);
@@ -55,24 +58,29 @@ public: /* API functions */
 	bool setDnsDiscovery(bool enabled);
 	bool setAoR(const char* ip, int port);
 #if !defined(SWIG)
-	bool setModeServer();
+	bool setMode(enum tsip_stack_mode_e mode);
 #endif
 
 	bool setSigCompParams(unsigned dms, unsigned sms, unsigned cpb, bool enablePresDict);
 	bool addSigCompCompartment(const char* compId);
 	bool removeSigCompCompartment(const char* compId);
 	
+	bool setSTUNEnabledForICE(bool enabled);
 	bool setSTUNServer(const char* ip, unsigned short port);
 	bool setSTUNCred(const char* login, const char* password);
+	bool setSTUNEnabled(bool enabled);
 
 	bool setTLSSecAgree(bool enabled);
-	bool setSSLCretificates(const char* privKey, const char* pubKey, const char* caKey);
+	bool setSSLCertificates(const char* privKey, const char* pubKey, const char* caKey, bool verify = false);
+	bool setSSLCretificates(const char* privKey, const char* pubKey, const char* caKey, bool verify = false); /*@deprecated: typo */
 	bool setIPSecSecAgree(bool enabled);
 	bool setIPSecParameters(const char* algo, const char* ealgo, const char* mode, const char* proto);
 	
 	char* dnsENUM(const char* service, const char* e164num, const char* domain);
 	char* dnsNaptrSrv(const char* domain, const char* service, unsigned short *OUTPUT);
 	char* dnsSrv(const char* service, unsigned short* OUTPUT);
+
+	bool setMaxFDs(unsigned max_fds);
 
 	char* getLocalIPnPort(const char* protocol, unsigned short* OUTPUT);
 
@@ -84,7 +92,7 @@ public: /* API functions */
 	static bool initialize();
 	static bool deInitialize();
 	static void setCodecs(tdav_codec_id_t codecs);
-	static void setCodecs_2(int codecs); // For stupid languages
+	static void setCodecs_2(int64_t codecs); // For stupid languages
 	static bool setCodecPriority(tdav_codec_id_t codec_id, int priority);
 	static bool setCodecPriority_2(int codec, int priority);// For stupid languages
 	static bool isCodecSupported(tdav_codec_id_t codec_id);

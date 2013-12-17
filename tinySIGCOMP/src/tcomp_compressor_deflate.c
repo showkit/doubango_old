@@ -64,7 +64,7 @@ tsk_bool_t tcomp_compressor_deflate_compress(tcomp_compartment_t *lpCompartment,
 	
 	/* Compression Data */
 	if(!lpCompartment->compressorData){
-		lpCompartment->compressorData = tcomp_deflatedata_create(stream);
+		lpCompartment->compressorData = tcomp_deflatedata_create(stream, lpCompartment->useOnlyACKedStates);
 		if(!lpCompartment->compressorData){
 			TSK_DEBUG_ERROR("Failed to create deflate compressor data.");
 			result = tsk_false;
@@ -81,17 +81,18 @@ tsk_bool_t tcomp_compressor_deflate_compress(tcomp_compartment_t *lpCompartment,
 
 	/* State memory size code */
 	smsCode = TCOMP_MIN(lpCompartment->remote_parameters->smsCode, lpCompartment->remote_parameters->dmsCode);
-#if USE_ONLY_ACKED_STATES
-	stateful = (deflatedata->ghostState && tcomp_deflatedata_isStateful(deflatedata));
-#else
-	stateful = (deflatedata->ghostState != 0);
-#endif
+	if(lpCompartment->useOnlyACKedStates){
+		stateful = (deflatedata->ghostState && tcomp_deflatedata_isStateful(deflatedata));
+	}
+	else{
+		stateful = !!deflatedata->ghostState;
+	}
 
 	/*
 	*	Init zLIB
 	*/
-	windowBits = ( smsCode - (stream?2:1) ) + 10;
-	windowBits = (windowBits < 8) ? 8 : ( (windowBits > 15 ? 15 : windowBits) ); /* Because of zlib limitation (windowsize MUST be between 8 and 15) */
+	windowBits = ( smsCode - (stream ? 2 : 1) ) + 10;
+	windowBits = TSK_CLAMP(8, windowBits, 15); /* Because of zlib limitation (windowsize MUST be between 8 and 15) */
 	if(windowBits != deflatedata->zWindowBits){
 		/* Window size changed */
 		tcomp_deflatedata_freeGhostState(deflatedata);
@@ -108,6 +109,8 @@ tsk_bool_t tcomp_compressor_deflate_compress(tcomp_compartment_t *lpCompartment,
 			goto bail;
 		}
 	}
+
+	stateful &= !!deflatedata->ghostState;
 
 	/*
 	*	SigComp headers
@@ -130,15 +133,15 @@ tsk_bool_t tcomp_compressor_deflate_compress(tcomp_compartment_t *lpCompartment,
 	* Stateless or stateful?
 	*/
 	if(stateful){
+		TSK_DEBUG_INFO("SigComp - Compressing message with state id = ");
+		tcomp_buffer_print(deflatedata->ghostState->identifier);
 		memcpy(GET_OUTPUT_BUFFER_AT(pointer), tcomp_buffer_getBuffer(deflatedata->ghostState->identifier), TCOMP_PARTIAL_ID_LEN_VALUE);
 
 		pointer += TCOMP_PARTIAL_ID_LEN_VALUE; 
 		*header |= TCOMP_PARTIAL_ID_LEN_CODE;
-
-		TSK_DEBUG_INFO("Compressing stateful message.");
 	}
 	else{
-		uint16_t codeLen = DEFLATE_BYTECODE_LEN;
+		uint32_t codeLen = DEFLATE_BYTECODE_LEN;
 		/* first byte for codelen */
 		*GET_OUTPUT_BUFFER_AT(pointer++) = ((codeLen>>4)& 0x00ff);
 		/* last 4 bits for codelen */
@@ -167,7 +170,6 @@ tsk_bool_t tcomp_compressor_deflate_compress(tcomp_compartment_t *lpCompartment,
 		*output_buffer.getBuffer(pointer++) = 0x00; // First dict byte	// FIXME
 		*output_buffer.getBuffer(pointer++) = DEFLATE_FIXME_DICT; // FIXME: also change ghost
 #endif
-		TSK_DEBUG_INFO("Compressing stateless message.");
 	}
 
 	/*
@@ -186,7 +188,7 @@ tsk_bool_t tcomp_compressor_deflate_compress(tcomp_compartment_t *lpCompartment,
 	* Update state length
 	*/
 	if(!stateful){	
-		uint16_t state_len = ( (1<<(deflatedata->zWindowBits)) + DEFLATE_UDVM_CIRCULAR_START_INDEX - 64 );
+		uint32_t state_len = ( (1<<(deflatedata->zWindowBits)) + DEFLATE_UDVM_CIRCULAR_START_INDEX - 64 );
 		uint32_t hash_len = (state_len + 8);
 		
 		// FIXME: 131072  could not go in 2-bytes
@@ -200,9 +202,7 @@ tsk_bool_t tcomp_compressor_deflate_compress(tcomp_compartment_t *lpCompartment,
 			tcomp_deflatedata_createGhost(deflatedata, state_len, lpCompartment->local_parameters);
 		}
 	}
-#if USE_ONLY_ACKED_STATES
-	if(stateChanged)
-#endif
+	if(!lpCompartment->useOnlyACKedStates || (lpCompartment->useOnlyACKedStates && stateChanged))
 	{
 		tcomp_deflatedata_updateGhost(deflatedata, (const uint8_t*)input_ptr, input_size);
 	}

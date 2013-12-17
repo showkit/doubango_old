@@ -1,23 +1,23 @@
 /*
- * Copyright (C) 2010-2011 Mamadou Diop
- * Copyright (C) 2012-2013 Doubango Telecom <http://www.doubango.org>
- *
- * This file is part of Open Source Doubango Framework.
- *
- * DOUBANGO is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * DOUBANGO is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with DOUBANGO.
- *
- */
+* Copyright (C) 2010-2011 Mamadou Diop
+* Copyright (C) 2012-2013 Doubango Telecom <http://www.doubango.org>
+*	
+* This file is part of Open Source Doubango Framework.
+*
+* DOUBANGO is free software: you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation, either version 3 of the License, or
+* (at your option) any later version.
+*	
+* DOUBANGO is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
+*	
+* You should have received a copy of the GNU General Public License
+* along with DOUBANGO.
+*
+*/
 
 /**@file tnet_transport_poll.c
  * @brief Network transport layer using polling.
@@ -31,7 +31,7 @@
 #include "tsk_buffer.h"
 #include "tsk_safeobj.h"
 
-#if USE_POLL && !(__IPHONE_OS_VERSION_MIN_REQUIRED >= 40000)
+#if USE_POLL && !__APPLE__ //(__IPHONE_OS_VERSION_MIN_REQUIRED >= 40000)
 
 #include "tnet_poll.h"
 
@@ -39,7 +39,9 @@
 #   include <sys/param.h> /* http://www.freebsd.org/doc/en/books/porters-handbook/porting-versions.html */
 #endif
 
-#define TNET_MAX_FDS		1024
+#if !defined(TNET_MAX_FDS)
+#	define TNET_MAX_FDS		0xFFFF /* Default "FD_SIZE". WIll be updated using the OS limit when the transport starts. */
+#endif
 
 /*== Socket description ==*/
 typedef struct transport_socket_xs
@@ -48,7 +50,7 @@ typedef struct transport_socket_xs
 	tsk_bool_t owner;
 	tsk_bool_t connected;
 	tsk_bool_t paused;
-    
+
 	tnet_socket_type_t type;
 	tnet_tls_socket_handle_t* tlshandle;
 }
@@ -60,28 +62,28 @@ typedef struct transport_context_s
 	TSK_DECLARE_OBJECT;
 	
 	tsk_size_t count;
-	short events;
 	tnet_fd_t pipeW;
 	tnet_fd_t pipeR;
 	tnet_pollfd_t ufds[TNET_MAX_FDS];
 	transport_socket_xt* sockets[TNET_MAX_FDS];
-    
+	tsk_bool_t polling; // whether we are poll()ing
+
 	TSK_DECLARE_SAFEOBJ;
 }
 transport_context_t;
 
 static transport_socket_xt* getSocket(transport_context_t *context, tnet_fd_t fd);
-static int addSocket(tnet_fd_t fd, tnet_socket_type_t type, tnet_transport_t *transport, tsk_bool_t take_ownership, tsk_bool_t is_client);
+static int addSocket(tnet_fd_t fd, tnet_socket_type_t type, tnet_transport_t *transport, tsk_bool_t take_ownership, tsk_bool_t is_client, tnet_tls_socket_handle_t* tlsHandle);
 static int removeSocket(int index, transport_context_t *context);
 
 
-int tnet_transport_add_socket(const tnet_transport_handle_t *handle, tnet_fd_t fd, tnet_socket_type_t type, tsk_bool_t take_ownership, tsk_bool_t isClient)
+int tnet_transport_add_socket(const tnet_transport_handle_t *handle, tnet_fd_t fd, tnet_socket_type_t type, tsk_bool_t take_ownership, tsk_bool_t isClient, tnet_tls_socket_handle_t* tlsHandle)
 {
 	tnet_transport_t *transport = (tnet_transport_t*)handle;
 	transport_context_t* context;
 	static char c = '\0';
 	int ret = -1;
-    
+
 	if(!transport){
 		TSK_DEBUG_ERROR("Invalid server handle.");
 		return ret;
@@ -91,16 +93,16 @@ int tnet_transport_add_socket(const tnet_transport_handle_t *handle, tnet_fd_t f
 		TSK_DEBUG_ERROR("Invalid context.");
 		return -2;
 	}
-    
+
 	if(TNET_SOCKET_TYPE_IS_TLS(type) || TNET_SOCKET_TYPE_IS_WSS(type)){
 		transport->tls.enabled = 1;
 	}
 	
-	if((ret = addSocket(fd, type, transport, take_ownership, isClient))){
+	if((ret = addSocket(fd, type, transport, take_ownership, isClient, tlsHandle))){
 		TSK_DEBUG_ERROR("Failed to add new Socket.");
 		return ret;
 	}
-    
+
 	// signal
 	if(context->pipeW && (TSK_RUNNABLE(transport)->running || TSK_RUNNABLE(transport)->started)){
 		if((ret = write(context->pipeW, &c, 1)) > 0){
@@ -122,12 +124,12 @@ int tnet_transport_pause_socket(const tnet_transport_handle_t *handle, tnet_fd_t
 	tnet_transport_t *transport = (tnet_transport_t*)handle;
 	transport_context_t *context;
 	transport_socket_xt* socket;
-    
+
 	if(!transport || !(context = (transport_context_t*)transport->context)){
 		TSK_DEBUG_ERROR("Invalid parameter");
 		return -1;
 	}
-    
+
 	if((socket = getSocket(context, fd))){
 		socket->paused = pause;
 	}
@@ -148,7 +150,7 @@ int tnet_transport_remove_socket(const tnet_transport_handle_t *handle, tnet_fd_
     tnet_fd_t fd = *pfd;
 	
 	TSK_DEBUG_INFO("Removing socket %d", fd);
-    
+
 	if(!transport){
 		TSK_DEBUG_ERROR("Invalid server handle.");
 		return ret;
@@ -160,19 +162,20 @@ int tnet_transport_remove_socket(const tnet_transport_handle_t *handle, tnet_fd_
 	}
 	
 	tsk_safeobj_lock(context);
-    
+
 	for(i=0; i<context->count; i++){
 		if(context->sockets[i]->fd == fd){
 			tsk_bool_t self_ref = (&context->sockets[i]->fd == pfd);
 			removeSocket(i, context); // sockets[i] will be destroyed
 			found = tsk_true;
+			TSK_RUNNABLE_ENQUEUE(transport, event_removed, transport->callback_data, fd);
 			if(!self_ref){ // if self_ref then, pfd no longer valid after removeSocket()
-				*pfd = TNET_INVALID_FD;
+				*pfd = TNET_INVALID_FD;				
 			}
 			break;
 		}
 	}
-    
+
 	tsk_safeobj_unlock(context);
 	
 	if(found){
@@ -192,12 +195,12 @@ tsk_size_t tnet_transport_send(const tnet_transport_handle_t *handle, tnet_fd_t 
 {
 	tnet_transport_t *transport = (tnet_transport_t*)handle;
 	int numberOfBytesSent = 0;
-    
+
 	if(!transport){
 		TSK_DEBUG_ERROR("Invalid transport handle.");
 		goto bail;
 	}
-    
+
 	if(transport->tls.enabled){
 		const transport_socket_xt* socket = getSocket(transport->context, from);
 		if(socket && socket->tlshandle){
@@ -210,13 +213,13 @@ tsk_size_t tnet_transport_send(const tnet_transport_handle_t *handle, tnet_fd_t 
 			goto bail;
 		}
 	}
-	else if((numberOfBytesSent = send(from, buf, size, 0)) <= 0){
+	else if((numberOfBytesSent = tnet_sockfd_send(from, buf, size, 0)) <= 0){
 		TNET_PRINT_LAST_ERROR("send have failed.");
-        
+
 		//tnet_sockfd_close(&from);
 		goto bail;
 	}
-    
+
 bail:
 	return numberOfBytesSent;
 }
@@ -236,11 +239,11 @@ tsk_size_t tnet_transport_sendto(const tnet_transport_handle_t *handle, tnet_fd_
 		goto bail;
 	}
 	
-    if((numberOfBytesSent = sendto(from, buf, size, 0, to, tnet_get_sockaddr_size(to))) <= 0){
+    if((numberOfBytesSent = tnet_sockfd_sendto(from, to, buf, size)) <= 0){
 		TNET_PRINT_LAST_ERROR("sendto have failed.");
 		goto bail;
 	}
-    
+		
 bail:
 	return numberOfBytesSent;
 }
@@ -279,7 +282,7 @@ static transport_socket_xt* getSocket(transport_context_t *context, tnet_fd_t fd
 {
 	tsk_size_t i;
 	transport_socket_xt* ret = 0;
-    
+
 	if(context){
 		tsk_safeobj_lock(context);
 		for(i=0; i<context->count; i++){
@@ -295,7 +298,7 @@ static transport_socket_xt* getSocket(transport_context_t *context, tnet_fd_t fd
 }
 
 /*== Add new socket ==*/
-int addSocket(tnet_fd_t fd, tnet_socket_type_t type, tnet_transport_t *transport, tsk_bool_t take_ownership, tsk_bool_t is_client)
+int addSocket(tnet_fd_t fd, tnet_socket_type_t type, tnet_transport_t *transport, tsk_bool_t take_ownership, tsk_bool_t is_client, tnet_tls_socket_handle_t* tlsHandle)
 {
 	transport_context_t *context = transport?transport->context:0;
 	if(context){
@@ -303,17 +306,25 @@ int addSocket(tnet_fd_t fd, tnet_socket_type_t type, tnet_transport_t *transport
 		sock->fd = fd;
 		sock->type = type;
 		sock->owner = take_ownership;
-        
-		if(!sock->tlshandle && (TNET_SOCKET_TYPE_IS_TLS(sock->type) || TNET_SOCKET_TYPE_IS_WSS(sock->type)) && transport->tls.enabled){
+
+		if((TNET_SOCKET_TYPE_IS_TLS(sock->type) || TNET_SOCKET_TYPE_IS_WSS(sock->type)) && transport->tls.enabled){
+			if(tlsHandle){
+				sock->tlshandle = tsk_object_ref(tlsHandle);
+			}
+			else{
 #if HAVE_OPENSSL
-			sock->tlshandle = tnet_tls_socket_create(sock->fd, is_client ? transport->tls.ctx_client : transport->tls.ctx_server);
+				sock->tlshandle = tnet_tls_socket_create(sock->fd, is_client ? transport->tls.ctx_client : transport->tls.ctx_server);       
 #endif
+			}
 		}
 		
 		tsk_safeobj_lock(context);
 		
 		context->ufds[context->count].fd = fd;
-		context->ufds[context->count].events = (fd == context->pipeR) ? TNET_POLLIN : context->events;
+		context->ufds[context->count].events = (fd == context->pipeR) ? TNET_POLLIN : (TNET_POLLIN | TNET_POLLNVAL | TNET_POLLERR);
+		if(TNET_SOCKET_TYPE_IS_STREAM(sock->type)){
+			context->ufds[context->count].events |= TNET_POLLOUT; // emulate WinSock2 FD_CONNECT event
+		}
 		context->ufds[context->count].revents = 0;
 		context->sockets[context->count] = sock;
 		
@@ -321,7 +332,7 @@ int addSocket(tnet_fd_t fd, tnet_socket_type_t type, tnet_transport_t *transport
 		
 		tsk_safeobj_unlock(context);
 		
-		TSK_DEBUG_INFO("Socket added: fd=%d, tail.count=%d", fd, context->count);
+		TSK_DEBUG_INFO("Socket added[%s]: fd=%d, tail.count=%d", transport->description, fd, context->count);
 		
 		return 0;
 	}
@@ -333,18 +344,18 @@ int addSocket(tnet_fd_t fd, tnet_socket_type_t type, tnet_transport_t *transport
 
 /*== change connection state ==*/
 /*
- static void setConnected(tnet_fd_t fd, transport_context_t *context, int connected)
- {
- tsk_size_t i;
- 
- for(i=0; i<context->count; i++)
- {
- if(context->sockets[i]->fd == fd){
- context->sockets[i]->connected = connected;
- }
- }
- }
- */
+static void setConnected(tnet_fd_t fd, transport_context_t *context, int connected)
+{
+	tsk_size_t i;
+
+	for(i=0; i<context->count; i++)
+	{
+		if(context->sockets[i]->fd == fd){
+			context->sockets[i]->connected = connected;
+		}
+	}
+}
+*/
 
 /*== Remove socket ==*/
 int removeSocket(int index, transport_context_t *context)
@@ -352,11 +363,19 @@ int removeSocket(int index, transport_context_t *context)
 	int i;
 	
 	tsk_safeobj_lock(context);
-    
+
 	if(index < (int)context->count){
 		/* Close the socket if we are the owner. */
 		TSK_DEBUG_INFO("Socket to remove: fd=%d, index=%d, tail.count=%d", context->sockets[index]->fd, index, context->count);
 		if(context->sockets[index]->owner){
+			// do not close the socket while it's being poll()ed
+			// http://stackoverflow.com/questions/5039608/poll-cant-detect-event-when-socket-is-closed-locally
+			if(context->polling){
+				TSK_DEBUG_INFO("RemoveSocket(fd=%d) has been requested but we are poll()ing the socket. ShutdownSocket(fd) called on the socket and we deferred the request.", context->sockets[index]->fd);
+				TSK_DEBUG_INFO("ShutdownSocket(fd=%d)", context->sockets[index]->fd);
+				tnet_sockfd_shutdown(context->sockets[index]->fd);
+				goto done;
+			}
 			tnet_sockfd_close(&(context->sockets[index]->fd));
 		}
 		
@@ -366,7 +385,7 @@ int removeSocket(int index, transport_context_t *context)
 		// Free socket
 		TSK_FREE(context->sockets[index]);
 		
-		for(i=index ; i<context->count-1; i++){
+		for(i=index ; i<context->count-1; i++){			
 			context->sockets[i] = context->sockets[i+1];
 			context->ufds[i] = context->ufds[i+1];
 		}
@@ -378,23 +397,23 @@ int removeSocket(int index, transport_context_t *context)
 		
 		context->count--;
 	}
-    
+done:
 	tsk_safeobj_unlock(context);
 	
 	return 0;
 }
 
 int tnet_transport_stop(tnet_transport_t *transport)
-{
+{	
 	int ret;
 	transport_context_t *context;
-    
+
 	if(!transport){
 		return -1;
 	}
 	
 	context = transport->context;
-    
+
 	if((ret = tsk_runnable_stop(TSK_RUNNABLE(transport)))){
 		return ret;
 	}
@@ -424,6 +443,8 @@ int tnet_transport_prepare(tnet_transport_t *transport)
 	int ret = -1;
 	transport_context_t *context;
 	tnet_fd_t pipes[2];
+
+	TSK_DEBUG_INFO("tnet_transport_prepare()");
 	
 	if(!transport || !transport->context){
 		TSK_DEBUG_ERROR("Invalid parameter.");
@@ -437,7 +458,7 @@ int tnet_transport_prepare(tnet_transport_t *transport)
 		TSK_DEBUG_ERROR("Transport already prepared.");
 		return -2;
 	}
-    
+
 	/* Prepare master */
 	if(!transport->master){
 		if((transport->master = tnet_socket_create(transport->local_host, transport->req_local_port, transport->type))){
@@ -448,16 +469,6 @@ int tnet_transport_prepare(tnet_transport_t *transport)
 			TSK_DEBUG_ERROR("Failed to create master socket");
 			return -3;
 		}
-	}
-	
-	/* set events */
-	context->events = TNET_POLLIN | TNET_POLLNVAL | TNET_POLLERR;
-	if(TNET_SOCKET_TYPE_IS_STREAM(transport->master->type)){
-		context->events |= TNET_POLLOUT // emulate WinSock2 FD_CONNECT event
-        //#if !defined(ANDROID)
-        //			| TNET_POLLHUP /* FIXME: always present */
-        //#endif
-        ;
 	}
 	
 	/* Start listening */
@@ -480,7 +491,7 @@ int tnet_transport_prepare(tnet_transport_t *transport)
 	
 	/* add R side */
 	TSK_DEBUG_INFO("pipeR fd=%d", context->pipeR);
-	if((ret = addSocket(context->pipeR, transport->master->type, transport, tsk_true, tsk_false))){
+	if((ret = addSocket(context->pipeR, transport->master->type, transport, tsk_true, tsk_false, tsk_null))){
 		goto bail;
 	}
 	
@@ -488,7 +499,7 @@ int tnet_transport_prepare(tnet_transport_t *transport)
 	TSK_DEBUG_INFO("master fd=%d", transport->master->fd);
 	// don't take ownership: will be closed by the dctor()
 	// otherwise will be closed twice: dctor() and removeSocket()
-	if((ret = addSocket(transport->master->fd, transport->master->type, transport, tsk_false, tsk_false))){
+	if((ret = addSocket(transport->master->fd, transport->master->type, transport, tsk_false, tsk_false, tsk_null))){
 		TSK_DEBUG_ERROR("Failed to add master socket");
 		goto bail;
 	}
@@ -511,24 +522,24 @@ int tnet_transport_unprepare(tnet_transport_t *transport)
 	else{
 		context = transport->context;
 	}
-    
+
 	if(!transport->prepared){
 		return 0;
 	}
-    
+
 	transport->prepared = tsk_false;
 	
 	while(context->count){
 		removeSocket(0, context); // safe
 	}
-    
+
 	/* reset both R and W sides */
 	context->pipeR = 0;
 	context->pipeW = 0;
-    
+
 	// destroy master as it has been closed by removeSocket()
 	TSK_OBJECT_SAFE_FREE(transport->master);
-    
+
 	return 0;
 }
 
@@ -541,10 +552,10 @@ void *tnet_transport_mainthread(void *param)
 	tsk_size_t i;
 	tsk_bool_t is_stream;
     tnet_fd_t fd;
-    
+
 	struct sockaddr_storage remote_addr = {0};
 	transport_socket_xt* active_socket;
-    
+
 	/* check whether the transport is already prepared */
 	if(!transport->prepared){
 		TSK_DEBUG_ERROR("Transport must be prepared before strating.");
@@ -553,19 +564,22 @@ void *tnet_transport_mainthread(void *param)
 	
 	is_stream = TNET_SOCKET_TYPE_IS_STREAM(transport->master->type);
 	
-	TSK_DEBUG_INFO("Starting [%s] server with IP {%s} on port {%d} using fd {%d} with type {%d}...",
-                   transport->description,
-                   transport->master->ip,
-                   transport->master->port,
-                   transport->master->fd,
-                   transport->master->type);
-    
+	TSK_DEBUG_INFO("Starting [%s] server with IP {%s} on port {%d} using fd {%d} with type {%d}...", 
+			transport->description, 
+			transport->master->ip, 
+			transport->master->port,
+			transport->master->fd,
+			transport->master->type);
+
 	while(TSK_RUNNABLE(transport)->running || TSK_RUNNABLE(transport)->started){
-		if((ret = tnet_poll(context->ufds, context->count, -1)) < 0){
-			TNET_PRINT_LAST_ERROR("poll have failed.");
+		context->polling = tsk_true;
+		ret = tnet_poll(context->ufds, context->count, 10);
+		context->polling = tsk_false;
+		if(ret < 0){
+			TNET_PRINT_LAST_ERROR("poll() have failed.");
 			goto bail;
 		}
-        
+
 		if(!TSK_RUNNABLE(transport)->running && !TSK_RUNNABLE(transport)->started){
 			TSK_DEBUG_INFO("Stopping [%s] server with IP {%s} on port {%d} with type {%d}...", transport->description, transport->master->ip, transport->master->port, transport->master->type);
 			goto bail;
@@ -573,7 +587,7 @@ void *tnet_transport_mainthread(void *param)
 		
 		/* lock context */
 		tsk_safeobj_lock(context);
-        
+
 		/* == == */
 		for(i=0; i<context->count; i++)
 		{
@@ -582,9 +596,9 @@ void *tnet_transport_mainthread(void *param)
 			}
 			
 			// TSK_DEBUG_INFO("REVENTS(i=%d) = %d", i, context->ufds[i].revents);
-            
+
 			if(context->ufds[i].fd == context->pipeR){
-				TSK_DEBUG_INFO("PipeR event = %d", context->ufds[i].revents);
+				//TSK_DEBUG_INFO("PipeR event = %d", context->ufds[i].revents);
 				if(context->ufds[i].revents & TNET_POLLIN){
 					static char __buffer[1024];
 					if(read(context->pipeR, __buffer, sizeof(__buffer)) < 0){
@@ -598,21 +612,23 @@ void *tnet_transport_mainthread(void *param)
 				context->ufds[i].revents = 0;
 				continue;
 			}
-            
+
 			/* Get active event and socket */
 			active_socket = context->sockets[i];
             
             /*================== TNET_POLLHUP ==================*/
 			if(context->ufds[i].revents & (TNET_POLLHUP)){
-                fd = active_socket->fd;
-				TSK_DEBUG_INFO("NETWORK EVENT FOR SERVER [%s] -- TNET_POLLHUP(%d)", transport->description, fd);
-#if defined(ANDROID)
-				/* FIXME */
-#else
-                tnet_transport_remove_socket(transport, &active_socket->fd);
-				TSK_RUNNABLE_ENQUEUE(transport, event_closed, transport->callback_data, fd);
-                continue;
-#endif
+				if(context->ufds[i].revents & TNET_POLLOUT){
+					TSK_DEBUG_INFO("POLLOUT and POLLHUP are exclusive");
+				}
+				else{
+					fd = active_socket->fd;
+					TSK_DEBUG_INFO("NETWORK EVENT FOR SERVER [%s] -- TNET_POLLHUP(%d)", transport->description, fd);
+
+					tnet_transport_remove_socket(transport, &active_socket->fd);
+					TSK_RUNNABLE_ENQUEUE(transport, event_closed, transport->callback_data, fd);
+					continue;
+				}
 			}
             
 			/*================== TNET_POLLERR ==================*/
@@ -649,13 +665,14 @@ void *tnet_transport_mainthread(void *param)
 					TSK_DEBUG_INFO("Socket is paused");
 					goto TNET_POLLIN_DONE;
 				}
-                
+
 				/* Retrieve the amount of pending data.
 				 * IMPORTANT: If you are using Symbian please update your SDK to the latest build (August 2009) to have 'FIONREAD'.
 				 * This apply whatever you are using the 3rd or 5th edition.
 				 * Download link: http://wiki.forum.nokia.com/index.php/Open_C/C%2B%2B_Release_History
 				 */
-				if((tnet_ioctlt(active_socket->fd, FIONREAD, &len) < 0 || !len) && is_stream){
+				ret = tnet_ioctlt(active_socket->fd, FIONREAD, &len);
+				if((ret < 0 || !len) && is_stream){
 					/* It's probably an incoming connection --> try to accept() it */
 					int listening = 0, remove_socket = 0;
 					socklen_t socklen = sizeof(listening);
@@ -675,13 +692,13 @@ void *tnet_transport_mainthread(void *param)
                     if (listening){
 						if((fd = accept(active_socket->fd, tsk_null, tsk_null)) != TNET_INVALID_SOCKET){
 							TSK_DEBUG_INFO("NETWORK EVENT FOR SERVER [%s] -- FD_ACCEPT(fd=%d)", transport->description, fd);
-							addSocket(fd, transport->master->type, transport, tsk_true, tsk_false);
+							addSocket(fd, transport->master->type, transport, tsk_true, tsk_false, tsk_null);
 							TSK_RUNNABLE_ENQUEUE(transport, event_accepted, transport->callback_data, fd);
 							if(active_socket->tlshandle){
 								transport_socket_xt* tls_socket;
 								if((tls_socket = getSocket(context, fd))){
 									if(tnet_tls_socket_accept(tls_socket->tlshandle) != 0){
-                                        TSK_RUNNABLE_ENQUEUE(transport, event_closed, transport->callback_data, fd);
+                                        					TSK_RUNNABLE_ENQUEUE(transport, event_closed, transport->callback_data, fd);
 										tnet_transport_remove_socket(transport, &fd);
 										TNET_PRINT_LAST_ERROR("SSL_accept() failed");
 										continue;
@@ -709,7 +726,14 @@ void *tnet_transport_mainthread(void *param)
 				}
 				
 				if(len <= 0){
-                    context->ufds[i].revents &= ~TNET_POLLIN;
+#if ANDROID
+					// workaround for indoona OSX which sends bodiless UDP packets
+					// vand Android requires to call recv() even if len is equal to zero
+					if(len == 0 && ret == 0){
+						static char __fake_buff[1];
+						ret = recv(active_socket->fd, __fake_buff, len, 0);
+					}
+#endif
 					goto TNET_POLLIN_DONE;
 				}
 				
@@ -754,19 +778,22 @@ void *tnet_transport_mainthread(void *param)
 					len = (tsk_size_t)ret;
 					// buffer = tsk_realloc(buffer, len);
 				}
-                
-				e = tnet_transport_event_create(event_data, transport->callback_data, active_socket->fd);
-				e->data = buffer;
-				e->size = len;
-				e->remote_addr = remote_addr;
+					
+				if(len > 0){
+					e = tnet_transport_event_create(event_data, transport->callback_data, active_socket->fd);
+					e->data = buffer, buffer = tsk_null;
+					e->size = len;
+					e->remote_addr = remote_addr;
 				
-				TSK_RUNNABLE_ENQUEUE_OBJECT_SAFE(TSK_RUNNABLE(transport), e);
-                
-            TNET_POLLIN_DONE:
-                context->ufds[i].revents &= ~TNET_POLLIN;
+					TSK_RUNNABLE_ENQUEUE_OBJECT_SAFE(TSK_RUNNABLE(transport), e);
+				}
+				TSK_FREE(buffer);
+
+TNET_POLLIN_DONE:
+                /*context->ufds[i].revents &= ~TNET_POLLIN*/;
 			}
-            
-            
+
+
 			/*================== TNET_POLLOUT ==================*/
 			if(context->ufds[i].revents & TNET_POLLOUT){
 				TSK_DEBUG_INFO("NETWORK EVENT FOR SERVER [%s] -- TNET_POLLOUT", transport->description);
@@ -774,24 +801,26 @@ void *tnet_transport_mainthread(void *param)
 					active_socket->connected = tsk_true;
 					TSK_RUNNABLE_ENQUEUE(transport, event_connected, transport->callback_data, active_socket->fd);
 				}
-				context->ufds[i].events &= ~TNET_POLLOUT;
+				//else{
+					context->ufds[i].events &= ~TNET_POLLOUT;
+				//}
 			}
-            
-            
+
+
 			/*================== TNET_POLLPRI ==================*/
 			if(context->ufds[i].revents & TNET_POLLPRI){
 				TSK_DEBUG_INFO("NETWORK EVENT FOR SERVER [%s] -- TNET_POLLPRI", transport->description);
 			}
-            
+
             context->ufds[i].revents = 0;
 		}/* for */
-        
-    done:
+
+done:
 		/* unlock context */
 		tsk_safeobj_unlock(context);
-        
+
 	} /* while */
-    
+
 bail:
 	
 	TSK_DEBUG_INFO("Stopped [%s] server with IP {%s} on port {%d}", transport->description, transport->master->ip, transport->master->port);
@@ -824,7 +853,7 @@ static tsk_object_t* transport_context_ctor(tsk_object_t * self, va_list * app)
 }
 
 static tsk_object_t* transport_context_dtor(tsk_object_t * self)
-{
+{ 
 	transport_context_t *context = self;
 	if(context){
 		while(context->count){
@@ -837,10 +866,10 @@ static tsk_object_t* transport_context_dtor(tsk_object_t * self)
 
 static const tsk_object_def_t tnet_transport_context_def_s = 
 {
-    sizeof(transport_context_t),
-    transport_context_ctor, 
-    transport_context_dtor,
-    tsk_null, 
+sizeof(transport_context_t),
+transport_context_ctor, 
+transport_context_dtor,
+tsk_null, 
 };
 const tsk_object_def_t *tnet_transport_context_def_t = &tnet_transport_context_def_s;
 

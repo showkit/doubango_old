@@ -21,6 +21,9 @@
  */
 #include "tinydav/audio/coreaudio/tdav_audiounit.h"
 
+#if HAVE_COREAUDIO_AUDIO_UNIT
+
+#include "tsk_string.h"
 #include "tsk_list.h"
 #include "tsk_safeobj.h"
 #include "tsk_debug.h"
@@ -30,18 +33,17 @@ static UInt32 kOne = 1;
 static UInt32 kZero = 0;
 #endif /* TARGET_OS_IPHONE */
 
-#if HAVE_COREAUDIO_AUDIO_UNIT
-	#if TARGET_OS_IPHONE
-		#if TARGET_IPHONE_SIMULATOR // VoiceProcessingIO will give unexpected result on the simulator when using iOS 5
-			#define kDoubangoAudioUnitSubType	kAudioUnitSubType_RemoteIO
-		#else // Echo cancellation, AGC, ...
-			#define kDoubangoAudioUnitSubType	kAudioUnitSubType_VoiceProcessingIO
-		#endif
-	#elif TARGET_OS_MAC
-		#define kDoubangoAudioUnitSubType	kAudioUnitSubType_HALOutput
-	#else
-		#error "Unknown target"
+#if TARGET_OS_IPHONE
+	#if TARGET_IPHONE_SIMULATOR // VoiceProcessingIO will give unexpected result on the simulator when using iOS 5
+		#define kDoubangoAudioUnitSubType	kAudioUnitSubType_RemoteIO
+	#else // Echo cancellation, AGC, ...
+		#define kDoubangoAudioUnitSubType	kAudioUnitSubType_VoiceProcessingIO
 	#endif
+#elif TARGET_OS_MAC
+	#define kDoubangoAudioUnitSubType	kAudioUnitSubType_HALOutput
+#else
+	#error "Unknown target"
+#endif
 
 #undef kInputBus
 #define kInputBus 1
@@ -106,67 +108,11 @@ static int _tdav_audiounit_handle_signal_xxx_prepared(tdav_audiounit_handle_t* s
 	tsk_safeobj_unlock(inst);
 	return 0;
 }
-#if TARGET_OS_IPHONE
-void interruptionListenerCallback( void * inUserData, UInt32 interruptionState )
-{
-    
-    tdav_audiounit_handle_t* handle = (tdav_audiounit_handle_t*)inUserData;
 
-    if( interruptionState == kAudioSessionBeginInterruption )
-    {
-        
-        tdav_audiounit_handle_stop(handle);
-    } else  if(interruptionState == kAudioSessionEndInterruption){
-
-        tdav_audiounit_handle_start(handle);
-    }
-}
-#endif
 tdav_audiounit_handle_t* tdav_audiounit_handle_create(uint64_t session_id)
 {
-	tdav_audiounit_instance_t* inst =  tsk_object_new(tdav_audiounit_instance_def_t);
-
-    if(!inst) goto done;
-
-    {
-        // initialize audio session
-#if TARGET_OS_IPHONE
-        OSStatus status;
-        status = AudioSessionInitialize(NULL, NULL, interruptionListenerCallback, inst);
-        if(status){
-            char fourcc[5] = { 0 } ;
-            memcpy(fourcc, &status, 4);
-            TSK_DEBUG_ERROR("AudioSessionInitialize() failed with status code=%d(%s)", (int32_t)status, fourcc);
-            
-        }
-
-        // enable record/playback
-        UInt32 audioCategory = kAudioSessionCategory_PlayAndRecord;
-        status = AudioSessionSetProperty(kAudioSessionProperty_AudioCategory, sizeof(audioCategory), &audioCategory);
-        if(status){
-            char fourcc[5] = { 0 } ;
-            memcpy(fourcc, &status, 4);
-            TSK_DEBUG_ERROR("AudioSessionSetProperty(kAudioSessionProperty_AudioCategory) failed with status code=%d (%s)", (int32_t)status, fourcc);
-        
-        }
-
-        // allow mixing
-        UInt32 allowMixing = true;
-        status = AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers, sizeof(allowMixing), &allowMixing);
-        if(status){
-            TSK_DEBUG_ERROR("AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers) failed with status code=%d", (int32_t)status);
-            
-        }
-
-        
-        // enable audio session
-        status = AudioSessionSetActive(true);
-        if(status){
-            TSK_DEBUG_ERROR("AudioSessionSetActive(true) failed with status code=%d", (int32_t)status);
-            
-        }
-#endif
-    }
+	tdav_audiounit_instance_t* inst = tsk_null;
+	
 	// create audio unit component
 	if(!__audioSystem){
 		AudioComponentDescription audioDescription;
@@ -207,7 +153,7 @@ tdav_audiounit_handle_t* tdav_audiounit_handle_create(uint64_t session_id)
 #endif
 	
 	// create instance object and put it into the list
-	if((inst )){
+	if((inst = tsk_object_new(tdav_audiounit_instance_def_t))){
 		OSStatus status = noErr;
 		tdav_audiounit_instance_t* _inst;
 		
@@ -283,15 +229,8 @@ int tdav_audiounit_handle_configure(tdav_audiounit_handle_t* self, tsk_bool_t co
 	}
 
 #if TARGET_OS_IPHONE
-
 	// set preferred buffer size
-    TSK_DEBUG_INFO("ptime: %d", ptime);
-   
-	Float32 preferredBufferSize ;
-
-    preferredBufferSize = 0.02f;
-
-    TSK_DEBUG_INFO("AU Buffer Size: %lf", preferredBufferSize);
+	Float32 preferredBufferSize = ((Float32)ptime / 1000.f); // in seconds
 	UInt32 size = sizeof(preferredBufferSize);
 	status = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration, sizeof(preferredBufferSize), &preferredBufferSize);
 	if(status != noErr){
@@ -315,17 +254,6 @@ int tdav_audiounit_handle_configure(tdav_audiounit_handle_t* self, tsk_bool_t co
 		TSK_DEBUG_ERROR("AudioSessionSetProperty(kAudioSessionProperty_AudioCategory) failed with status code=%ld", status);
 		goto done;
 	}
-    CFStringRef route;
-	UInt32 propertySize = sizeof(CFStringRef);
-	if (AudioSessionGetProperty(kAudioSessionProperty_AudioRoute, &propertySize, &route) == 0)	{
-        if(CFStringFind(route, CFSTR("Headset"), 0).location == kCFNotFound && CFStringFind(route, CFSTR("Headphone"), 0).location == kCFNotFound)
-        {
-            UInt32 audioRouteOverride =  kAudioSessionOverrideAudioRoute_Speaker ;
-            UInt32 doChangeDefaultRoute = 1;
-            AudioSessionSetProperty (kAudioSessionProperty_OverrideAudioRoute, sizeof (audioRouteOverride),&audioRouteOverride);
-            AudioSessionSetProperty (kAudioSessionProperty_OverrideCategoryDefaultToSpeaker, sizeof (doChangeDefaultRoute), &doChangeDefaultRoute);
-        }
-    }
 	
 #elif TARGET_OS_MAC
 #if 1

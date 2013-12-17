@@ -3,19 +3,19 @@
  *
  * Contact: Mamadou Diop <diopmamadou(at)doubango.org>
  * Original Author: Laurent Etiemble <laurent.etiemble(at)gmail.com>
- *
+ *	
  * This file is part of Open Source Doubango Framework.
  *
  * DOUBANGO is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- *
+ *	
  * DOUBANGO is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
+ *	
  * You should have received a copy of the GNU General Public License
  * along with DOUBANGO.
  *
@@ -25,7 +25,7 @@
  * @brief Network transport layer using CFSocket. Used for iOS devices.
  *
  * @author Laurent Etiemble <laurent.etiemble(at)gmail.com>
- * @author Mamadou Diop <diopmamadou(at)doubango.org>
+ * @author Mamadou Diop <diopmamadou(at)doubango.org> 
  */
 
 #include "tnet_transport.h"
@@ -36,7 +36,7 @@
 #include "tsk_buffer.h"
 #include "tsk_safeobj.h"
 
-#if (__IPHONE_OS_VERSION_MIN_REQUIRED >= 40000)
+#if __APPLE__ //(__IPHONE_OS_VERSION_MIN_REQUIRED >= 40000)
 
 
 #ifdef __OBJC__
@@ -54,7 +54,8 @@ typedef struct transport_socket_xs
 {
 	tnet_fd_t fd;
 	tsk_bool_t owner;
-	tsk_bool_t connected;
+	tsk_bool_t readable;
+    tsk_bool_t writable;
 	tsk_bool_t paused;
     tsk_bool_t is_client;
     
@@ -176,7 +177,7 @@ int recvData(tnet_transport_t *transport, transport_socket_xt* active_socket)
         e->data = buffer; buffer = NULL;
         e->size = len;
         e->remote_addr = remote_addr;
-        
+	
         TSK_RUNNABLE_ENQUEUE_OBJECT_SAFE(TSK_RUNNABLE(transport), e);
     }
 	
@@ -185,11 +186,12 @@ bail:
 	return 0;
 }
 
-int tnet_transport_add_socket(const tnet_transport_handle_t *handle, tnet_fd_t fd, tnet_socket_type_t type, tsk_bool_t take_ownership, tsk_bool_t isClient)
+int tnet_transport_add_socket(const tnet_transport_handle_t *handle, tnet_fd_t fd, tnet_socket_type_t type, tsk_bool_t take_ownership, tsk_bool_t isClient, tnet_tls_socket_handle_t* tlsHandle)
 {
 	tnet_transport_t *transport = (tnet_transport_t*)handle;
 	transport_context_t* context;
 	int ret = -1;
+    (void)(tlsHandle);
     
 	if (!transport) {
 		TSK_DEBUG_ERROR("Invalid server handle.");
@@ -288,7 +290,7 @@ tsk_size_t tnet_transport_send(const tnet_transport_handle_t *handle, tnet_fd_t 
 		TSK_DEBUG_ERROR("Invalid transport handle.");
 		goto bail;
 	}
-    
+
     const transport_socket_xt* sock = getSocket(transport->context, from);
     if (TNET_SOCKET_TYPE_IS_STREAM(sock->type) && sock->cf_write_stream) {
         int sent = 0, to_send;
@@ -474,7 +476,7 @@ int removeSocketAtIndex(int index, transport_context_t *context)
         
 		TSK_FREE(sock);
 		
-		for(i=index ; i<context->count-1; i++) {
+		for(i=index ; i<context->count-1; i++) {			
 			context->sockets[i] = context->sockets[i+1];
 		}
 		
@@ -509,7 +511,7 @@ int removeSocket(transport_socket_xt *value, transport_context_t *context)
 }
 
 int tnet_transport_stop(tnet_transport_t *transport)
-{
+{	
 	int ret;
 	transport_context_t *context;
     
@@ -526,7 +528,7 @@ int tnet_transport_stop(tnet_transport_t *transport)
 	
 	if(transport->mainThreadId[0]){
 		if (context && context->cf_run_loop) {
-			// Signal the run-loop -  FIXME!  this often crashes! (TH)
+			// Signal the run-loop
 			CFRunLoopWakeUp(context->cf_run_loop);
 		}
 		return tsk_thread_join(transport->mainThreadId);
@@ -629,13 +631,16 @@ void __CFReadStreamClientCallBack(CFReadStreamRef stream, CFStreamEventType even
     switch(eventType) {
         case kCFStreamEventOpenCompleted:
         {
-            TSK_DEBUG_INFO("__CFReadStreamClientCallBack --> kCFStreamEventOpenCompleted");
-            TSK_RUNNABLE_ENQUEUE(transport, event_connected, transport->callback_data, sock->fd);
+            TSK_DEBUG_INFO("__CFReadStreamClientCallBack --> kCFStreamEventOpenCompleted(fd=%d)", fd);
+            sock->readable = tsk_true;
+            if(sock->writable){
+                TSK_RUNNABLE_ENQUEUE(transport, event_connected, transport->callback_data, sock->fd);
+            }
             break;
         }
         case kCFStreamEventEndEncountered:
         {
-            TSK_DEBUG_INFO("__CFReadStreamClientCallBack --> kCFStreamEventEndEncountered");
+            TSK_DEBUG_INFO("__CFReadStreamClientCallBack --> kCFStreamEventEndEncountered(fd=%d)", fd);
             break;
         }
         case kCFStreamEventHasBytesAvailable:
@@ -651,7 +656,7 @@ void __CFReadStreamClientCallBack(CFReadStreamRef stream, CFStreamEventType even
                 CFIndex index = CFErrorGetCode(error);
                 CFRelease(error);
                 
-                TSK_DEBUG_INFO("__CFReadStreamClientCallBack --> Error %lu", index);
+                TSK_DEBUG_INFO("__CFReadStreamClientCallBack --> Error=%lu, fd=%d", index, fd);
             }
             
             TSK_RUNNABLE_ENQUEUE(transport, event_error, transport->callback_data, sock->fd);
@@ -691,20 +696,23 @@ void __CFWriteStreamClientCallBack(CFWriteStreamRef stream, CFStreamEventType ev
     switch(eventType) {
         case kCFStreamEventOpenCompleted:
         {
-            TSK_DEBUG_INFO("__CFWriteStreamClientCallBack --> kCFStreamEventOpenCompleted");
-            
-            sock->connected = tsk_true;
-            TSK_RUNNABLE_ENQUEUE(transport, event_connected, transport->callback_data, sock->fd);
+            TSK_DEBUG_INFO("__CFWriteStreamClientCallBack --> kCFStreamEventOpenCompleted(fd=%d)", fd);
+            // still not connected, see kCFStreamEventCanAcceptBytes
             break;
         }
         case kCFStreamEventCanAcceptBytes:
         {
-            TSK_DEBUG_INFO("__CFWriteStreamClientCallBack --> kCFStreamEventCanAcceptBytes");
+            // To avoid blocking, call this function only if CFWriteStreamCanAcceptBytes returns true or after the stream’s client (set with CFWriteStreamSetClient) is notified of a kCFStreamEventCanAcceptBytes event.
+            TSK_DEBUG_INFO("__CFWriteStreamClientCallBack --> kCFStreamEventCanAcceptBytes(fd=%d)", fd);
+            sock->writable = tsk_true;
+            if(sock->readable){
+                TSK_RUNNABLE_ENQUEUE(transport, event_connected, transport->callback_data, sock->fd);
+            }
             break;
         }
         case kCFStreamEventEndEncountered:
         {
-            TSK_DEBUG_INFO("__CFWriteStreamClientCallBack --> kCFStreamEventEndEncountered");
+            TSK_DEBUG_INFO("__CFWriteStreamClientCallBack --> kCFStreamEventEndEncountered(fd=%d)", fd);
             break;
         }
         case kCFStreamEventErrorOccurred:
@@ -715,7 +723,7 @@ void __CFWriteStreamClientCallBack(CFWriteStreamRef stream, CFStreamEventType ev
                 CFIndex index = CFErrorGetCode(error);
                 CFRelease(error);
                 
-                TSK_DEBUG_INFO("__CFWriteStreamClientCallBack --> Error %lu", index);
+                TSK_DEBUG_INFO("__CFWriteStreamClientCallBack --> Error=%lu, fd=%d", index, fd);
             }
             
             TSK_RUNNABLE_ENQUEUE(transport, event_error, transport->callback_data, sock->fd);
@@ -744,7 +752,7 @@ void __CFSocketCallBack(CFSocketRef s, CFSocketCallBackType callbackType, CFData
     int fd = CFSocketGetNative(s);
     transport_socket_xt *sock = (transport_socket_xt *) getSocket(context, fd);
 	if(!sock) goto bail;
-    
+
     /* lock context */
     tsk_safeobj_lock(context);
     
@@ -773,7 +781,7 @@ bail:
 
 
 
-int wrapSocket(tnet_transport_t *transport, transport_socket_xt *sock)
+int wrapSocket(tnet_transport_t *transport, transport_socket_xt *sock) 
 {
 	transport_context_t *context;
 	if(!transport || !(context = transport->context) || !sock){
@@ -786,16 +794,16 @@ int wrapSocket(tnet_transport_t *transport, transport_socket_xt *sock)
         return 0;
     }
     
-    // Put a reference to the transport context
+    // Put a reference to the transport context 
     const CFSocketContext socket_context = { 0, transport, NULL, NULL, NULL };
     
     if (TNET_SOCKET_TYPE_IS_DGRAM(sock->type)) {
         
         // Create a CFSocket from the native socket and register for Read events
-        sock->cf_socket = CFSocketCreateWithNative(kCFAllocatorDefault,
+        sock->cf_socket = CFSocketCreateWithNative(kCFAllocatorDefault, 
                                                    sock->fd,
-                                                   kCFSocketReadCallBack,
-                                                   &__CFSocketCallBack,
+                                                   kCFSocketReadCallBack, 
+                                                   &__CFSocketCallBack, 
                                                    &socket_context);
         
         // Don't close the socket if the CFSocket is invalidated
@@ -807,7 +815,7 @@ int wrapSocket(tnet_transport_t *transport, transport_socket_xt *sock)
         // Create a new RunLoopSource and register it with the main thread RunLoop
         sock->cf_run_loop_source = CFSocketCreateRunLoopSource(kCFAllocatorDefault, sock->cf_socket, 0);
         CFRunLoopAddSource(context->cf_run_loop, sock->cf_run_loop_source, kCFRunLoopDefaultMode);
-        CFRelease(sock->cf_run_loop_source);
+        CFRelease(sock->cf_run_loop_source), sock->cf_run_loop_source = NULL;
         
     } else if (TNET_SOCKET_TYPE_IS_STREAM(sock->type)) {
         
@@ -868,13 +876,13 @@ int wrapSocket(tnet_transport_t *transport, transport_socket_xt *sock)
         CFStreamClientContext streamContext = { 0, transport, NULL, NULL, NULL };
         
         // Set the client callback for the stream
-        CFReadStreamSetClient(sock->cf_read_stream,
+        CFReadStreamSetClient(sock->cf_read_stream, 
                               kCFStreamEventOpenCompleted | kCFStreamEventHasBytesAvailable | kCFStreamEventErrorOccurred | kCFStreamEventEndEncountered,
-                              &__CFReadStreamClientCallBack,
+                              &__CFReadStreamClientCallBack, 
                               &streamContext);
-        CFWriteStreamSetClient(sock->cf_write_stream,
-                               kCFStreamEventOpenCompleted | kCFStreamEventErrorOccurred | kCFStreamEventEndEncountered,
-                               &__CFWriteStreamClientCallBack,
+        CFWriteStreamSetClient(sock->cf_write_stream, 
+                               kCFStreamEventOpenCompleted | kCFStreamEventErrorOccurred | kCFStreamEventCanAcceptBytes |kCFStreamEventEndEncountered,
+                               &__CFWriteStreamClientCallBack, 
                                &streamContext);
         
         // Enroll streams in the run-loop
@@ -894,7 +902,7 @@ void *tnet_transport_mainthread(void *param)
 	tnet_transport_t *transport = param;
     transport_context_t *context = transport->context;
     int i;
-    
+
 	/* check whether the transport is already prepared */
 	if (!transport->prepared) {
 		TSK_DEBUG_ERROR("Transport must be prepared before strating.");
@@ -905,6 +913,7 @@ void *tnet_transport_mainthread(void *param)
     
     // Set the RunLoop of the context
     context->cf_run_loop = CFRunLoopGetCurrent();
+    CFRetain(context->cf_run_loop);
 	// Wrap sockets now that the runloop is defined
 	tsk_safeobj_lock(context);
 	for (i = 0; i < context->count; ++i) {
@@ -944,10 +953,14 @@ void *tnet_transport_mainthread(void *param)
         }
     }
 	tsk_safeobj_unlock(context);
-    
+
     
 bail:
 	TSK_DEBUG_INFO("Stopped [%s] server with IP {%s} on port {%d}...", transport->description, transport->master->ip, transport->master->port);
+    if(context->cf_run_loop){
+        CFRelease(context->cf_run_loop);
+        context->cf_run_loop = NULL;
+    }
 	return 0;
 }
 
@@ -977,7 +990,7 @@ static tsk_object_t* transport_context_ctor(tsk_object_t * self, va_list * app)
 }
 
 static tsk_object_t* transport_context_dtor(tsk_object_t * self)
-{
+{ 
 	transport_context_t *context = self;
 	if (context) {
 		while(context->count) {
@@ -988,12 +1001,12 @@ static tsk_object_t* transport_context_dtor(tsk_object_t * self)
 	return self;
 }
 
-static const tsk_object_def_t tnet_transport_context_def_s =
+static const tsk_object_def_t tnet_transport_context_def_s = 
 {
     sizeof(transport_context_t),
-    transport_context_ctor,
+    transport_context_ctor, 
     transport_context_dtor,
-    tsk_null,
+    tsk_null, 
 };
 const tsk_object_def_t *tnet_transport_context_def_t = &tnet_transport_context_def_s;
 

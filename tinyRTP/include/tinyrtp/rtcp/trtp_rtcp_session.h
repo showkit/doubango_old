@@ -43,11 +43,12 @@ struct trtp_rtp_packet_s;
 
 typedef int (*trtp_rtcp_cb_f)(const void* callback_data, const struct trtp_rtcp_packet_s* packet);
 
-struct trtp_rtcp_session_s* trtp_rtcp_session_create(uint32_t ssrc);
+struct trtp_rtcp_session_s* trtp_rtcp_session_create(uint32_t ssrc, const char* cname);
 int trtp_rtcp_session_set_callback(struct trtp_rtcp_session_s* self, trtp_rtcp_cb_f callback, const void* callback_data);
 #if HAVE_SRTP
 int trtp_rtcp_session_set_srtp_sess(struct trtp_rtcp_session_s* self, const srtp_t* session);
 #endif
+int trtp_rtcp_session_set_app_bandwidth_max(struct trtp_rtcp_session_s* self, int32_t bw_upload_kbps, int32_t bw_download_kbps);
 int trtp_rtcp_session_start(struct trtp_rtcp_session_s* self, tnet_fd_t local_fd, const struct sockaddr* remote_addr);
 int trtp_rtcp_session_stop(struct trtp_rtcp_session_s* self);
 int trtp_rtcp_session_process_rtp_out(struct trtp_rtcp_session_s* self, const struct trtp_rtp_packet_s* packet_rtp, tsk_size_t size);

@@ -57,7 +57,7 @@ tsk_bool_t tnet_tls_is_supported()
 #endif
 }
 
- tnet_tls_socket_handle_t* tnet_tls_socket_create(tnet_fd_t fd, struct ssl_ctx_st* ssl_ctx)
+tnet_tls_socket_handle_t* tnet_tls_socket_create(tnet_fd_t fd, struct ssl_ctx_st* ssl_ctx)
 {
 #if !HAVE_OPENSSL
 	TSK_DEBUG_ERROR("OpenSSL not enabled");
@@ -241,6 +241,9 @@ int tnet_tls_socket_recv(tnet_tls_socket_handle_t* self, void** data, tsk_size_t
 			ret = SSL_get_error(socket->ssl, ret);
 			if(ret == SSL_ERROR_WANT_WRITE || ret == SSL_ERROR_WANT_READ){
 				ret = 0;
+			}
+			else{
+				TSK_DEBUG_ERROR("SSL_read failed [%d, %s]", ret, ERR_error_string(ERR_get_error(), tsk_null));
 			}
 			*size = 0;
 		}

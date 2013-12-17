@@ -16,6 +16,16 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if !defined(TNET_ICE_PAIR_FULL_DEBUG)
+#	define TNET_ICE_PAIR_FULL_DEBUG 0
+#endif /* TNET_ICE_PAIR_FULL_DEBUG */
+
+#if TNET_ICE_PAIR_FULL_DEBUG
+#define TNET_ICE_PAIR_DEBUG_INFO TSK_DEBUG_INFO
+#else
+#define TNET_ICE_PAIR_DEBUG_INFO(...) ((void)0)
+#endif
+
 static int __pred_find_by_pair(const tsk_list_item_t *item, const void *pair)
 {
 	if(item && item->data){
@@ -84,6 +94,68 @@ tnet_ice_pair_t* tnet_ice_pair_create(const tnet_ice_candidate_t* candidate_offe
 	}
 
 	return pair;
+}
+
+// rfc 5245 - 7.1.3.2.1.  Discovering Peer Reflexive Candidates
+tnet_ice_pair_t* tnet_ice_pair_prflx_create(tnet_ice_pairs_L_t* pairs, uint16_t local_fd, const struct sockaddr_storage *remote_addr)
+{
+	int ret;
+	const tsk_list_item_t *item;
+	const tnet_ice_pair_t *pair_local = tsk_null, *pair = tsk_null;
+	tnet_ip_t remote_ip;
+	tnet_port_t remote_port;
+	
+	if(!pairs || !remote_addr){
+		TSK_DEBUG_ERROR("Invalid parameter");
+		return tsk_null;
+	}
+
+	if((ret = tnet_get_sockip_n_port((const struct sockaddr*)remote_addr, &remote_ip, &remote_port))){
+		TNET_PRINT_LAST_ERROR("tnet_get_sockip_n_port() failed");
+		return tsk_null;
+	}
+
+	tsk_list_foreach(item, pairs){
+		if(!(pair = item->data) || !pair->candidate_offer || !pair->candidate_answer || !pair->candidate_offer->socket || pair->candidate_offer->socket->fd != local_fd){
+			continue;
+		}
+		pair_local = pair;
+		break;
+	}
+
+	if(!pair_local){
+		TSK_DEBUG_ERROR("Cannot create prflx candidate with remote ip = %s and remote port = %u", remote_ip, remote_port);
+		return tsk_null;
+	}
+	else{
+		tnet_ice_pair_t* pair_peer = tsk_null;
+		tnet_ice_candidate_t* cand_local = tnet_ice_candidate_create(tnet_ice_cand_type_prflx, pair_local->candidate_offer->socket, pair_local->is_ice_jingle, pair_local->candidate_offer->is_rtp, pair_local->candidate_offer->is_video, pair_local->candidate_offer->ufrag, pair_local->candidate_offer->pwd, pair_local->candidate_offer->foundation);
+		tnet_ice_candidate_t* cand_remote = tnet_ice_candidate_create(tnet_ice_cand_type_prflx, tsk_null, pair_local->is_ice_jingle, pair_local->candidate_answer->is_rtp, pair_local->candidate_answer->is_video, pair_local->candidate_answer->ufrag, pair_local->candidate_answer->pwd, pair_local->candidate_answer->foundation);
+		if(cand_local && cand_remote){
+			
+			tsk_strupdate(&cand_remote->transport_str, pair_local->candidate_offer->transport_str);
+			cand_remote->comp_id = pair_local->candidate_offer->comp_id;
+			memcpy(cand_remote->connection_addr, remote_ip, sizeof(tnet_ip_t));
+			cand_remote->port = remote_port;
+
+			TSK_DEBUG_INFO("ICE Pair (Peer Reflexive Candidate): [%s %u %s %d] -> [%s %u %s %d]",
+				cand_local->foundation,
+				cand_local->comp_id,
+				cand_local->connection_addr,
+				cand_local->port,
+
+				cand_remote->foundation,
+				cand_remote->comp_id,
+				cand_remote->connection_addr,
+				cand_remote->port);
+			pair_peer = tnet_ice_pair_create(cand_local, cand_remote, pair_local->is_controlling, pair_local->tie_breaker, pair_local->is_ice_jingle);
+		}
+		TSK_OBJECT_SAFE_FREE(cand_local);
+		TSK_OBJECT_SAFE_FREE(cand_remote);
+		return pair_peer;
+	}
+
+	return tsk_null;
 }
 
 int tnet_ice_pair_send_conncheck(tnet_ice_pair_t *self)
@@ -313,6 +385,9 @@ int tnet_ice_pair_send_response(tnet_ice_pair_t *self, const tnet_stun_request_t
 			int sendBytes = tnet_sockfd_sendto(self->candidate_offer->socket->fd, (const struct sockaddr*)&dest_addr, req_buffer->data, req_buffer->size);
 			TSK_OBJECT_SAFE_FREE(req_buffer);
 			ret = (sendBytes > 0) ? 0 : -2;
+			if(ret != 0){
+				TSK_DEBUG_ERROR("ICE pair-answer: failed to send response");
+			}
 		}
 
 		TSK_OBJECT_SAFE_FREE(message);
@@ -324,6 +399,12 @@ int tnet_ice_pair_send_response(tnet_ice_pair_t *self, const tnet_stun_request_t
 			(!self->is_controlling && tnet_stun_message_has_attribute(request, stun_ice_use_candidate)) || // Sender is controlling and uses "ICE-USE-CANDIDATE" attribute
 			(self->is_controlling) // We always use agressive nomination and final check-list will have high-priority pairs on the top
 			;
+		TNET_ICE_PAIR_DEBUG_INFO("ICE pair-answer changing state to 'succeed' ? %s, comp-id=%d, found=%s, addr=%s", 
+				change_state?"yes":"no",
+				self->candidate_answer->comp_id,
+				self->candidate_answer->foundation,
+				self->candidate_answer->connection_addr
+			);
 		if(change_state){
 			self->state_answer = tnet_ice_pair_state_succeed;
 		}
@@ -404,7 +485,7 @@ int tnet_ice_pair_auth_conncheck(const tnet_ice_pair_t *self, const tnet_stun_re
 	if(!stun_att_integrity){
 		if(self->is_ice_jingle){ // Bug introduced in Chrome 20.0.1120.0
 			*resp_code = 200;
-			tsk_strupdate(resp_phrase, "MESSAGE-INTEGRITY is missing by accepted");
+			tsk_strupdate(resp_phrase, "MESSAGE-INTEGRITY is missing but accepted");
 			return 0;
 		}
 		else{
@@ -463,6 +544,11 @@ int tnet_ice_pair_recv_response(tnet_ice_pair_t *self, const tnet_stun_response_
 			// ignore errors (e.g. STALE-CREDENTIALS) which could happen in some special cases before success
 			if(TNET_STUN_RESPONSE_IS_SUCCESS(response)){
 				self->state_offer = tnet_ice_pair_state_succeed;
+				TNET_ICE_PAIR_DEBUG_INFO("ICE pair-offer changing state to 'succeed', comp-id=%d, found=%s, addr=%s", 
+					self->candidate_offer->comp_id,
+					self->candidate_offer->foundation,
+					self->candidate_offer->connection_addr
+				);
 			}
 		}
 	}
@@ -474,11 +560,55 @@ const tnet_ice_pair_t* tnet_ice_pairs_find_by_response(tnet_ice_pairs_L_t* pairs
 	if(pairs && response){
 		const tsk_list_item_t *item;
 		const tnet_ice_pair_t *pair;
+		tnet_port_t mapped_port;
+		char* mapped_addr_str = tsk_null;
 		tsk_list_foreach(item, pairs){
-			if(!(pair = item->data)){
+			if(!(pair = item->data) || !pair->candidate_answer || !pair->candidate_offer){
 				continue;
 			}
 			if(pair->last_request && tnet_stun_message_transac_id_equals(pair->last_request->transaction_id, response->transaction_id)){
+				// check that mapped/xmapped address match destination
+				const tnet_stun_attribute_xmapped_addr_t *xmapped_addr;
+				const tnet_stun_attribute_mapped_addr_t* mapped_addr = tsk_null;
+
+				if(!(xmapped_addr = (const tnet_stun_attribute_xmapped_addr_t *)tnet_stun_message_get_attribute(response, stun_xor_mapped_address))){
+					mapped_addr = (const tnet_stun_attribute_mapped_addr_t *)tnet_stun_message_get_attribute(response, stun_mapped_address);
+				}
+				if(!xmapped_addr && !mapped_addr){
+					return pair; // do nothing if the client doesn't return mapped address STUN attribute
+				}
+				/* rfc 5245 7.1.3.2.1.  Discovering Peer Reflexive Candidates
+
+				   The agent checks the mapped address from the STUN response.  If the
+				   transport address does not match any of the local candidates that the
+				   agent knows about, the mapped address represents a new candidate -- a
+				   peer reflexive candidate.  Like other candidates, it has a type,
+				   base, priority, and foundation.  They are computed as follows:
+
+				   o  Its type is equal to peer reflexive.
+
+				   o  Its base is set equal to the local candidate of the candidate pair
+					  from which the STUN check was sent.
+
+				   o  Its priority is set equal to the value of the PRIORITY attribute
+					  in the Binding request.
+
+				   o  Its foundation is selected as described in Section 4.1.1.3.
+
+				   This peer reflexive candidate is then added to the list of local
+				   candidates for the media stream.  Its username fragment and password
+				   are the same as all other local candidates for that media stream.
+				*/
+				tnet_ice_utils_stun_address_tostring(xmapped_addr ? xmapped_addr->xaddress : mapped_addr->address, xmapped_addr ? xmapped_addr->family : mapped_addr->family, &mapped_addr_str);
+				mapped_port = xmapped_addr ? xmapped_addr->xport : mapped_addr->port;
+				if((mapped_port != pair->candidate_offer->port || !tsk_striequals(mapped_addr_str, pair->candidate_offer->connection_addr))){
+					TSK_DEBUG_INFO("Mapped address different than local connection address...probably symetric NAT: %s#%s or %u#%u", 
+						pair->candidate_offer->connection_addr, mapped_addr_str,
+						pair->candidate_offer->port, mapped_port);
+					// do we really need to add new local candidate?
+					// continue;
+				}
+
 				return pair;
 			}
 		}
@@ -515,8 +645,34 @@ const tnet_ice_pair_t* tnet_ice_pairs_find_by_fd_and_addr(tnet_ice_pairs_L_t* pa
 		return pair;
 	}
 
+	TSK_DEBUG_INFO("No ICE candidate with remote ip = %s and port = %u could be found...probably symetric NAT", remote_ip, remote_port);
+
 	return tsk_null;
 }
+
+static tsk_bool_t _tnet_ice_pairs_none_succeed(const tnet_ice_pairs_L_t* pairs, uint32_t comp_id, const char* foundation, tsk_bool_t answer){
+	if(pairs && foundation){
+		const tsk_list_item_t *item;
+		const tnet_ice_pair_t *pair;
+		const tnet_ice_candidate_t* candidate;
+		tsk_list_foreach(item, pairs){
+			if(!(pair = item->data) || !(candidate = (answer ? pair->candidate_answer : pair->candidate_offer))){
+				continue;
+			}
+			if(candidate->comp_id != comp_id || !tsk_striequals(candidate->foundation, foundation)){
+				continue;
+			}
+			if((answer ? pair->state_answer : pair->state_offer) == tnet_ice_pair_state_succeed){
+				TNET_ICE_PAIR_DEBUG_INFO("_tnet_ice_pairs_none_succeed_%s(%u, %s):false", answer?"anwser":"offer", comp_id, foundation);
+				return tsk_false;
+			}
+		}
+	}
+	TNET_ICE_PAIR_DEBUG_INFO("_tnet_ice_pairs_none_succeed_%s(%u, %s):true", answer?"anwser":"offer", comp_id, foundation);
+	return tsk_true;
+}
+#define _tnet_ice_pairs_none_succeed_answer(pairs, comp_id, foundation) _tnet_ice_pairs_none_succeed((pairs), (comp_id), (foundation), tsk_true)
+#define _tnet_ice_pairs_none_succeed_offer(pairs, comp_id, foundation) _tnet_ice_pairs_none_succeed((pairs), (comp_id), (foundation), tsk_false)
 
 // both RTP and RTCP have succeeded
 #define _tnet_ice_pairs_get_nominated_offer_at(pairs, index, comp_id, check_fullness, ret)	_tnet_ice_pairs_get_nominated_at((pairs), offer, answer, (index), (comp_id), (check_fullness), (ret))
@@ -533,20 +689,25 @@ const tnet_ice_pair_t* tnet_ice_pairs_find_by_fd_and_addr(tnet_ice_pairs_L_t* pa
 			if(!(pair = item->data)){ \
 				continue; \
 			} \
+			TNET_ICE_PAIR_DEBUG_INFO("ICE pair(%d,dir_1) state=%d, compid=%d, found=%s, addr=%s", _comp_id, pair->state_##dir_1, pair->candidate_##dir_1->comp_id, pair->candidate_##dir_1->foundation, pair->candidate_##dir_1->connection_addr); \
+			TNET_ICE_PAIR_DEBUG_INFO("ICE pair(%d,dir_2) state=%d, compid=%d, found=%s, addr=%s", _comp_id, pair->state_##dir_2, pair->candidate_##dir_2->comp_id, pair->candidate_##dir_2->foundation, pair->candidate_##dir_2->connection_addr); \
 			if(pair->state_##dir_1 == tnet_ice_pair_state_succeed && pair->candidate_##dir_1->comp_id == _comp_id){ \
 				pos = 0; \
 				nominated = tsk_true; \
 				if(check_fullness){ \
-					/* find another pair with same foundation (e.g. 'host') but different comp-id (e.g. RTCP) */ \
+					/* find another pair with same foundation but different comp-id (e.g. RTCP) */ \
 					const tsk_list_item_t *item2; \
 					const tnet_ice_pair_t *pair2; \
 					tsk_list_foreach(item2, pairs){ \
 						if(!(pair2 = item2->data)){ \
 							continue; \
 						} \
+						TNET_ICE_PAIR_DEBUG_INFO("ICE pair2(dir_1) state=%d, compid=%d, found=%s, addr=%s", pair2->state_##dir_1, pair2->candidate_##dir_1->comp_id, pair2->candidate_##dir_1->foundation, pair2->candidate_##dir_1->connection_addr); \
+						TNET_ICE_PAIR_DEBUG_INFO("ICE pair2(dir_2) state=%d, compid=%d, found=%s, addr=%s", pair2->state_##dir_2, pair2->candidate_##dir_2->comp_id, pair2->candidate_##dir_2->foundation, pair2->candidate_##dir_2->connection_addr); \
 						if((tsk_striequals(pair2->candidate_##dir_2->foundation, pair->candidate_##dir_2->foundation)) \
 							&& (pair2->candidate_##dir_2->comp_id != pair->candidate_##dir_2->comp_id)){ \
-								nominated = (pair2->state_##dir_2 == tnet_ice_pair_state_succeed); \
+								/* nominated = (pair2->state_##dir_2 == tnet_ice_pair_state_succeed); */  \
+								nominated = !_tnet_ice_pairs_none_succeed_##dir_2(pairs, pair2->candidate_##dir_2->comp_id, pair2->candidate_##dir_2->foundation); \
 								break; \
 						} \
 					} \
@@ -566,11 +727,13 @@ tsk_bool_t tnet_ice_pairs_have_nominated_offer(const tnet_ice_pairs_L_t* pairs, 
 {
 	const tnet_ice_pair_t *pair_ = tsk_null;
 	tsk_bool_t is_nominated_rtp, is_nominated_rtcp = tsk_true;
+	TNET_ICE_PAIR_DEBUG_INFO("tnet_ice_pairs_have_nominated_offer()");
 	_tnet_ice_pairs_get_nominated_offer_at((pairs), 0, TNET_ICE_CANDIDATE_COMPID_RTP, check_rtcp, (pair_));
 	if((is_nominated_rtp = (pair_ != tsk_null)) && check_rtcp){
 		_tnet_ice_pairs_get_nominated_offer_at((pairs), 0, TNET_ICE_CANDIDATE_COMPID_RTCP, check_rtcp, (pair_));
 		is_nominated_rtcp =(pair_ != tsk_null);
 	}
+	TNET_ICE_PAIR_DEBUG_INFO("is_nominated_rtp_offer=%s, is_nominated_rtcp_offer=%s", is_nominated_rtp?"yes":"no", is_nominated_rtcp?"yes":"no");
 	return (is_nominated_rtp && is_nominated_rtcp);
 }
 
@@ -579,11 +742,13 @@ tsk_bool_t tnet_ice_pairs_have_nominated_answer(const tnet_ice_pairs_L_t* pairs,
 {
 	const tnet_ice_pair_t *pair_ = tsk_null;
 	tsk_bool_t is_nominated_rtp, is_nominated_rtcp = tsk_true;
+	TNET_ICE_PAIR_DEBUG_INFO("tnet_ice_pairs_have_nominated_answer()");
 	_tnet_ice_pairs_get_nominated_answer_at((pairs), 0, TNET_ICE_CANDIDATE_COMPID_RTP, check_rtcp, (pair_));
 	if((is_nominated_rtp = (pair_ != tsk_null)) && check_rtcp){
 		_tnet_ice_pairs_get_nominated_answer_at((pairs), 0, TNET_ICE_CANDIDATE_COMPID_RTCP, check_rtcp, (pair_));
 		is_nominated_rtcp =(pair_ != tsk_null);
 	}
+	TNET_ICE_PAIR_DEBUG_INFO("is_nominated_rtp_answer=%s, is_nominated_rtcp_answer=%s", is_nominated_rtp?"yes":"no", is_nominated_rtcp?"yes":"no");
 	return (is_nominated_rtp && is_nominated_rtcp);
 }
 

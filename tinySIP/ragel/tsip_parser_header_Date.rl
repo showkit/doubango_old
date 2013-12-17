@@ -128,9 +128,13 @@ tsip_header_Date_t *tsip_header_Date_parse(const char *data, tsk_size_t size)
 	const char *eof = pe;
 	tsip_header_Date_t *hdr_Date = tsip_header_Date_create_null();
 	
-	const char *tag_start;
+	const char *tag_start = tsk_null;
 
 	%%write data;
+	(void)(eof);
+	(void)(tsip_machine_parser_header_Date_first_final);
+	(void)(tsip_machine_parser_header_Date_error);
+	(void)(tsip_machine_parser_header_Date_en_main);
 	%%write init;
 	%%write exec;
 	

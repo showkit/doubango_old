@@ -24,7 +24,7 @@
  *
  */
 #include "tcomp_udvm.h"
-#include "tcomp_nackinfo.h"
+
 #include "tsk_debug.h"
 
 int tcomp_udvm_createNackInfo(tcomp_udvm_t *udvm, uint8_t reasonCode, tcomp_buffer_handle_t* lpDetails, int16_t memory_address_of_instruction)

@@ -79,7 +79,6 @@ int tsip_dialog_register_event_callback(const tsip_dialog_register_t *self, tsip
 {
 	int ret = -1;
 
-   // printf("response: %d (%s) type: %d\n", msg->line.response.status_code, msg->line.response.reason_phrase, type);
 	switch(type){
 		case tsip_dialog_i_msg:
 			{
@@ -104,7 +103,7 @@ int tsip_dialog_register_event_callback(const tsip_dialog_register_t *self, tsip
 						else{
 							// Alert User
 							ret = tsip_dialog_fsm_act(TSIP_DIALOG(self), _fsm_action_error, msg, action);
-						//	TSK_DEBUG_ERROR("Not supported status code: %d", TSIP_RESPONSE_CODE(msg));
+							/* TSK_DEBUG_WARN("Not supported status code: %d", TSIP_RESPONSE_CODE(msg)); */
 						}
 					}
 					else{
@@ -133,6 +132,8 @@ int tsip_dialog_register_event_callback(const tsip_dialog_register_t *self, tsip
 				ret = tsip_dialog_fsm_act(TSIP_DIALOG(self), _fsm_action_transporterror, msg, tsk_null);
 				break;
 			}
+            
+    default: break;
 	}
 
 	return ret;
@@ -430,8 +431,10 @@ int tsip_dialog_register_OnTerminated(tsip_dialog_register_t *self)
 	if(TSIP_DIALOG_GET_STACK(self)->security.secagree_mech && tsk_striequals(TSIP_DIALOG_GET_STACK(self)->security.secagree_mech, "ipsec-3gpp")){
 		tsip_transport_cleanupSAs(TSIP_DIALOG_GET_STACK(self)->layer_transport);
 	}
-    self->unregistering =tsk_false;
-    TSK_OBJECT_SAFE_FREE(self->last_iRegister);
+	/* Reset values to avoid issues when the session is reused */
+	self->unregistering = tsk_false;
+	TSK_OBJECT_SAFE_FREE(self->last_iRegister);
+
 	/* Alert the user */
 	TSIP_DIALOG_SIGNAL_2(self, tsip_event_code_dialog_terminated,
 			TSIP_DIALOG(self)->last_error.phrase ? TSIP_DIALOG(self)->last_error.phrase : "Dialog terminated",

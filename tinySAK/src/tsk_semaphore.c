@@ -31,13 +31,10 @@
 #include "tsk_memory.h"
 #include "tsk_debug.h"
 #include "tsk_string.h"
-#include <errno.h>
-
 
 /* Apple claims that they fully support POSIX semaphore but ...
  */
 #if defined(__APPLE__) /* Mac OSX/Darwin/Iphone/Ipod Touch */
-#include <stdlib.h>
 #	define TSK_USE_NAMED_SEM	1
 #else 
 #	define TSK_USE_NAMED_SEM	0
@@ -49,6 +46,11 @@
 #	include "tsk_errno.h"
 #	define SEMAPHORE_S void
 	typedef HANDLE	SEMAPHORE_T;
+#	if TSK_UNDER_WINDOWS_RT
+#		if !defined(CreateSemaphoreEx)
+#			define CreateSemaphoreEx CreateSemaphoreExW
+#		endif
+#	endif
 //#else if define(__APPLE__) /* Mac OSX/Darwin/Iphone/Ipod Touch */
 //#	include <march/semaphore.h>
 //#	include <march/task.h>
@@ -101,16 +103,17 @@ tsk_semaphore_handle_t* tsk_semaphore_create_2(int initial_val)
 	SEMAPHORE_T handle = tsk_null;
 	
 #if TSK_UNDER_WINDOWS
+#	if TSK_UNDER_WINDOWS_RT
+	handle = CreateSemaphoreEx(NULL, initial_val, 0x7FFFFFFF, NULL, 0x00000000, SEMAPHORE_ALL_ACCESS);
+#	else
 	handle = CreateSemaphore(NULL, initial_val, 0x7FFFFFFF, NULL);
+#	endif
 #else
 	handle = tsk_calloc(1, sizeof(SEMAPHORE_S));
 	
 #if TSK_USE_NAMED_SEM
-    //shouldn't use the same semaphore name, add a random number to make it unique
-    int r = rand();
 	named_sem_t * nsem = (named_sem_t*)handle;
-	tsk_sprintf(&(nsem->name), "/sem-%d-s%dt", sem_count++, r);
-    TSK_DEBUG_INFO("Creating semaphore name: %s", nsem->name);
+	tsk_sprintf(&(nsem->name), "/sem-%d", sem_count++);
 	if((nsem->sem = sem_open(nsem->name, O_CREAT /*| O_EXCL*/, S_IRUSR | S_IWUSR, initial_val)) == SEM_FAILED)
 	{
 		TSK_FREE(nsem->name);
@@ -119,7 +122,7 @@ tsk_semaphore_handle_t* tsk_semaphore_create_2(int initial_val)
 	{
 #endif
 		TSK_FREE(handle);
-		TSK_DEBUG_ERROR("Failed to initialize the new semaphore (errno=%d (%s)).", errno, strerror(errno));
+		TSK_DEBUG_ERROR("Failed to initialize the new semaphore (errno=%d).", errno);
 	}
 #endif
 	
@@ -141,7 +144,7 @@ int tsk_semaphore_increment(tsk_semaphore_handle_t* handle)
 	if(handle)
 	{
 #if TSK_UNDER_WINDOWS
-		if((ret = ReleaseSemaphore((SEMAPHORE_T)handle, 1L, 0L) ? 0 : -1))
+		if((ret = ReleaseSemaphore((SEMAPHORE_T)handle, 1L, NULL) ? 0 : -1))
 #else
 		if((ret = sem_post((SEMAPHORE_T)GET_SEM(handle))))
 #endif
@@ -161,14 +164,16 @@ int tsk_semaphore_increment(tsk_semaphore_handle_t* handle)
 int tsk_semaphore_decrement(tsk_semaphore_handle_t* handle)
 {
 	int ret = EINVAL;
-	if(handle)
-	{
+	if(handle){
 #if TSK_UNDER_WINDOWS
-		ret = (WaitForSingleObject((SEMAPHORE_T)handle, INFINITE) == WAIT_OBJECT_0 ? 0 : -1);
+#	   if TSK_UNDER_WINDOWS_RT
+	   ret = (WaitForSingleObjectEx((SEMAPHORE_T)handle, INFINITE, TRUE) == WAIT_OBJECT_0) ? 0 : -1;
+#	   else
+	   ret = (WaitForSingleObject((SEMAPHORE_T)handle, INFINITE) == WAIT_OBJECT_0) ? 0 : -1;
+#endif
 		if(ret)	TSK_DEBUG_ERROR("sem_wait function failed: %d", ret);
 #else
-		do 
-		{ 
+		do { 
 			ret = sem_wait((SEMAPHORE_T)GET_SEM(handle)); 
 		} 
 		while ( errno == EINTR );

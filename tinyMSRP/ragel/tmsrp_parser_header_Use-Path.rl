@@ -112,9 +112,13 @@ tmsrp_header_Use_Path_t *tmsrp_header_Use_Path_parse(const char *data, tsk_size_
 	const char *eof = pe;
 	tmsrp_header_Use_Path_t *header = tmsrp_header_Use_Path_create_null();
 
-	const char *tag_start;
+	const char *tag_start = tsk_null;
 
 	%%write data;
+	(void)(eof);
+	(void)(tmsrp_machine_parser_header_Use_Path_first_final);
+	(void)(tmsrp_machine_parser_header_Use_Path_error);
+	(void)(tmsrp_machine_parser_header_Use_Path_en_main);
 	%%write init;
 	%%write exec;
 	

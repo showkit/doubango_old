@@ -314,18 +314,32 @@ static int thttp_transport_layer_stream_cb(const tnet_transport_event_t* e)
 	}
 	
 	/* Gets the associated dialog */
-	if((session = thttp_session_get_by_fd(stack->sessions, e->local_fd))){
-		if(!(dialog = thttp_dialog_get_oldest(session->dialogs))){
-			TSK_DEBUG_ERROR("Failed to found associated dialog.");
-			ret = -5;
+	if(!(session = thttp_session_get_by_fd(stack->sessions, e->local_fd))){
+		if ((stack->mode & thttp_stack_mode_server)) {
+			// server mode -> add new session
+			session = thttp_session_create(stack,
+				THTTP_SESSION_SET_HEADER("User-Agent", "doubango 2.0"),
+				THTTP_SESSION_SET_NULL());
+			if (!session) {
+				TSK_DEBUG_ERROR("Failed to create new session.");
+				ret = -5;
+				goto bail;
+			}
+		}
+		else {
+			// client mode -> session *must* exist
+			TSK_DEBUG_ERROR("Failed to found associated session.");
+			ret = -4;
 			goto bail;
 		}
-	}
-	else{
-		TSK_DEBUG_ERROR("Failed to found associated session.");
-		ret = -4;
-		goto bail;
 	}	
+
+	// Get dialog associated to this session
+	if(!(dialog = thttp_dialog_get_oldest(session->dialogs))){
+		TSK_DEBUG_ERROR("Failed to found associated dialog.");
+		ret = -5;
+		goto bail;
+	}
 
 	/* Check if buffer is too big to be valid (have we missed some chuncks?) */
 	//if(TSK_BUFFER_SIZE(buf) >= THTTP_MAX_CONTENT_SIZE){
@@ -446,10 +460,35 @@ int __thttp_stack_set(thttp_stack_t *self, va_list* app)
 				self->local_port = va_arg(*app, int);
 				break;
 			}
+
+
+			//
+			//	Modes
+			//
+		case thttp_pname_mode_client:
+			{	/* VOID */
+				self->mode = thttp_stack_mode_client;
+				break;
+			}
+		case thttp_pname_mode_server:
+			{	/* VOID */
+				self->mode = thttp_stack_mode_server;
+				break;
+			}
 		
 			//
 			// TLS
 			//
+		case thttp_pname_tls_enabled:
+			{	/* (tsk_bool_t)ENABLED_BOOL */
+				self->tls.enabled = va_arg(*app, tsk_bool_t);
+				break;
+			}
+		case thttp_pname_tls_certs_verify:
+			{	/* (tsk_bool_t)CERTS_VERIFY_BOOL */
+				self->tls.verify = va_arg(*app, tsk_bool_t);
+				break;
+			}
 		case thttp_pname_tls_certs:
 			{	/* A_FILE_STR, PUB_FILE_STR, PRIV_FILE_STR */
 				tsk_strupdate(&self->tls.ca, va_arg(*app, const char*));
@@ -509,6 +548,7 @@ thttp_stack_handle_t *thttp_stack_create(thttp_stack_callback_f callback, ...)
 	}
 	stack->local_ip = TNET_SOCKET_HOST_ANY;
 	stack->local_port = TNET_SOCKET_PORT_ANY;
+	stack->mode = thttp_stack_mode_client; // default mode
 
 	stack->callback = callback;
 	va_start(ap, callback);
@@ -543,20 +583,25 @@ int thttp_stack_start(thttp_stack_handle_t *self)
 	}
 
 	if(!stack->transport){
-		stack->transport = tnet_transport_create(stack->local_ip, stack->local_port, tnet_socket_type_tcp_ipv46, "HTTP/HTTPS transport");
+		const char* transport_desc = stack->tls.enabled ? "HTTPS transport" : "HTTP transport";
+		tnet_socket_type_t transport_type = stack->tls.enabled ? tnet_socket_type_tls_ipv46 : tnet_socket_type_tcp_ipv46;
+		stack->transport = tnet_transport_create(stack->local_ip, stack->local_port, transport_type, transport_desc);
 		tnet_transport_set_callback(stack->transport, TNET_TRANSPORT_CB_F(thttp_transport_layer_stream_cb), self);
 	}
 
-	if(!(ret = tnet_transport_start(stack->transport))){
-		// Sets TLS certificates
-		if(stack->tls.ca){
-			tsk_strupdate(&stack->transport->tls.ca, stack->tls.ca);
-			tsk_strupdate(&stack->transport->tls.pvk, stack->tls.pvk);
-			tsk_strupdate(&stack->transport->tls.pbk, stack->tls.pbk);
-		}
-		stack->started = tsk_true;
+	// Sets TLS certificates
+	if((ret = tnet_transport_tls_set_certs(stack->transport, stack->tls.ca, stack->tls.pbk, stack->tls.pvk, stack->tls.verify))){
+		goto bail;
 	}
-	else{
+
+	if((ret = tnet_transport_start(stack->transport))){
+		goto bail;
+	}
+
+	stack->started = tsk_true;
+	
+bail:
+	if(ret){
 		TSK_OBJECT_SAFE_FREE(stack->transport);
 	}
 

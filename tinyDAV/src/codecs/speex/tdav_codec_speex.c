@@ -41,7 +41,7 @@
 int tdav_codec_speex_init(tdav_codec_speex_t* self, tdav_codec_speex_type_t type);
 int tdav_codec_speex_deinit(tdav_codec_speex_t* self);
 
-/* ============ iLBC Plugin interface ================= */
+/* ============ Speex Plugin interface ================= */
 
 int tdav_codec_speex_open(tmedia_codec_t* self)
 {
@@ -117,7 +117,7 @@ tsk_size_t tdav_codec_speex_encode(tmedia_codec_t* self, const void* in_data, ts
 		}
 	}
 	
-	outsize = speex_bits_write(&speex->encoder.bits, *out_data, speex->encoder.size/2);
+	outsize = speex_bits_write(&speex->encoder.bits, *out_data, (speex->encoder.size >> 1));
 
    return outsize;
 }
@@ -219,7 +219,7 @@ tsk_bool_t tdav_codec_speex_sdp_att_match(const tmedia_codec_t* codec, const cha
 		 \
 		{ /* audio */ \
 			1, /* channels*/ \
-			20 /* ptime*/ \
+			0 /* ptime @deprecated*/ \
 		}, \
 	 \
 		/* video */ \

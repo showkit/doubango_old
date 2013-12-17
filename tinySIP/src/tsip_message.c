@@ -236,6 +236,16 @@ bail:
 	return hdr;
 }
 
+const tsip_header_t *tsip_message_get_headerLast(const tsip_message_t *self, tsip_header_type_t type)
+{
+	const tsip_header_t *hdr, *last = tsk_null;
+	tsk_size_t index = 0;
+	while((hdr = tsip_message_get_headerAt(self, type, index++))){
+		last = hdr;
+	}
+	return last;
+}
+
 const tsip_header_t *tsip_message_get_header(const tsip_message_t *self, tsip_header_type_t type)
 {
 	return tsip_message_get_headerAt(self, type, 0);
@@ -255,7 +265,7 @@ tsk_bool_t tsip_message_allowed(const tsip_message_t *self, const char* method)
 	tsip_header_Allow_t *hdr_allow;
 
 	if(self){
-		while( hdr_allow = (tsip_header_Allow_t*)tsip_message_get_headerAt(self, tsip_htype_Allow, index++) ){
+		while( (hdr_allow = (tsip_header_Allow_t*)tsip_message_get_headerAt(self, tsip_htype_Allow, index++)) ){
 			if(tsk_list_find_item_by_pred(hdr_allow->methods, __pred_find_string_by_value, method)){
 				return tsk_true;
 			}
@@ -270,7 +280,7 @@ tsk_bool_t tsip_message_supported(const tsip_message_t *self, const char* option
 	tsip_header_Supported_t *hdr_supported;
 
 	if(self){
-		while( hdr_supported = (tsip_header_Supported_t*)tsip_message_get_headerAt(self, tsip_htype_Supported, index++) ){
+		while( (hdr_supported = (tsip_header_Supported_t*)tsip_message_get_headerAt(self, tsip_htype_Supported, index++)) ){
 			if(tsk_list_find_item_by_pred(hdr_supported->options, __pred_find_string_by_value, option)){
 				return tsk_true;
 			}
@@ -286,7 +296,7 @@ tsk_bool_t tsip_message_required(const tsip_message_t *self, const char* option)
 	tsip_header_Require_t *hdr_require;
 
 	if(self){
-		while( hdr_require = (tsip_header_Require_t*)tsip_message_get_headerAt(self, tsip_htype_Require, index++) ){
+		while( (hdr_require = (tsip_header_Require_t*)tsip_message_get_headerAt(self, tsip_htype_Require, index++)) ){
 			if(tsk_list_find_item_by_pred(hdr_require->options, __pred_find_string_by_value, option)){
 				return tsk_true;
 			}
@@ -324,24 +334,11 @@ int tsip_message_tostring(const tsip_message_t *self, tsk_buffer_t *output)
 	if(TSIP_MESSAGE_IS_REQUEST(self)){
 		/*Method SP Request_URI SP SIP_Version CRLF*/
 		/* Method */
-  
-
-        tsk_size_t loc ;
-		tsk_size_t size;
-		size_t i ;
-
-		       
-		loc = output->size;
-
-        tsk_buffer_append_2(output, "%s ", self->line.request.method);
-        /* Request URI (without quotes but with params)*/
+		tsk_buffer_append_2(output, "%s ", self->line.request.method);
+		/* Request URI (without quotes but with params)*/
 		tsip_uri_serialize(self->line.request.uri, tsk_true, tsk_false, output);
 		/* SIP VERSION */
 		tsk_buffer_append_2(output, " %s\r\n", TSIP_MESSAGE_VERSION_DEFAULT);
-
-        size = (output->size - loc);
-
-        TSK_DEBUG_INFO(" encrypted header: 0x%llx\n", *(uint64_t*)output->data); 
 	}
 	else{
 		/*SIP_Version SP Status_Code SP Reason_Phrase CRLF*/
@@ -549,6 +546,8 @@ static tsk_object_t* tsip_message_ctor(tsk_object_t *self, va_list * app)
 				/* Copy network information */
 				message->local_fd = request->local_fd;
 				message->remote_addr = request->remote_addr;
+				message->src_net_type = request->src_net_type;
+				message->dst_net_type = request->dst_net_type;
 
 				/*
 				RFC 3261 - 8.2.6.2 Headers and Tags
@@ -636,6 +635,8 @@ static tsk_object_t* tsip_message_dtor(tsk_object_t *self)
 		TSK_OBJECT_SAFE_FREE(message->headers);
 
 		TSK_FREE(message->sigcomp_id);
+
+		TSK_FREE(message->dst_address);
 	}
 	else TSK_DEBUG_ERROR("Null SIP message.");
 

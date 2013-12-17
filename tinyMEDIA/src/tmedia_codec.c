@@ -36,6 +36,8 @@
 #include "tsk_memory.h"
 #include "tsk_debug.h"
 
+#include <limits.h> /* INT_MAX */
+
 /**@defgroup tmedia_codec_group Codecs
 */
 
@@ -80,11 +82,24 @@ int tmedia_codec_init(tmedia_codec_t* self, tmedia_type_t type, const char* name
 	tsk_strupdate(&self->name, name);
 	tsk_strupdate(&self->desc,desc);
 	tsk_strupdate(&self->format, format);
-	
+	if(!self->bandwidth_max_upload) self->bandwidth_max_upload = (type == tmedia_video ? tmedia_defaults_get_bandwidth_video_upload_max() : INT_MAX); // INT_MAX or <=0 means undefined
+	if(!self->bandwidth_max_download) self->bandwidth_max_download = (type == tmedia_video ? tmedia_defaults_get_bandwidth_video_download_max() : INT_MAX); // INT_MAX or <=0 means undefined
+	if(!self->in.rate) self->in.rate = self->plugin->rate;
+	if(!self->out.rate) self->out.rate = self->plugin->rate;
+
+	if(type & tmedia_audio){
+		tmedia_codec_audio_t* audio = TMEDIA_CODEC_AUDIO(self);
+		if(!audio->in.ptime) audio->in.ptime = (self->plugin->audio.ptime ? self->plugin->audio.ptime : tmedia_defaults_get_audio_ptime());
+		if(!audio->out.ptime) audio->out.ptime = (self->plugin->audio.ptime ? self->plugin->audio.ptime : tmedia_defaults_get_audio_ptime());
+		if(!audio->in.channels) audio->in.channels = self->plugin->audio.channels;
+		if(!audio->out.channels) audio->out.channels = self->plugin->audio.channels;
+		if(!audio->in.timestamp_multiplier) audio->in.timestamp_multiplier = tmedia_codec_audio_get_timestamp_multiplier(self->id, self->in.rate);
+		if(!audio->out.timestamp_multiplier) audio->out.timestamp_multiplier = tmedia_codec_audio_get_timestamp_multiplier(self->id, self->out.rate);
+	}
 	// Video flipping: For backward compatibility we have to initialize the default values
 	// according to the CFLAGS: 'FLIP_ENCODED_PICT' and 'FLIP_DECODED_PICT'. At any time you
 	// can update thse values (e.g. when the device switch from landscape to portrait) using video_session->set();
-	if(type & tmedia_video){
+	else if(type & tmedia_video){
 		tmedia_codec_video_t* video = TMEDIA_CODEC_VIDEO(self);
 #if FLIP_ENCODED_PICT
 		video->out.flip = tsk_true;
@@ -92,7 +107,8 @@ int tmedia_codec_init(tmedia_codec_t* self, tmedia_type_t type, const char* name
 #if FLIP_DECODED_PICT
 		video->in.flip = tsk_true;
 #endif
-		if(!video->in.fps) video->in.fps = video->out.fps = self->plugin->video.fps;
+		if(!video->in.fps) video->in.fps = self->plugin->video.fps ? self->plugin->video.fps : tmedia_defaults_get_video_fps();
+		if(!video->out.fps) video->out.fps = self->plugin->video.fps ? self->plugin->video.fps : tmedia_defaults_get_video_fps();
 		if(video->in.chroma == tmedia_chroma_none) video->in.chroma = tmedia_chroma_yuv420p;
 		if(video->out.chroma == tmedia_chroma_none) video->out.chroma = tmedia_chroma_yuv420p;
 
@@ -235,7 +251,12 @@ int tmedia_codec_plugin_register(const tmedia_codec_plugin_def_t* plugin)
 	for(i = 0; i<TMED_CODEC_MAX_PLUGINS; i++){
 		if(!__tmedia_codec_plugins[i] || (__tmedia_codec_plugins[i] == plugin)){
 			__tmedia_codec_plugins[i] = plugin;
+			TSK_DEBUG_INFO("Register codec: %s, %s", plugin->name, plugin->desc);
 			return 0;
+		}
+		if(__tmedia_codec_plugins[i]->codec_id == plugin->codec_id && plugin->codec_id != tmedia_codec_id_none){ // 'tmedia_codec_id_none' is used for fake codecs
+			TSK_DEBUG_INFO("Codec Registration: '%s' ignored because '%s' already registered", plugin->desc, __tmedia_codec_plugins[i]->desc);
+			return -3;
 		}
 	}
 	
@@ -260,6 +281,7 @@ int tmedia_codec_plugin_register_2(const tmedia_codec_plugin_def_t* plugin, int 
 		}
 		++count;
 	}
+	
 	if(count >= TMED_CODEC_MAX_PLUGINS){
 		TSK_DEBUG_ERROR("No room");
 		return -1;
@@ -267,14 +289,15 @@ int tmedia_codec_plugin_register_2(const tmedia_codec_plugin_def_t* plugin, int 
 
 	// unregister and compact
 	if(already_registered){
-        return 0;
-//		tmedia_codec_plugin_unregister(plugin);
-//		--count;
+		if(tmedia_codec_plugin_unregister(plugin) == 0){
+			--count;
+		}
 	}	
 	
-	 tmp = __tmedia_codec_plugins[prio];
-	__tmedia_codec_plugins[prio] = plugin;
+	// put current plugin at prio and old (which was at prio) at the end
+	tmp = __tmedia_codec_plugins[prio];
 	__tmedia_codec_plugins[count] = tmp;// put old codec add prio to the end of the list
+	__tmedia_codec_plugins[prio] = plugin;
 	
 	return 0;
 }
@@ -283,13 +306,13 @@ int tmedia_codec_plugin_register_2(const tmedia_codec_plugin_def_t* plugin, int 
  * Checks whether a codec plugin is registered or not.
  * @param plugin the definition of the plugin to check for availability.
  * @retval 1 (tsk_true) if registered and 0 (tsk_false) otherwise.
- * @sa @ref tmedia_codec_plugin_register() and @ref tmedia_codec_plugin_unregister()
+ * @sa @ref tmedia_codec_plugin_is_registered_2() @ref tmedia_codec_plugin_register() and @ref tmedia_codec_plugin_unregister()
  */
 tsk_bool_t tmedia_codec_plugin_is_registered(const tmedia_codec_plugin_def_t* plugin)
 {
 	if(plugin){
 		tsk_size_t i;
-		for(i = 0; i<TMED_CODEC_MAX_PLUGINS && __tmedia_codec_plugins[i]; i++){
+		for(i = 0; i < TMED_CODEC_MAX_PLUGINS && __tmedia_codec_plugins[i]; i++){
 			if(__tmedia_codec_plugins[i] == plugin){
 				return tsk_true;
 			}
@@ -299,9 +322,50 @@ tsk_bool_t tmedia_codec_plugin_is_registered(const tmedia_codec_plugin_def_t* pl
 }
 
 /**@ingroup tmedia_codec_group
+ * Checks whether a codec is registered or not.
+ * @param codec_id The code id to check.
+ * @return 1 @ref tsk_true if registered and tsk_false otherwise.
+ * @sa @ref tmedia_codec_plugin_is_registered() @ref tmedia_codec_plugin_register() and @ref tmedia_codec_plugin_unregister()
+ */
+tsk_bool_t tmedia_codec_plugin_is_registered_2(tmedia_codec_id_t codec_id)
+{
+	return (tmedia_codec_plugin_registered_get_const(codec_id) != tsk_null);
+}
+
+/**@ingroup tmedia_codec_group
+ * Gets the list of all registered plugins.
+ * @param plugins List of the registered plugins.
+ * @param count Number of plugins in the list.
+ * @return 0 if succeed and non-zero error code otherwise.
+ */
+int tmedia_codec_plugin_registered_get_all(const struct tmedia_codec_plugin_def_s*** plugins, tsk_size_t* count)
+{
+	if(!plugins || !count) {
+		TSK_DEBUG_ERROR("Invalid parameter");
+		return -1;
+	}
+	*plugins = (const struct tmedia_codec_plugin_def_s**)&__tmedia_codec_plugins;
+	*count = sizeof(__tmedia_codec_plugins)/sizeof(__tmedia_codec_plugins[0]);
+	return 0;
+}
+
+/**@ingroup tmedia_codec_group
+*/
+const struct tmedia_codec_plugin_def_s* tmedia_codec_plugin_registered_get_const(tmedia_codec_id_t codec_id)
+{
+	tsk_size_t i;
+	for(i = 0; i < TMED_CODEC_MAX_PLUGINS && __tmedia_codec_plugins[i]; i++){
+		if(__tmedia_codec_plugins[i]->codec_id == codec_id){
+			return __tmedia_codec_plugins[i];
+		}
+	}
+	return tsk_null;
+}
+
+/**@ingroup tmedia_codec_group
 * UnRegisters a codec plugin.
 * @param plugin the definition of the plugin.
-* @retval Zero if succeed and non-zero error code otherwise.
+* @retval 0 if succeed and non-zero error code otherwise.
 */
 int tmedia_codec_plugin_unregister(const tmedia_codec_plugin_def_t* plugin)
 {
@@ -315,6 +379,7 @@ int tmedia_codec_plugin_unregister(const tmedia_codec_plugin_def_t* plugin)
 	/* find the plugin to unregister */
 	for(i = 0; i<TMED_CODEC_MAX_PLUGINS && __tmedia_codec_plugins[i]; i++){
 		if(__tmedia_codec_plugins[i] == plugin){
+			TSK_DEBUG_INFO("UnRegister codec: %s, %s", plugin->name, plugin->desc);
 			__tmedia_codec_plugins[i] = tsk_null;
 			found = tsk_true;
 			break;
@@ -334,6 +399,16 @@ int tmedia_codec_plugin_unregister(const tmedia_codec_plugin_def_t* plugin)
 		__tmedia_codec_plugins[i] = tsk_null;
 	}
 	return (found ? 0 : -2);
+}
+
+/**@ingroup tmedia_codec_group
+* Unregister all codecs
+* @retval 0 if succeed and non-zero error code otherwise.
+*/
+int tmedia_codec_plugin_unregister_all()
+{
+	memset((void*)__tmedia_codec_plugins, 0, sizeof(__tmedia_codec_plugins));
+	return 0;
 }
 
 /**@ingroup tmedia_codec_group
@@ -425,13 +500,13 @@ char* tmedia_codec_get_rtpmap(const tmedia_codec_t* self)
 			}
 		}
 	}
-    else if(self->type & tmedia_data)
-    {
-        tsk_sprintf(&rtpmap, "%s %s", self->neg_format? self->neg_format : self->format, self->name);
-		if(self->plugin->rate){
-			tsk_strcat_2(&rtpmap, "/%d", self->plugin->rate);
-		}
-    }
+        else if(self->type & tmedia_data)
+        {
+            tsk_sprintf(&rtpmap, "%s %s", self->neg_format? self->neg_format : self->format, self->name);
+                   if(self->plugin->rate){
+                           tsk_strcat_2(&rtpmap, "/%d", self->plugin->rate);
+                   }
+        }
 	else if(self->type & tmedia_t140){
 		tsk_sprintf(&rtpmap, "%s %s", self->neg_format? self->neg_format : self->format, self->name);
 		if(self->plugin->rate){
@@ -522,7 +597,7 @@ int tmedia_codec_to_sdp(const tmedia_codecs_L_t* codecs, tsdp_header_M_t* m)
 	const tsk_list_item_t* item;
 	const tmedia_codec_t* codec;
 	char *fmtp, *rtpmap, *imageattr, *framerate;
-	tsk_bool_t is_audio, is_video, is_data;
+	tsk_bool_t is_audio, is_video, is_text, is_data;
 	int ret;
 
 	if(!m){
@@ -532,6 +607,7 @@ int tmedia_codec_to_sdp(const tmedia_codecs_L_t* codecs, tsdp_header_M_t* m)
 
 	is_audio = tsk_striequals(m->media, "audio");
 	is_video = tsk_striequals(m->media, "video");
+	is_text = tsk_striequals(m->media, "text");
 	is_data = tsk_striequals(m->media, "data");
 
 	tsk_list_foreach(item, codecs){
@@ -544,7 +620,7 @@ int tmedia_codec_to_sdp(const tmedia_codecs_L_t* codecs, tsdp_header_M_t* m)
 			return ret;
 		}
 		
-		if(is_audio || is_video || is_data){
+		if(is_audio || is_video || is_text || is_data){
 			char* temp = tsk_null;
 			/* add rtpmap attributes */
 			if((rtpmap = tmedia_codec_get_rtpmap(codec))){
@@ -585,7 +661,7 @@ int tmedia_codec_to_sdp(const tmedia_codecs_L_t* codecs, tsdp_header_M_t* m)
 				TSK_FREE(fmtp);
 			}
 			/* special case for T.140 + red */
-			if(is_data && tsk_striequals(codec->format, TMEDIA_CODEC_FORMAT_RED)){
+			if((is_data||is_text) && tsk_striequals(codec->format, TMEDIA_CODEC_FORMAT_RED)){
 				const tmedia_codec_t* codec_t140 = tsk_list_find_object_by_pred(codecs, __pred_find_codec_by_format, TMEDIA_CODEC_FORMAT_T140);
 				if(codec_t140){
 					const char* neg_format_t140 = codec_t140->neg_format?  codec_t140->neg_format : codec_t140->format;
@@ -667,33 +743,9 @@ int tmedia_codec_parse_fmtp(const char* fmtp, unsigned* maxbr, unsigned* fps, un
 			*height = 240;
 			found = tsk_true;
 		}
-        else if(sscanf(pch, "HVGA=%u", &div) == 1 && div){
-			*fps = 30/div;
-			*width = 480;
-			*height = 320;
-			found = tsk_true;
-		}
-        else if(sscanf(pch, "VGA=%u", &div) == 1 && div) {
-            *fps = 30/div;
-            *width = 640;
-            *height = 480;
-            found = tsk_true;
-        }
-        else if(sscanf(pch, "DVGA=%u", &div) == 1 && div){
-			*fps = 30/div;
-			*width = 960;
-			*height = 640;
-			found = tsk_true;
-		}
-        else if(sscanf(pch, "720P=%u", &div) == 1 && div){
-			*fps = 30/div;
-			*width = 1280;
-			*height = 720;
-			found = tsk_true;
-		}
-
 		// to be continued
 
+		if(found){
 			//found = tsk_false;
 			pch = strtok(tsk_null, "; ");
 			while(pch){
@@ -703,7 +755,7 @@ int tmedia_codec_parse_fmtp(const char* fmtp, unsigned* maxbr, unsigned* fps, un
 				}
 				pch = strtok(tsk_null, "; /");
 			}
-		
+		}
 		
 		if(found){
 			break;
@@ -761,4 +813,37 @@ int tmedia_codec_video_set_dec_callback(tmedia_codec_video_t *self, tmedia_codec
 	self->in.callback = callback;
 	self->in.result.usr_data = callback_data;
 	return 0;
+}
+
+float tmedia_codec_audio_get_timestamp_multiplier(tmedia_codec_id_t id, uint32_t sample_rate)
+{
+	switch(id){
+		case tmedia_codec_id_opus:
+			{
+				// draft-spittka-payload-rtp-opus-03 - 4.1.  RTP Header Usage
+				switch(sample_rate){
+					case 8000: return 6.f;
+					case 12000: return 4.f;
+					case 16000: return 3.f;
+					case 24000: return 2.f;
+					default: case 48000: return 1.f;
+				}
+				break;
+			}
+		case tmedia_codec_id_g722:
+			{
+				/* http://www.ietf.org/rfc/rfc3551.txt
+					 Even though the actual sampling rate for G.722 audio is 16,000 Hz,
+					   the RTP clock rate for the G722 payload format is 8,000 Hz because
+					   that value was erroneously assigned in RFC 1890 and must remain
+					   unchanged for backward compatibility.  The octet rate or sample-pair
+					   rate is 8,000 Hz.
+				*/
+				return .5f;
+			}
+		default:
+			{
+				return 1;
+			}
+	}
 }

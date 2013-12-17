@@ -35,11 +35,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
-#include <stdio.h>
-
-#ifndef _WIN32
-#include <pthread.h>
-#endif
 
 #define jb_warn(...) (warnf ? warnf(__VA_ARGS__) : (void)0) 
 #define jb_err(...) (errf ? errf(__VA_ARGS__) : (void)0) 
@@ -100,7 +95,7 @@ jitterbuffer *jb_new()
   jitterbuffer *jb;
   
   jb_dbg("N");
-  jb = calloc(1, sizeof(jitterbuffer));
+  jb = tsk_calloc(1, sizeof(jitterbuffer));
   if (!jb) {
     jb_err("cannot allocate jitterbuffer\n");
     return NULL;
@@ -343,8 +338,7 @@ int jb_has_frames(jitterbuffer *jb)
  * keep track of statistics
  */
 void jb_put(jitterbuffer *jb, void *data, int type, long ms, long ts, long now, int codec) 
-{
- //printf("jb_put: %p\n", pthread_self());
+{ 
   long pointer, max_index;
   
   if (jb == NULL) {
@@ -398,7 +392,7 @@ void jb_put(jitterbuffer *jb, void *data, int type, long ms, long ts, long now, 
 int jb_get(jitterbuffer *jb, void **data, long now, long interpl) 
 {
   int result;
- // printf("jb_get: %p\n", pthread_self());
+  
   jb_dbg("A");
   if (jb == NULL) {
     jb_err("no jitterbuffer in jb_get()\n");
@@ -528,7 +522,7 @@ static void put_control(jitterbuffer *jb, void *data, int type, long ts)
 static void put_voice(jitterbuffer *jb, void *data, int type, long ms, long ts, int codec) 
 {
   jb_frame *frame, *p;
-  frame = calloc(1,sizeof(jb_frame));
+  frame = malloc(sizeof(jb_frame));
   if(!frame) {
     jb_err("cannot allocate frame\n");
     return;
@@ -541,7 +535,7 @@ static void put_voice(jitterbuffer *jb, void *data, int type, long ms, long ts, 
   frame->codec = codec;
   
   data = NULL; //to avoid stealing the memory location
-  /*
+  /* 
    * frames are a circular list, jb->voiceframes points to to the lowest ts, 
    * jb->voiceframes->prev points to the highest ts
    */

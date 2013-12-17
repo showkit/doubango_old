@@ -40,7 +40,7 @@ int tmedia_resampler_init(tmedia_resampler_t* self)
 	return 0;
 }
 
-int tmedia_resampler_open(tmedia_resampler_t* self, uint32_t in_freq, uint32_t out_freq, uint32_t frame_duration, uint32_t channels, uint32_t quality)
+int tmedia_resampler_open(tmedia_resampler_t* self, uint32_t in_freq, uint32_t out_freq, uint32_t frame_duration, uint32_t in_channels, uint32_t out_channels, uint32_t quality)
 {
 	int ret;
 
@@ -53,7 +53,7 @@ int tmedia_resampler_open(tmedia_resampler_t* self, uint32_t in_freq, uint32_t o
 		return 0;
 	}
 	
-	if((ret = self->plugin->open(self, in_freq, out_freq, frame_duration, channels, quality))){
+	if((ret = self->plugin->open(self, in_freq, out_freq, frame_duration, in_channels, out_channels, quality))){
 		TSK_DEBUG_ERROR("Failed to open [%s] resamplerr", self->plugin->desc);
 		return ret;
 	}
@@ -127,12 +127,16 @@ int tmedia_resampler_plugin_register(const tmedia_resampler_plugin_def_t* plugin
 		TSK_DEBUG_ERROR("Invalid parameter");
 		return -1;
 	}
-	__tmedia_resampler_plugin = plugin;
+	if(!__tmedia_resampler_plugin) {
+		TSK_DEBUG_INFO("Register resampler: %d", plugin->desc);
+		__tmedia_resampler_plugin = plugin;
+	}
 	return 0;
 }
 
-int tmedia_resampler_plugin_unregister()
+int tmedia_resampler_plugin_unregister(const tmedia_resampler_plugin_def_t* plugin)
 {
+	(void)(plugin);
 	__tmedia_resampler_plugin = tsk_null;
 	return 0;
 }
@@ -142,7 +146,7 @@ tmedia_resampler_t* tmedia_resampler_create()
 	tmedia_resampler_t* resampler = tsk_null;
 
 	if(__tmedia_resampler_plugin){
-		if((resampler = tsk_object_new(__tmedia_resampler_plugin->objdef))){
+		if((resampler = (tmedia_resampler_t*)tsk_object_new(__tmedia_resampler_plugin->objdef))){
 			resampler->plugin = __tmedia_resampler_plugin;
 		}
 	}

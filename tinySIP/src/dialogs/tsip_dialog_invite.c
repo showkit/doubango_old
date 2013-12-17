@@ -78,6 +78,8 @@
 3GPP TS 24.605 : Ad-Hoc Multi Party Conference
 */
 
+extern int tsip_dialog_add_session_headers(const tsip_dialog_t *self, tsip_request_t* request);
+
 /* ======================== internal functions ======================== */
 /*static*/ int tsip_dialog_invite_msession_start(tsip_dialog_invite_t *self);
 /*static*/ int tsip_dialog_invite_msession_configure(tsip_dialog_invite_t *self);
@@ -90,9 +92,11 @@
 /*static*/ int send_CANCEL(tsip_dialog_invite_t *self);
 /*static*/ int tsip_dialog_invite_notify_parent(tsip_dialog_invite_t *self, const tsip_response_t* response);
 static int tsip_dialog_invite_OnTerminated(tsip_dialog_invite_t *self);
+static int tsip_dialog_invite_msession_onerror_cb(const void* usrdata, const struct tmedia_session_s* session, const char* reason, tsk_bool_t is_fatal);
 
 /* ======================== external functions ======================== */
 extern int tsip_dialog_invite_ice_process_ro(tsip_dialog_invite_t * self, const tsdp_message_t* sdp_ro, tsk_bool_t is_remote_offer);
+extern int tsip_dialog_invite_ice_set_media_type(tsip_dialog_invite_t * self, tmedia_type_t media_type);
 extern int tsip_dialog_invite_stimers_cancel(tsip_dialog_invite_t* self);
 extern int tsip_dialog_invite_qos_timer_cancel(tsip_dialog_invite_t* self);
 extern int tsip_dialog_invite_qos_timer_schedule(tsip_dialog_invite_t* self);
@@ -125,7 +129,7 @@ static int x0000_Any_2_Trying_X_oBYE(va_list *app); /* If not Connected => Cance
 static int x0000_Any_2_Terminated_X_iBYE(va_list *app);
 static int x0000_Any_2_Trying_X_shutdown(va_list *app);
 
-static int x9998_Any_2_Any_X_transportError(va_list *app);
+static int x9998_Any_2_Terminated_X_transportError(va_list *app);
 static int x9999_Any_2_Any_X_Error(va_list *app);
 
 /* ======================== conds ======================== */
@@ -256,6 +260,8 @@ int tsip_dialog_invite_event_callback(const tsip_dialog_invite_t *self, tsip_dia
 			ret = tsip_dialog_fsm_act(TSIP_DIALOG(self), _fsm_action_transporterror, msg, tsk_null);
 			break;
 		}
+            
+        default: break;
 	}
 
 	return ret;
@@ -385,7 +391,7 @@ int tsip_dialog_invite_init(tsip_dialog_invite_t *self)
 		// Any -> (i2xx INFO) -> Any
 		TSK_FSM_ADD(tsk_fsm_state_any, _fsm_action_i2xx, _fsm_cond_is_resp2INFO, tsk_fsm_state_any, tsk_null, "x0000_Any_2_Any_X_i2xxINFO"),
 		// Any -> (transport error) -> Terminated
-		TSK_FSM_ADD_ALWAYS(tsk_fsm_state_any, _fsm_action_transporterror, _fsm_state_Terminated, x9998_Any_2_Any_X_transportError, "x9998_Any_2_Any_X_transportError"),
+		TSK_FSM_ADD_ALWAYS(tsk_fsm_state_any, _fsm_action_transporterror, _fsm_state_Terminated, x9998_Any_2_Terminated_X_transportError, "x9998_Any_2_Terminated_X_transportError"),
 		// Any -> (transport error) -> Terminated
 		TSK_FSM_ADD_ALWAYS(tsk_fsm_state_any, _fsm_action_error, _fsm_state_Terminated, x9999_Any_2_Any_X_Error, "x9999_Any_2_Any_X_Error"),
 
@@ -422,6 +428,7 @@ int tsip_dialog_invite_process_ro(tsip_dialog_invite_t *self, const tsip_message
 	tmedia_type_t new_media_type;
 	tsk_bool_t media_session_was_null;
 	int ret = 0;
+	tmedia_ro_type_t ro_type = tmedia_ro_type_none;
 
 	if(!self || !message){
 		TSK_DEBUG_ERROR("Invalid parameter");
@@ -432,7 +439,7 @@ int tsip_dialog_invite_process_ro(tsip_dialog_invite_t *self, const tsip_message
 	if(TSIP_MESSAGE_HAS_CONTENT(message)){
 		if(tsk_striequals("application/sdp", TSIP_MESSAGE_CONTENT_TYPE(message))){
 			if(!(sdp_ro = tsdp_message_parse(TSIP_MESSAGE_CONTENT_DATA(message), TSIP_MESSAGE_CONTENT_DATA_LENGTH(message)))){
-				TSK_DEBUG_ERROR("Failed to parse remote sdp message");
+				TSK_DEBUG_ERROR("Failed to parse remote sdp message:\n [%s]", (const char*)TSIP_MESSAGE_CONTENT_DATA(message));
 				return -2;
 			}
 			// ICE processing
@@ -454,24 +461,28 @@ int tsip_dialog_invite_process_ro(tsip_dialog_invite_t *self, const tsip_message
 		}
 	}
 	
+	ro_type = (TSIP_REQUEST_IS_INVITE(message) || TSIP_REQUEST_IS_UPDATE(message)) // ACK/PRACK can only contain a response if the initial INVITE was bodiless
+			? tmedia_ro_type_offer
+			:(TSIP_RESPONSE_IS_1XX(message) ? tmedia_ro_type_provisional : tmedia_ro_type_answer);
 	media_session_was_null = (self->msession_mgr == tsk_null);
 	old_media_type = TSIP_DIALOG_GET_SS(self)->media.type;
 	new_media_type = sdp_ro ? tmedia_type_from_sdp(sdp_ro) : old_media_type;
 
 	/* Create session Manager if not already done */
 	if(!self->msession_mgr){
+		int32_t transport_idx = TSIP_DIALOG_GET_STACK(self)->network.transport_idx_default;
 		TSIP_DIALOG_GET_SS(self)->media.type = new_media_type;
-		self->msession_mgr = tmedia_session_mgr_create(TSIP_DIALOG_GET_SS(self)->media.type, TSIP_DIALOG_GET_STACK(self)->network.local_ip, 
-			TNET_SOCKET_TYPE_IS_IPV6(TSIP_DIALOG_GET_STACK(self)->network.proxy_cscf_type), (sdp_ro == tsk_null));
+		self->msession_mgr = tmedia_session_mgr_create(TSIP_DIALOG_GET_SS(self)->media.type, TSIP_DIALOG_GET_STACK(self)->network.local_ip[transport_idx], 
+			TNET_SOCKET_TYPE_IS_IPV6(TSIP_DIALOG_GET_STACK(self)->network.proxy_cscf_type[transport_idx]), (sdp_ro == tsk_null));
 		if(TSIP_DIALOG_GET_STACK(self)->natt.ctx){
-			tmedia_session_mgr_set_natt_ctx(self->msession_mgr, TSIP_DIALOG_GET_STACK(self)->natt.ctx, TSIP_DIALOG_GET_STACK(self)->network.aor.ip);
+			tmedia_session_mgr_set_natt_ctx(self->msession_mgr, TSIP_DIALOG_GET_STACK(self)->natt.ctx, TSIP_DIALOG_GET_STACK(self)->network.aor.ip[transport_idx]);
 		}
 		ret = tmedia_session_mgr_set_ice_ctx(self->msession_mgr, self->ice.ctx_audio, self->ice.ctx_video, self->ice.ctx_data);
 	}
 	ret = tsip_dialog_invite_msession_configure(self);
 	
 	if(sdp_ro){
-		if((ret = tmedia_session_mgr_set_ro(self->msession_mgr, sdp_ro))){
+		if((ret = tmedia_session_mgr_set_ro(self->msession_mgr, sdp_ro, ro_type))){
 			TSK_DEBUG_ERROR("Failed to set remote offer");
 			goto bail;
 		}
@@ -567,6 +578,11 @@ int x0000_Connected_2_Connected_X_iACK(va_list *app)
 		return ret;
 	}
 
+	/* Starts media session if not already done */
+	if(!self->msession_mgr->started && (self->msession_mgr->sdp.lo && self->msession_mgr->sdp.ro)){
+		ret = tsip_dialog_invite_msession_start(self);
+	}
+
 	// starts ICE timers now that both parties receive the "candidates"
 	if(tsip_dialog_invite_ice_is_enabled(self)){
 		tsip_dialog_invite_ice_timers_set(self, (self->required.ice ? -1 : TSIP_DIALOG_INVITE_ICE_CONNCHECK_TIMEOUT));
@@ -634,11 +650,6 @@ int x0000_Connected_2_Connected_X_iINVITEorUPDATE(va_list *app)
 	/* alert the user */
 	TSIP_DIALOG_INVITE_SIGNAL(self, tsip_i_request, 
 			tsip_event_code_dialog_request_incoming, "Incoming Request.", rINVITEorUPDATE);
-
-	// stops ICE timers until both parties receive the "candidates"
-	if(tsip_dialog_invite_ice_is_enabled(self)){
-		tsip_dialog_invite_ice_timers_set(self, -1);
-	}
 
 	return ret;
 }
@@ -936,7 +947,7 @@ int x0000_Any_2_Any_X_iINFO(va_list *app)
 	return 0;
 }
 
-int x9998_Any_2_Any_X_transportError(va_list *app)
+int x9998_Any_2_Terminated_X_transportError(va_list *app)
 {
 	tsip_dialog_invite_t *self = va_arg(*app, tsip_dialog_invite_t *);
 
@@ -960,22 +971,42 @@ int tsip_dialog_invite_msession_configure(tsip_dialog_invite_t *self)
 {
 	tmedia_srtp_mode_t srtp_mode;
 	tsk_bool_t is_rtcweb_enabled;
+	tsk_bool_t is_webrtc2sip_mode_enabled;
 	
 	if(!self || !self->msession_mgr){
 		TSK_DEBUG_ERROR("Invalid parameter");
 		return -1;
 	}
 
+	is_webrtc2sip_mode_enabled = (TSIP_DIALOG_GET_STACK(self)->network.mode == tsip_stack_mode_webrtc2sip);
 	is_rtcweb_enabled = (((tsip_ssession_t*)TSIP_DIALOG(self)->ss)->media.profile == tmedia_profile_rtcweb);
 	srtp_mode = is_rtcweb_enabled ? tmedia_srtp_mode_mandatory : ((tsip_ssession_t*)TSIP_DIALOG(self)->ss)->media.srtp_mode;
-
 	
 
+	// set callback functions
+	tmedia_session_mgr_set_onerror_cbfn(self->msession_mgr, self, tsip_dialog_invite_msession_onerror_cb);
+
+	// set params
 	return tmedia_session_mgr_set(self->msession_mgr,
 			TMEDIA_SESSION_SET_INT32(self->msession_mgr->type, "srtp-mode", srtp_mode),
 			TMEDIA_SESSION_SET_INT32(self->msession_mgr->type, "avpf-enabled", is_rtcweb_enabled), // Otherwise will be negociated using SDPCapNeg (RFC 5939)
+			TMEDIA_SESSION_SET_INT32(self->msession_mgr->type, "webrtc2sip-mode-enabled", is_webrtc2sip_mode_enabled), // hack the media stack
 			TMEDIA_SESSION_SET_INT32(self->msession_mgr->type, "rtcp-enabled", self->use_rtcp),
 			TMEDIA_SESSION_SET_INT32(self->msession_mgr->type, "rtcpmux-enabled", self->use_rtcpmux),
+			TMEDIA_SESSION_SET_INT32(self->msession_mgr->type, "codecs-supported", ((tsip_ssession_t*)TSIP_DIALOG(self)->ss)->media.codecs),
+			
+			TMEDIA_SESSION_SET_INT32(self->msession_mgr->type, "bypass-encoding", ((tsip_ssession_t*)TSIP_DIALOG(self)->ss)->media.bypass_encoding),
+			TMEDIA_SESSION_SET_INT32(self->msession_mgr->type, "bypass-decoding", ((tsip_ssession_t*)TSIP_DIALOG(self)->ss)->media.bypass_decoding),
+
+			TMEDIA_SESSION_SET_INT32(tmedia_audio, "rtp-ssrc", ((tsip_ssession_t*)TSIP_DIALOG(self)->ss)->media.rtp.ssrc.audio),
+			TMEDIA_SESSION_SET_INT32(tmedia_video, "rtp-ssrc", ((tsip_ssession_t*)TSIP_DIALOG(self)->ss)->media.rtp.ssrc.video),
+			TMEDIA_SESSION_SET_INT32(tmedia_data, "rtp-ssrc", ((tsip_ssession_t*)TSIP_DIALOG(self)->ss)->media.rtp.ssrc.data),
+			
+			TMEDIA_SESSION_SET_STR(self->msession_mgr->type, "dtls-file-ca", TSIP_DIALOG_GET_STACK(self)->security.tls.ca),
+			TMEDIA_SESSION_SET_STR(self->msession_mgr->type, "dtls-file-pbk", TSIP_DIALOG_GET_STACK(self)->security.tls.pbk),
+			TMEDIA_SESSION_SET_STR(self->msession_mgr->type, "dtls-file-pvk", TSIP_DIALOG_GET_STACK(self)->security.tls.pvk),
+			TMEDIA_SESSION_SET_INT32(self->msession_mgr->type, "dtls-cert-verify", TSIP_DIALOG_GET_STACK(self)->security.tls.verify),
+
 			tsk_null);
 }
 
@@ -987,6 +1018,11 @@ int tsip_dialog_invite_msession_start(tsip_dialog_invite_t *self)
 	}
 
 	if(tsip_dialog_invite_ice_is_enabled(self) && !tsip_dialog_invite_ice_is_connected(self)){
+		if(self->msession_mgr->type != self->ice.media_type){
+			TSK_DEBUG_INFO("Media session type(%d)<>ICE media type(%d)", self->msession_mgr->type, self->ice.media_type);
+			// make sure to use the right media types
+			tsip_dialog_invite_ice_set_media_type(self, self->msession_mgr->type);
+		}
 		self->ice.start_smgr = tsk_true;
 	}
 	else{
@@ -1015,7 +1051,6 @@ int send_INVITEorUPDATE(tsip_dialog_invite_t *self, tsk_bool_t is_INVITE, tsk_bo
 	}
 
 	if((request = tsip_dialog_request_new(TSIP_DIALOG(self), is_INVITE ? "INVITE" : "UPDATE"))){
-
 		/* apply action params to the request (will add a content if the action contains one) */
 		if(TSIP_DIALOG(self)->curr_action){
 			tsip_dialog_apply_action(request, TSIP_DIALOG(self)->curr_action);
@@ -1182,7 +1217,7 @@ int send_PRACK(tsip_dialog_invite_t *self, const tsip_response_t* r1xx)
 			TSK_FREE(sdp);
 		}
 	}
-
+	
 	// Send request
 	ret = tsip_dialog_request_send(TSIP_DIALOG(self), request);
 	
@@ -1249,6 +1284,7 @@ int send_CANCEL(tsip_dialog_invite_t *self)
 			cancel->To = tsk_object_ref(last_oInvite->To);
 			cancel->From = tsk_object_ref(last_oInvite->From);
 			cancel->firstVia = tsk_object_ref(last_oInvite->firstVia);
+			cancel->sigcomp_id = tsk_strdup(TSIP_DIALOG_GET_SS(self)->sigcomp_id);
 
 			// Copy Authorizations, Routes and Proxy-Auth
 			tsk_list_foreach(item, last_oInvite->headers){
@@ -1266,9 +1302,11 @@ int send_CANCEL(tsip_dialog_invite_t *self)
 						}
 						tsk_list_push_back_data(cancel->headers, (void**)&header);
 						break;
+                    default: break;
 				}
 			}
-
+			
+			ret = tsip_dialog_add_session_headers(TSIP_DIALOG(self), cancel);
 			ret = tsip_dialog_request_send(TSIP_DIALOG(self), cancel);
 			TSK_OBJECT_SAFE_FREE(cancel);
 		}
@@ -1337,6 +1375,9 @@ int send_BYE(tsip_dialog_invite_t *self)
 		session and the dialog terminated.
 	*/
 	if((bye = tsip_dialog_request_new(TSIP_DIALOG(self), "BYE"))){
+		if(TSIP_DIALOG(self)->curr_action){
+			tsip_dialog_apply_action(bye, TSIP_DIALOG(self)->curr_action);
+		}
 		ret = tsip_dialog_request_send(TSIP_DIALOG(self), bye);
 		TSK_OBJECT_SAFE_FREE(bye);
 	}
@@ -1507,7 +1548,7 @@ int send_RESPONSE(tsip_dialog_invite_t *self, const tsip_request_t* request, sho
 						ret = tsip_dialog_invite_ice_process_lo(self, sdp_lo);
 					}
 				}
-				TSK_FREE(sdp);				
+				TSK_FREE(sdp);
 			}
 
 			/* Add Allow header */
@@ -1585,9 +1626,10 @@ int tsip_dialog_invite_OnTerminated(tsip_dialog_invite_t *self)
 	if(self->ice.ctx_video){
 		tnet_ice_ctx_stop(self->ice.ctx_video);
 	}
-    if(self->ice.ctx_data){
-        tnet_ice_ctx_stop(self->ice.ctx_data);
-    }
+	if(self->ice.ctx_data){
+		tnet_ice_ctx_stop(self->ice.ctx_data);
+	}
+
 	/* alert the user */
 	TSIP_DIALOG_SIGNAL_2(self, tsip_event_code_dialog_terminated,
 			TSIP_DIALOG(self)->last_error.phrase ? TSIP_DIALOG(self)->last_error.phrase : "Call Terminated",
@@ -1597,6 +1639,26 @@ int tsip_dialog_invite_OnTerminated(tsip_dialog_invite_t *self)
 	return tsip_dialog_remove(TSIP_DIALOG(self));
 }
 
+// callback function called when media session error occures asynchronously
+static int tsip_dialog_invite_msession_onerror_cb(const void* usrdata, const struct tmedia_session_s* session, const char* reason, tsk_bool_t is_fatal)
+{
+	tsip_dialog_t *self = (tsip_dialog_t*)usrdata;
+
+	if(self && is_fatal){
+		char* str = tsk_null;
+		tsip_action_t* action;
+		tsk_sprintf(&str, "SIP; cause=488; text=\"%s\"", (reason ? reason : "Internal error"));
+		action = tsip_action_create(tsip_atype_hangup,
+           TSIP_ACTION_SET_HEADER("Reason", str),
+           TSIP_ACTION_SET_NULL());
+		TSK_FREE(str);
+		
+		tsip_dialog_hangup(self, action);
+		TSK_OBJECT_SAFE_FREE(action);
+	}
+
+	return 0;
+}
 
 
 
@@ -1640,7 +1702,12 @@ static tsk_object_t* tsip_dialog_invite_ctor(tsk_object_t * self, va_list * app)
 		dialog->supported.norefersub = tsk_true;
 		dialog->required.ice = (((tsip_ssession_t*)ss)->media.profile == tmedia_profile_rtcweb);
 		dialog->supported.ice = (dialog->required.ice || ((tsip_ssession_t*)ss)->media.enable_ice);
+#if 0 /* This was a patch for chrome but no longer needed when using version 23.0.1271.64 or later */
 		dialog->ice.is_jingle = (((tsip_ssession_t*)ss)->media.profile == tmedia_profile_rtcweb);
+#else
+		dialog->ice.is_jingle = tsk_false;
+#endif
+		dialog->ice.last_sdp_ro_ver = -1;
 		dialog->use_rtcp = (((tsip_ssession_t*)ss)->media.profile == tmedia_profile_rtcweb) ? tsk_true : ((tsip_ssession_t*)ss)->media.enable_rtcp;
 		dialog->use_rtcpmux = (((tsip_ssession_t*)ss)->media.profile == tmedia_profile_rtcweb) ? tsk_true : ((tsip_ssession_t*)ss)->media.enable_rtcpmux;
 

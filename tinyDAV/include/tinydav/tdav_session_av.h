@@ -51,10 +51,15 @@ typedef struct tdav_session_av_s
 	tmedia_type_t media_type;
 	tsk_bool_t use_avpf;
 	tsk_bool_t use_srtp;
+	tsk_bool_t is_webrtc2sip_mode_enabled;
 	uint32_t rtp_ssrc;
 
 	tmedia_srtp_type_t srtp_type;
 	tmedia_srtp_mode_t srtp_mode;
+
+	int32_t bandwidth_max_upload_kbps;
+	int32_t bandwidth_max_download_kbps;
+	tsk_bool_t congestion_ctrl_enabled;
 
 	/* sdp capabilities (RFC 5939) */
 	struct tdav_sdp_caps_s* sdp_caps;
@@ -102,6 +107,13 @@ typedef struct tdav_session_av_s
 		tsk_bool_t is_fatal;
 		void* tid[1];
 	} last_error;
+	
+	// codec's payload type mapping used when bypassing is enabled
+	struct{
+		int8_t local;
+		int8_t remote;
+		int8_t neg;
+	} pt_map;
 
 	TSK_DECLARE_SAFEOBJ;
 }

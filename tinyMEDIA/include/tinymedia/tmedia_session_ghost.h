@@ -43,6 +43,8 @@ typedef struct tmedia_session_ghost_s
 {
 	TMEDIA_DECLARE_SESSION;
 	char* media;
+	char* proto;
+	char* first_format;
 }
 tmedia_session_ghost_t;
 

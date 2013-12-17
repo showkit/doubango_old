@@ -45,9 +45,8 @@
 
 TNET_BEGIN_DECLS
 
-struct ssl_ctx_st;
-
 typedef void tnet_tls_socket_handle_t;
+struct ssl_ctx_st;
 
 int tnet_tls_socket_connect(tnet_tls_socket_handle_t* self);
 int tnet_tls_socket_accept(tnet_tls_socket_handle_t* self);

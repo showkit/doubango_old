@@ -125,9 +125,13 @@ tmsrp_header_Byte_Range_t *tmsrp_header_Byte_Range_parse(const char *data, tsk_s
 	const char *eof = pe;
 	tmsrp_header_Byte_Range_t *hdr_Byte_Range = tmsrp_header_Byte_Range_create_null();
 
-	const char *tag_start;
+	const char *tag_start = tsk_null;
 
 	%%write data;
+	(void)(eof);
+	(void)(tmsrp_machine_parser_header_Byte_Range_first_final);
+	(void)(tmsrp_machine_parser_header_Byte_Range_error);
+	(void)(tmsrp_machine_parser_header_Byte_Range_en_main);
 	%%write init;
 	%%write exec;
 	

@@ -34,6 +34,8 @@
 
 #include "tinysdp/headers/tsdp_header_O.h"
 
+#include "ice/tnet_ice_ctx.h"
+
 #include "tsk_memory.h"
 #include "tsk_debug.h"
 
@@ -81,11 +83,22 @@ static int __pred_find_session_by_type(const tsk_list_item_t *item, const void *
 	return -1;
 }
 
-/*== Predicate function to find codec object by address */
-int __pred_find_codec_by_format(const tsk_list_item_t *item, const void *codec)
+/*== Predicate function to find codec object by format */
+static int __pred_find_codec_by_format(const tsk_list_item_t *item, const void *codec)
 {
 	if(item && item->data && codec){
 		return tsk_stricmp(((const tmedia_codec_t*)item->data)->format, ((const tmedia_codec_t*)codec)->format);
+	}
+	return -1;
+}
+
+/*== Predicate function to find codec object by id */
+static int __pred_find_codec_by_id(const tsk_list_item_t *item, const void *id)
+{
+	if(item && item->data && id){
+		if(((const tmedia_codec_t*)item->data)->id == *((const tmedia_codec_id_t*)id)){
+			return 0;
+		}
 	}
 	return -1;
 }
@@ -170,8 +183,12 @@ tsk_bool_t tmedia_session_set_2(tmedia_session_t* self, const tmedia_param_t* pa
 				//	TSK_DEBUG_WARN("Cannot change codec values at this stage");
 				//}
 				//else{
-					self->codecs_allowed = *((int32_t*)param->value);
-					return (_tmedia_session_load_codecs(self) == 0);
+					int32_t codecs_allowed = *((int32_t*)param->value);
+					if(self->codecs_allowed != codecs_allowed){
+						self->codecs_allowed = codecs_allowed;
+						return (_tmedia_session_load_codecs(self) == 0);
+					}
+					return 0;
 				//}
 				return tsk_true;
 			}
@@ -447,10 +464,11 @@ tmedia_codecs_L_t* tmedia_session_match_codec(tmedia_session_t* self, const tsdp
 		
 		/* foreach codec */
 		tsk_list_foreach(it2, self->codecs){
-			if(!(codec = it2->data) || !codec->plugin || !(codec->id & self->codecs_allowed)){
+			/* 'tmedia_codec_id_none' is used for fake codecs (e.g. dtmf or msrp) and should not be filtered beacuse of backward compatibility*/
+			if(!(codec = it2->data) || !codec->plugin || !(codec->id == tmedia_codec_id_none || (codec->id & self->codecs_allowed))){
 				continue;
 			}
-
+			
 			// Guard to avoid matching a codec more than once
 			// For example, H.264 codecs without profiles (Jitsi, Tiscali PC client) to distinguish them could match more than once
 			if(matchingCodecs && tsk_list_find_object_by_pred(matchingCodecs, __pred_find_codec_by_format, codec)){
@@ -495,13 +513,11 @@ compare_fmtp:
 
 compare_imageattr:
 			if(codec->type & tmedia_video){
-				if((image_attr = tsdp_header_M_get_imageattr(M, fmt->value))){
-					if(tmedia_codec_sdp_att_match(codec, "imageattr", image_attr)){
-                     
+                if((image_attr = tsdp_header_M_get_imageattr(M, fmt->value))){
+                    if(tmedia_codec_sdp_att_match(codec, "imageattr", image_attr)){
                         if((framerate = tsdp_header_M_get_framerate(M, fmt->value))){
-                          
                             tmedia_codec_sdp_att_match(codec, "framerate", framerate);
-                        }
+                         }
                         found = tsk_true;
                     }
 				}
@@ -510,8 +526,7 @@ compare_imageattr:
 
 			// update neg. format
 			if(found) tsk_strupdate((char**)&codec->neg_format, fmt->value);
-            
-
+			
 next:
 			TSK_FREE(name);
 			TSK_FREE(fmtp);
@@ -548,6 +563,7 @@ int tmedia_session_send_rtcp_event(tmedia_session_t* self, tmedia_rtcp_event_typ
 	if(self && self->plugin && self->plugin->rtcp.send_event){
 		return self->plugin->rtcp.send_event(self, event_type, ssrc_media);
 	}
+	TSK_DEBUG_INFO("Not sending RTCP event with SSRC = %u because no callback function found", ssrc_media);
 	return -1;
 }
 
@@ -630,6 +646,7 @@ int _tmedia_session_load_codecs(tmedia_session_t* self)
 	tsk_size_t i = 0;
 	tmedia_codec_t* codec;
 	const tmedia_codec_plugin_def_t* plugin;
+	const tsk_list_item_t* item;
 
 	if(!self){
 		TSK_DEBUG_ERROR("Invalid parameter");
@@ -649,15 +666,41 @@ int _tmedia_session_load_codecs(tmedia_session_t* self)
 	/* for each registered plugin create a session instance */
 	while((i < TMED_CODEC_MAX_PLUGINS) && (plugin = __tmedia_codec_plugins[i++])){
 		/* 'tmedia_codec_id_none' is used for fake codecs (e.g. dtmf or msrp) and should not be filtered beacuse of backward compatibility*/
-      if((plugin->type & self->type) && (plugin->codec_id == tmedia_codec_id_none || (plugin->codec_id & self->codecs_allowed))){
-      		if((codec = tmedia_codec_create(plugin->format))){
+		if((plugin->type & self->type) && (plugin->codec_id == tmedia_codec_id_none || (plugin->codec_id & self->codecs_allowed))){
+			if((codec = tmedia_codec_create(plugin->format))){
 				if(!self->codecs){
 					self->codecs = tsk_list_create();
 				}
 				tsk_list_push_back_data(self->codecs, (void**)(&codec));
-			} else {
-                TSK_DEBUG_ERROR("error creating %s\n", plugin->name);
-            }
+			}
+		}
+	}
+
+	// filter negotiated codecs with the newly loaded codecs
+	if(1){ // code valid for all use-cases but for now it's not fully tested and not needed for the clients
+filter_neg_codecs:
+		tsk_list_foreach(item, self->neg_codecs){
+			if(!(codec = (item->data))){
+				continue;
+			}
+			if(!(tsk_list_find_item_by_pred(self->codecs, __pred_find_codec_by_id, &codec->id))){
+				const char* codec_name = codec->plugin ? codec->plugin->name : "unknown";
+				const char* neg_format = codec->neg_format ? codec->neg_format : codec->format;
+				TSK_DEBUG_INFO("Codec '%s' with format '%s' was negotiated but [supported codecs] updated without it -> removing", codec_name, neg_format);
+				// update sdp and remove the codec from the list
+				if(self->M.lo && !TSK_LIST_IS_EMPTY(self->M.lo->FMTs)){
+					if(self->M.lo->FMTs->head->next == tsk_null && tsdp_header_M_have_fmt(self->M.lo, neg_format)){ // single item?
+						// rejecting a media with port equal to zero requires at least one format
+						TSK_DEBUG_INFO("[supported codecs] updated but do not remove codec with name='%s' and format='%s' because it's the last one", codec_name, neg_format);
+						self->M.lo->port = 0;
+					}
+					else{
+						tsdp_header_M_remove_fmt(self->M.lo, neg_format);
+					}
+				}
+				tsk_list_remove_item_by_data(self->neg_codecs, codec);
+				goto filter_neg_codecs;
+			}
 		}
 	}
 
@@ -717,6 +760,30 @@ int tmedia_session_mgr_set_media_type(tmedia_session_mgr_t* self, tmedia_type_t 
 	return 0;
 }
 
+// special set() case
+int tmedia_session_mgr_set_codecs_supported(tmedia_session_mgr_t* self, tmedia_codec_id_t codecs_supported)
+{
+	int ret = 0;
+	if(!self){
+		TSK_DEBUG_ERROR("Invalid parameter");
+		return -1;
+	}
+
+	// calling set() could create zombies (media sessions with port equal to zero)
+	ret = tmedia_session_mgr_set(self,
+		TMEDIA_SESSION_SET_INT32(self->type, "codecs-supported", codecs_supported),
+		tsk_null);
+	if(ret == 0 && self->sdp.lo){
+		// update type (will discard zombies)
+		tmedia_type_t new_type = tmedia_type_from_sdp(self->sdp.lo);
+		if(new_type != self->type){
+			TSK_DEBUG_INFO("codecs-supported updated and media type changed from %d to %d", self->type, new_type);
+			self->type = new_type;
+		}
+	}
+	return ret;
+}
+
 /**@ingroup tmedia_session_group
 */
 tmedia_session_t* tmedia_session_mgr_find(tmedia_session_mgr_t* self, tmedia_type_t type)
@@ -758,11 +825,11 @@ int tmedia_session_mgr_set_ice_ctx(tmedia_session_mgr_t* self, struct tnet_ice_c
 	TSK_OBJECT_SAFE_FREE(self->ice.ctx_audio);
 	TSK_OBJECT_SAFE_FREE(self->ice.ctx_video);
 	TSK_OBJECT_SAFE_FREE(self->ice.ctx_data);
-    
+	
 	self->ice.ctx_audio = tsk_object_ref(ctx_audio);
 	self->ice.ctx_video = tsk_object_ref(ctx_video);
 	self->ice.ctx_data = tsk_object_ref(ctx_data);
-    
+	
 	if(self->type & tmedia_audio){
 		tmedia_session_mgr_set(self,
 			TMEDIA_SESSION_SET_POBJECT(tmedia_audio, "ice-ctx", self->ice.ctx_audio),
@@ -774,11 +841,13 @@ int tmedia_session_mgr_set_ice_ctx(tmedia_session_mgr_t* self, struct tnet_ice_c
 			TMEDIA_SESSION_SET_POBJECT(tmedia_video, "ice-ctx", self->ice.ctx_video),
 			TMEDIA_SESSION_SET_NULL());
 	}
-    if(self->type & tmedia_data){
-        tmedia_session_mgr_set(self,
-                               TMEDIA_SESSION_SET_POBJECT(tmedia_video, "ice-ctx", self->ice.ctx_data),
-                               TMEDIA_SESSION_SET_NULL());
-    }
+    
+    
+	if(self->type & tmedia_data){
+		tmedia_session_mgr_set(self,
+            TMEDIA_SESSION_SET_POBJECT(tmedia_data, "ice-ctx", self->ice.ctx_data),
+            TMEDIA_SESSION_SET_NULL());
+	}
 
 	return 0;
 }
@@ -793,7 +862,7 @@ int tmedia_session_mgr_set_ice_ctx(tmedia_session_mgr_t* self, struct tnet_ice_c
 */
 int tmedia_session_mgr_start(tmedia_session_mgr_t* self)
 {
-	int ret = 0;
+	int ret = 0, started_count = 0;
 	tsk_list_item_t* item;
 	tmedia_session_t* session;
 
@@ -818,13 +887,14 @@ int tmedia_session_mgr_start(tmedia_session_mgr_t* self)
 			TSK_DEBUG_ERROR("Failed to start %s session", session->plugin->media);
 			continue;
 		}
+		++started_count;
 	}
 
-	self->started = tsk_true;
+	self->started = (started_count > 0) ? tsk_true : tsk_false;
 
 bail:
 	tsk_safeobj_unlock(self);
-	return ret;
+	return (self->started ? 0 : -2);
 }
 
 /**@ingroup tmedia_session_group
@@ -959,6 +1029,8 @@ int tmedia_session_mgr_stop(tmedia_session_mgr_t* self)
 	tsk_list_item_t* item;
 	tmedia_session_t* session;
 
+	TSK_DEBUG_INFO("tmedia_session_mgr_stop()");
+
 	if(!self){
 		TSK_DEBUG_ERROR("Invalid parameter");
 		return -1;
@@ -1014,12 +1086,14 @@ const tsdp_message_t* tmedia_session_mgr_get_lo(tmedia_session_mgr_t* self)
 	
 	/* creates local sdp if not already done or update it's value (because of set_ro())*/
 	if((self->ro_changed || self->state_changed || self->mediaType_changed) && self->sdp.lo){
+		// delete current lo 
 		TSK_OBJECT_SAFE_FREE(self->sdp.lo);
 		if(self->mediaType_changed){
 			// reload session with new medias and keep the old one
 			_tmedia_session_mgr_load_sessions(self);
 		}
 		self->ro_changed = tsk_false;
+		self->ro_provisional = tsk_false;
 		self->state_changed = tsk_false;
 		self->mediaType_changed = tsk_false;
 	}
@@ -1028,7 +1102,7 @@ const tsdp_message_t* tmedia_session_mgr_get_lo(tmedia_session_mgr_t* self)
 		ret = self->sdp.lo;
 		goto bail;
 	}
-	else if((self->sdp.lo = tsdp_message_create_empty(self->public_addr ? self->public_addr : self->addr, self->ipv6, self->sdp.lo_ver++))){
+	else if((self->sdp.lo = tsdp_message_create_empty(self->public_addr ? self->public_addr : self->addr, self->ipv6, self->sdp.lo_ver++))){	
 		/* Set connection "c=" */
 		tsdp_message_add_headers(self->sdp.lo,
 			TSDP_HEADER_C_VA_ARGS("IN", self->ipv6 ? "IP6" : "IP4", self->public_addr ? self->public_addr : self->addr),//FIXME
@@ -1039,8 +1113,7 @@ const tsdp_message_t* tmedia_session_mgr_get_lo(tmedia_session_mgr_t* self)
 		goto bail;
 	}
 
-	/*	pass complete local sdp to the sessions to allow them to use session-level attributes
-	*/
+	/*	pass complete local sdp to the sessions to allow them to use session-level attributes */
 	tmedia_session_mgr_set(self,
 			TMEDIA_SESSION_SET_POBJECT(self->type, "local-sdp-message", self->sdp.lo),
 			TMEDIA_SESSION_SET_NULL());
@@ -1065,6 +1138,15 @@ const tsdp_message_t* tmedia_session_mgr_get_lo(tmedia_session_mgr_t* self)
 		/* add "m=" line from the session to the local sdp */
 		if((m = tmedia_session_get_lo(TMEDIA_SESSION(ms)))){
 			tsdp_message_add_header(self->sdp.lo, TSDP_HEADER(m));
+			// media session with port equal to zero (codec mismatch) is a zombie (zombie<>ghost)
+			if(ms->M.lo && ms->M.lo->port == 0){
+				const tmedia_session_plugin_def_t* plugin;
+				TSK_DEBUG_INFO("Media session with media type = '%s' is a zombie", ms->M.lo->media);
+				if((plugin = tmedia_session_plugin_find_by_media(ms->M.lo->media))){
+					self->type = (self->type & ~plugin->type);
+					// do not set 'mediaType_changed' as this is not an update
+				}
+			}
 		}
 		else{
 			TSK_DEBUG_ERROR("Failed to get m= line for [%s] media", ms->plugin->media);
@@ -1075,6 +1157,7 @@ const tsdp_message_t* tmedia_session_mgr_get_lo(tmedia_session_mgr_t* self)
 
 bail:
 	tsk_safeobj_unlock(self);
+
 	return ret;
 }
 
@@ -1082,7 +1165,7 @@ bail:
 /**@ingroup tmedia_session_group
 * Sets remote offer.
 */
-int tmedia_session_mgr_set_ro(tmedia_session_mgr_t* self, const tsdp_message_t* sdp)
+int tmedia_session_mgr_set_ro(tmedia_session_mgr_t* self, const tsdp_message_t* sdp, tmedia_ro_type_t ro_type)
 {
 	const tmedia_session_t* ms;
 	const tsdp_header_M_t* M;
@@ -1093,10 +1176,14 @@ int tmedia_session_mgr_set_ro(tmedia_session_mgr_t* self, const tsdp_message_t* 
 	int ret = 0;
 	tsk_bool_t found;
 	tsk_bool_t stopped_to_reconf = tsk_false;
-	tsk_bool_t is_hold_resume = tsk_false;
-	tsk_bool_t is_loopback_address = tsk_false;
-	tsk_bool_t is_mediatype_changed = tsk_false;
-	tsk_bool_t had_ro_sdp;
+	tsk_bool_t is_ro_codecs_changed = tsk_false;
+	tsk_bool_t is_ro_network_info_changed = tsk_false;
+	tsk_bool_t is_ro_hold_resume_changed = tsk_false;
+	tsk_bool_t is_ro_loopback_address = tsk_false;
+	tsk_bool_t is_media_type_changed = tsk_false;
+	tsk_bool_t is_ro_media_lines_changed = tsk_false;
+	tsk_bool_t is_ice_active = tsk_false;
+	tsk_bool_t had_ro_sdp, had_ro_provisional, is_ro_provisional_final_matching = tsk_false;
 	tmedia_qos_stype_t qos_type = tmedia_qos_stype_none;
 	tmedia_type_t new_mediatype = tmedia_none;
 
@@ -1108,6 +1195,10 @@ int tmedia_session_mgr_set_ro(tmedia_session_mgr_t* self, const tsdp_message_t* 
 	tsk_safeobj_lock(self);
 
 	had_ro_sdp = (self->sdp.ro != tsk_null);
+	had_ro_provisional = (had_ro_sdp && self->ro_provisional);
+	is_ice_active = (self->ice.ctx_audio && (self->type & tmedia_audio) && tnet_ice_ctx_is_active(self->ice.ctx_audio))
+		|| (self->ice.ctx_video && (self->type & tmedia_video) && tnet_ice_ctx_is_active(self->ice.ctx_video))
+        || (self->ice.ctx_data && (self->type & tmedia_data) && tnet_ice_ctx_is_active(self->ice.ctx_data));
 
 	/*	RFC 3264 subcaluse 8
 		When issuing an offer that modifies the session, the "o=" line of the new SDP MUST be identical to that in the previous SDP, 
@@ -1116,11 +1207,18 @@ int tmedia_session_mgr_set_ro(tmedia_session_mgr_t* self, const tsdp_message_t* 
 		an offer that contains SDP with a version that has not changed; this is effectively a no-op.
 	*/
 	if((O = (const tsdp_header_O_t*)tsdp_message_get_header(sdp, tsdp_htype_O))){
+		tsk_bool_t is_ro_provisional;
 		if(self->sdp.ro_ver == (int32_t)O->sess_version){
 			TSK_DEBUG_INFO("Remote offer has not changed");
 			ret = 0;
 			goto bail;
 		}
+		// Last provisional and new final sdp messages match only if:
+		//  - session version diff is == 1
+		//  - previous sdp was provisional and new one is final
+		//  - the new final sdp is inside an answer
+		is_ro_provisional = ((ro_type & tmedia_ro_type_provisional) == tmedia_ro_type_provisional);
+		is_ro_provisional_final_matching = ((had_ro_provisional && !is_ro_provisional) && ((self->sdp.ro_ver + 1) == O->sess_version) && ((ro_type & tmedia_ro_type_answer) == tmedia_ro_type_answer));
 		self->sdp.ro_ver = (int32_t)O->sess_version;
 	}
 	else{
@@ -1128,6 +1226,83 @@ int tmedia_session_mgr_set_ro(tmedia_session_mgr_t* self, const tsdp_message_t* 
 		ret = -2;
 		goto bail;
 	}
+
+	/* SDP comparison
+	*/
+	if((sdp && self->sdp.ro)){
+		const tsdp_header_M_t *M0, *M1;
+		const tsdp_header_C_t *C0, *C1;
+		index = 0;
+		while((M0 = (const tsdp_header_M_t*)tsdp_message_get_headerAt(self->sdp.ro, tsdp_htype_M, index))){
+			M1 = (const tsdp_header_M_t*)tsdp_message_get_headerAt(sdp, tsdp_htype_M, index);
+			if(!M1 || !tsk_striequals(M1->media, M0->media)){
+				// media lines must be at the same index
+				// (M1 == null) means media lines are not at the same index or new one have been added/removed
+				is_ro_media_lines_changed = tsk_true;
+			}
+			
+			// hold/resume
+			is_ro_hold_resume_changed |= (M1 && !tsk_striequals(tsdp_header_M_get_holdresume_att(M0), tsdp_header_M_get_holdresume_att(M1)));
+
+			// media lines
+			if(!is_ro_media_lines_changed){
+				is_ro_media_lines_changed
+					// (M1 == null) means media lines are not at the same index or new one have been added/removed
+					 |= (!M1)
+					 // same media (e.g. audio)
+					 || !tsk_striequals(M1->media, M0->media)
+					 // same protos (e.g. SRTP)
+					 || !tsk_striequals(M1->proto, M0->proto);
+			}
+			
+			// codecs
+			if(!is_ro_media_lines_changed){ // make sure it's same media at same index
+				const tsk_list_item_t* codec_item0;
+				const tsdp_fmt_t* codec_fmt1;
+				tsk_size_t codec_index0 = 0;
+				tsk_list_foreach(codec_item0, M0->FMTs){
+					codec_fmt1 = (const tsdp_fmt_t*)tsk_list_find_object_by_pred_at_index(M1->FMTs, tsk_null, tsk_null, codec_index0++);
+					if(!codec_fmt1 || !tsk_striequals(codec_fmt1->value, ((const tsdp_fmt_t*)codec_item0->data)->value)){
+						is_ro_codecs_changed = tsk_true;
+						break;
+					}
+				}
+				// make sure M0 and M1 have same number of codecs
+				is_ro_codecs_changed |= (tsk_list_find_object_by_pred_at_index(M1->FMTs, tsk_null, tsk_null, codec_index0) != tsk_null);
+			}
+			
+			// network ports
+			is_ro_network_info_changed |= ((M1 ? M1->port : 0) != (M0->port));
+			
+			if(!is_ro_network_info_changed){
+				C0 = (const tsdp_header_C_t*)tsdp_message_get_headerAt(self->sdp.ro, tsdp_htype_C, index);
+				C1 = (const tsdp_header_C_t*)tsdp_message_get_headerAt(sdp, tsdp_htype_C, index);
+				// Connection informations must be both "null" or "not-null"
+				if(!(is_ro_network_info_changed = !((C0 && C1) || (!C0 && !C1)))){
+					if(C0){
+						is_ro_network_info_changed = (!tsk_strequals(C1->addr, C0->addr) || !tsk_strequals(C1->nettype, C0->nettype) || !tsk_strequals(C1->addrtype, C0->addrtype));
+					}
+				}
+			}
+			++index;
+		}
+		// the index was used against current ro which means at this step there is no longer any media at "index"
+		// to be sure that new and old sdp have same number of media lines, we just check that there is no media in the new sdp at "index"
+		is_ro_media_lines_changed |= (tsdp_message_get_headerAt(sdp, tsdp_htype_M, index) != tsk_null);
+	}
+
+	/*
+	* Make sure that the provisional response is an preview of the final as explained rfc6337 section 3.1.1. We only check the most important part (IP addr and ports).
+	* It's useless to check codecs or any other caps (SRTP, ICE, DTLS...) as our offer haven't changed
+	* If the preview is different than the final response than this is a bug on the remote party:
+	* As per rfc6337 section 3.1.1.: 
+	* - [RFC3261] requires all SDP in the responses to the INVITE request to be identical.
+	* - After the UAS has sent the answer in a reliable provisional
+          response to the INVITE, the UAS should not include any SDPs in
+          subsequent responses to the INVITE.
+    * If the remote party is buggy, then the newly generated local SDP will be sent in the ACK request
+	*/
+	is_ro_provisional_final_matching &= !(is_ro_media_lines_changed || is_ro_network_info_changed);
 	
 	/* This is to hack fake forking from ZTE => ignore SDP with loopback address in order to not start/stop the camera several
 	 * times which leads to more than ten seconds for session connection.
@@ -1135,7 +1310,7 @@ int tmedia_session_mgr_set_ro(tmedia_session_mgr_t* self, const tsdp_message_t* 
 	 * Loopback address is only invalid on 
 	 */
 	if((C = (const tsdp_header_C_t*)tsdp_message_get_header(sdp, tsdp_htype_C)) && C->addr){
-		is_loopback_address = (tsk_striequals("IP4", C->addrtype) && tsk_striequals("127.0.0.1", C->addr))
+		is_ro_loopback_address = (tsk_striequals("IP4", C->addrtype) && tsk_striequals("127.0.0.1", C->addr))
 						|| (tsk_striequals("IP6", C->addrtype) && tsk_striequals("::1", C->addr));
 	}
 	
@@ -1144,21 +1319,42 @@ int tmedia_session_mgr_set_ro(tmedia_session_mgr_t* self, const tsdp_message_t* 
 	 */
 	if(self->sdp.lo){
 		new_mediatype = tmedia_type_from_sdp(sdp);
-		if((is_mediatype_changed = (new_mediatype != self->type))){
+		if((is_media_type_changed = (new_mediatype != self->type))){
 			tmedia_session_mgr_set_media_type(self, new_mediatype);
 			TSK_DEBUG_INFO("media type has changed");
 		}
 	}
+
+	TSK_DEBUG_INFO(
+		"is_ice_active=%d,\n"
+		"is_ro_hold_resume_changed=%d,\n"
+		"is_ro_provisional_final_matching=%d,\n"
+		"is_ro_media_lines_changed=%d,\n"
+		"is_ro_network_info_changed=%d,\n"
+		"is_ro_loopback_address=%d,\n"
+		"is_media_type_changed=%d,\n"
+		"is_ro_codecs_changed=%d\n",
+		is_ice_active,
+		is_ro_hold_resume_changed,
+		is_ro_provisional_final_matching,
+		is_ro_media_lines_changed,
+		is_ro_network_info_changed,
+		is_ro_loopback_address,
+		is_media_type_changed,
+		is_ro_codecs_changed
+		);
 	
 	/*
 	  * It's almost impossible to update the codecs, the connection information etc etc while the sessions are running
 	  * For example, if the video producer is already started then, you probably cannot update its configuration
-	  * without stoping it and restart again with the right config. Same for RTP Network config (ip addresses, NAT, ports, IP version, ...)
+	  * without stoping it and restarting it again with the right config. Same for RTP Network config (ip addresses, NAT, ports, IP version, ...)
+	  *
 	  * "is_loopback_address" is used as a guard to avoid reconf for loopback address used for example by ZTE for fake forking. In all case
 	  * loopback address won't work on embedded devices such as iOS and Android.
-	  * FIXME: We must check that it's not a basic hold/resume because this kind of request doesn't update the stream config
+	  *
 	 */
-	if(self->started && ((!is_hold_resume && !is_loopback_address) || is_mediatype_changed)){
+	if((self->started && !is_ro_loopback_address) && (is_ro_codecs_changed || is_ro_network_info_changed || is_ro_media_lines_changed || is_media_type_changed)){
+		TSK_DEBUG_INFO("stopped_to_reconf=true,is_ice_active=%s", is_ice_active?"true":"false");
 		if((ret = tmedia_session_mgr_stop(self))){
 			TSK_DEBUG_ERROR("Failed to stop session manager");
 			goto bail;
@@ -1169,6 +1365,14 @@ int tmedia_session_mgr_set_ro(tmedia_session_mgr_t* self, const tsdp_message_t* 
 	/* update remote offer */
 	TSK_OBJECT_SAFE_FREE(self->sdp.ro);
 	self->sdp.ro = tsk_object_ref((void*)sdp);
+
+	/*  - if the session is running this means no session update is required unless some important changes
+	    - this check must be done after the "ro" update
+		- "is_ro_hold_resume_changed" do not restart the session but updates the SDP
+	*/
+	if(self->started && !(is_ro_hold_resume_changed || is_ro_network_info_changed || is_ro_media_lines_changed || is_ro_codecs_changed)){
+		goto end_of_sessions_update;
+	}
 
 	/* prepare the session manager if not already done (create all sessions with their codecs) 
 	* if network-initiated: think about tmedia_type_from_sdp() before creating the manager */
@@ -1194,15 +1398,18 @@ int tmedia_session_mgr_set_ro(tmedia_session_mgr_t* self, const tsdp_message_t* 
 			TMEDIA_SESSION_SET_POBJECT(self->type, "remote-sdp-message", self->sdp.ro),
 			TMEDIA_SESSION_SET_NULL());
 
-	/* foreach "m=" line in the remote offer create a session*/
+	/* foreach "m=" line in the remote offer create/prepare a session (requires the session to be stopped)*/
+	index = 0;
 	while((M = (const tsdp_header_M_t*)tsdp_message_get_headerAt(sdp, tsdp_htype_M, index++))){
 		found = tsk_false;
 		/* Find session by media */
 		if((ms = tsk_list_find_object_by_pred(self->sessions, __pred_find_session_by_media, M->media))){
 			/* prepare the media session */
-			if(!ms->prepared && (_tmedia_session_prepare(TMEDIA_SESSION(ms)))){
-				TSK_DEBUG_ERROR("Failed to prepare session"); /* should never happen */
-				goto bail;
+			if(!self->started){
+				if(!ms->prepared && (_tmedia_session_prepare(TMEDIA_SESSION(ms)))){
+					TSK_DEBUG_ERROR("Failed to prepare session"); /* should never happen */
+					goto bail;
+				}
 			}
 			/* set remote ro at session-level */
 			if((ret = _tmedia_session_set_ro(TMEDIA_SESSION(ms), M)) == 0){
@@ -1226,9 +1433,21 @@ int tmedia_session_mgr_set_ro(tmedia_session_mgr_t* self, const tsdp_message_t* 
 		
 		if(!found && (self->sdp.lo == tsk_null)){
 			/* Session not supported and we are not the initial offerer ==> add ghost session */
+			/*
+				An offered stream MAY be rejected in the answer, for any reason.  If
+			   a stream is rejected, the offerer and answerer MUST NOT generate
+			   media (or RTCP packets) for that stream.  To reject an offered
+			   stream, the port number in the corresponding stream in the answer
+			   MUST be set to zero.  Any media formats listed are ignored.  AT LEAST
+			   ONE MUST BE PRESENT, AS SPECIFIED BY SDP.
+			*/
 			tmedia_session_ghost_t* ghost;
 			if((ghost = (tmedia_session_ghost_t*)tmedia_session_create(tmedia_ghost))){
 				tsk_strupdate(&ghost->media, M->media); /* copy media */
+				tsk_strupdate(&ghost->proto, M->proto); /* copy proto */
+				if(!TSK_LIST_IS_EMPTY(M->FMTs)){
+					tsk_strupdate(&ghost->first_format, ((const tsdp_fmt_t*)TSK_LIST_FIRST_DATA(M->FMTs))->value); /* copy format */
+				}
 				tsk_list_push_back_data(self->sessions, (void**)&ghost);
 			}
 			else{
@@ -1238,19 +1457,28 @@ int tmedia_session_mgr_set_ro(tmedia_session_mgr_t* self, const tsdp_message_t* 
 		}
 	}
 
+end_of_sessions_update:
+
 	/* update QoS type */
 	if(!self->offerer && (qos_type != tmedia_qos_stype_none)){
 		self->qos.type = qos_type;
 	}
 
-	/* signal that ro has changed (will be used to update lo) unless there was no ro_sdp*/
-	self->ro_changed = had_ro_sdp;
+	/* signal that ro has changed (will be used to update lo) unless there was no ro_sdp */
+	self->ro_changed = (had_ro_sdp && (is_ro_hold_resume_changed || is_ro_network_info_changed || is_ro_media_lines_changed || is_ro_codecs_changed));
+
+	/* update "provisional" info */
+	self->ro_provisional = ((ro_type & tmedia_ro_type_provisional) == tmedia_ro_type_provisional);
 	
-	/* manager was started and we stopped it in order to reconfigure it (codecs, network, ....) */
-	if(stopped_to_reconf){
+	if(self->ro_changed){
 		/* update local offer before restarting the session manager otherwise neg_codecs won't match if new codecs
 		 have been added or removed */
 		(tmedia_session_mgr_get_lo(self));
+	}
+	/* manager was started and we stopped it in order to reconfigure it (codecs, network, ....) 
+	* When ICE is active ("is_ice_active" = yes), the media session will be explicitly restarted when conncheck succeed or fail.
+	*/
+	if(stopped_to_reconf && !is_ice_active){
 		if((ret = tmedia_session_mgr_start(self))){
 			TSK_DEBUG_ERROR("Failed to re-start session manager");
 			goto bail;
@@ -1258,7 +1486,7 @@ int tmedia_session_mgr_set_ro(tmedia_session_mgr_t* self, const tsdp_message_t* 
 	}
 
 	// will send [488 Not Acceptable] / [BYE] if no active session
-	ret = (active_sessions_count > 0) ? 0 : -0xFF;
+	ret = (self->ro_changed && active_sessions_count <= 0) ? -0xFF : 0;
 
 bail:
 	tsk_safeobj_unlock(self);
@@ -1735,6 +1963,7 @@ static int _tmedia_session_mgr_load_sessions(tmedia_session_mgr_t* self)
 				TMEDIA_SESSION_SET_POBJECT(tmedia_audio, "ice-ctx", self->ice.ctx_audio),
 				TMEDIA_SESSION_SET_POBJECT(tmedia_video, "ice-ctx", self->ice.ctx_video),
                 TMEDIA_SESSION_SET_POBJECT(tmedia_data, "ice-ctx", self->ice.ctx_data),
+
 				TMEDIA_SESSION_SET_STR(self->type, "local-ip", self->addr),
 				TMEDIA_SESSION_SET_STR(self->type, "local-ipver", self->ipv6 ? "ipv6" : "ipv4"),
 				TMEDIA_SESSION_SET_INT32(self->type, "bandwidth-level", self->bl),
@@ -1838,6 +2067,7 @@ static tsk_object_t* tmedia_session_mgr_dtor(tsk_object_t * self)
 
 		TSK_OBJECT_SAFE_FREE(mgr->ice.ctx_audio);
 		TSK_OBJECT_SAFE_FREE(mgr->ice.ctx_video);
+		TSK_OBJECT_SAFE_FREE(mgr->ice.ctx_data);
 
 		TSK_FREE(mgr->addr);
 

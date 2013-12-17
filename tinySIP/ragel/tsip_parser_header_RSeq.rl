@@ -92,9 +92,13 @@ tsip_header_RSeq_t *tsip_header_RSeq_parse(const char *data, tsk_size_t size)
 	const char *eof = pe;
 	tsip_header_RSeq_t *hdr_rseq = tsip_header_RSeq_create_null();
 	
-	const char *tag_start;
+	const char *tag_start = tsk_null;
 
 	%%write data;
+	(void)(eof);
+	(void)(tsip_machine_parser_header_RSeq_first_final);
+	(void)(tsip_machine_parser_header_RSeq_error);
+	(void)(tsip_machine_parser_header_RSeq_en_main);
 	%%write init;
 	%%write exec;
 	

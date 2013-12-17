@@ -1,7 +1,6 @@
 /*
 * Copyright (C) 2010-2011 Mamadou Diop.
-*
-* Contact: Mamadou Diop <diopmamadou(at)doubango[dot]org>
+* Copyright (C) 2012 Doubango Telecom <http://doubango.org>
 *	
 * This file is part of Open Source Doubango Framework.
 *
@@ -22,10 +21,6 @@
 
 /**@file tsip.c
  * @brief SIP (RFC 3261) and 3GPP IMS/LTE (TS 24.229) implementation.
- *
- * @author Mamadou Diop <diopmamadou(at)doubango[dot]org>
- *
-
  */
 #include "tsip.h"
 
@@ -40,7 +35,8 @@
 #include "tinysip/api/tsip_api_register.h"
 #include "tinysip/api/tsip_api_subscribe.h"
 #include "tinysip/api/tsip_api_message.h"
-#include "tsk_runnable.h"
+
+#include "tinymedia/tmedia_defaults.h"
 
 #include "tnet.h"
 
@@ -51,7 +47,7 @@
 #include <stdarg.h>
 #include <string.h>
 
-static void *run(void* self);
+static void* TSK_STDCALL run(void* self);
 
 /* For tests:
 * http://www.voip-info.org/wiki/view/PROTOS+Test-Suite
@@ -64,16 +60,24 @@ static void *run(void* self);
 */
 
 extern tsip_event_t* tsip_event_create(tsip_ssession_t* ss, short code, const char* phrase, const tsip_message_t* sipmessage, tsip_event_type_t type);
-#define TSIP_STACK_SIGNAL(inst_self, code, phrase) \
+#define TSIP_STACK_SIGNAL(self, code, phrase) \
 	{ \
 		tsip_event_t* e; \
 		if((e = tsip_event_create(tsk_null, code, phrase, tsk_null, tsip_event_stack))){ \
-			TSK_RUNNABLE_ENQUEUE_OBJECT(TSK_RUNNABLE(inst_self), e); \
+			TSK_RUNNABLE_ENQUEUE_OBJECT(TSK_RUNNABLE(self), e); \
 		} \
 	}
 
+static int __tsip_stack_get_transport_idx_by_name(tsip_stack_t *self, const char* name)
+{
+	if(tsk_strnullORempty(name) && TSIP_STACK_MODE_IS_CLIENT(self)){
+		return self->network.transport_idx_default; // for backward compatibility
+	}
+	return tsip_transport_get_idx_by_name(name);
+}
+
 /* Internal function used to set all user's parameters */
-int __tsip_stack_set(tsip_stack_t *self, va_list* app)
+static int __tsip_stack_set(tsip_stack_t *self, va_list* app)
 {
 	tsip_stack_param_type_t curr;
 
@@ -179,27 +183,45 @@ int __tsip_stack_set(tsip_stack_t *self, va_list* app)
 					break;
 				}
 			case tsip_pname_local_ip:
-				{	/* (const char*)IP_STR */
+				{	/* (const char*)TRANSPORT_STR, (const char*)IP_STR */
+					const char* TRANSPORT_STR = va_arg(*app, const char*);
 					const char* IP_STR = va_arg(*app, const char*);
-					tsk_strupdate(&self->network.local_ip, IP_STR);
+					int t_idx = __tsip_stack_get_transport_idx_by_name(self, TRANSPORT_STR);
+					if(t_idx < 0) { TSK_DEBUG_ERROR("%s not valid as transport or you're probably using deprecated function", TRANSPORT_STR); return -1; }
+					
+					tsk_strupdate(&self->network.local_ip[t_idx], IP_STR);
+					if(TSIP_STACK_MODE_IS_SERVER(self) && !tsk_strnullORempty(TRANSPORT_STR)){
+						self->network.transport_types[t_idx] = tsip_transport_get_type_by_name(TRANSPORT_STR); 
+					}
 					break;
 				}
 			case tsip_pname_local_port:
-				{	/* (unsigned)PORT_UINT */
-					self->network.local_port = (tnet_port_t)va_arg(*app, unsigned);
+				{	/* (const char*)TRANSPORT_STR, (unsigned)PORT_UINT */
+					const char* TRANSPORT_STR = va_arg(*app, const char*);
+					unsigned PORT_UINT = va_arg(*app, unsigned);
+					int t_idx = __tsip_stack_get_transport_idx_by_name(self, TRANSPORT_STR);
+					if(t_idx < 0) { TSK_DEBUG_ERROR("%s not valid as transport or you're probably using deprecated function", TRANSPORT_STR); return -1; }
+					
+					self->network.local_port[t_idx] = PORT_UINT;
+					if(TSIP_STACK_MODE_IS_SERVER(self) && !tsk_strnullORempty(TRANSPORT_STR)){
+						self->network.transport_types[t_idx] = tsip_transport_get_type_by_name(TRANSPORT_STR); 
+					}
 					break;
 				}
 			case tsip_pname_aor:
-				{	/* (const char*)IP_STR, (unsigned)PORT_UINT */
+				{	/* (const char*)TRANSPORT_STR, (const char*)IP_STR, (unsigned)PORT_UINT */
+					const char* TRANSPORT_STR = va_arg(*app, const char*);
 					const char* IP_STR = va_arg(*app, const char*);
 					tnet_port_t PORT_UINT = (tnet_port_t)va_arg(*app, unsigned);
+					int t_idx = __tsip_stack_get_transport_idx_by_name(self, TRANSPORT_STR);
+					if(t_idx < 0) { TSK_DEBUG_ERROR("%s not valid as transport or you're probably using deprecated function", TRANSPORT_STR); return -1; }
+					
 					if(!tsk_strnullORempty(IP_STR)){
-						tsk_strupdate(&self->network.aor.ip, IP_STR);
+						tsk_strupdate(&self->network.aor.ip[t_idx], IP_STR);
 					}
 					if(PORT_UINT){
-						self->network.aor.port = PORT_UINT;
+						self->network.aor.port[t_idx] = PORT_UINT;
 					}
-					
 					break;
 				}
 			case tsip_pname_discovery_naptr:
@@ -218,47 +240,60 @@ int __tsip_stack_set(tsip_stack_t *self, va_list* app)
 				tnet_port_t PORT_UINT = va_arg(*app, unsigned);
 				const char* TRANSPORT_STR = va_arg(*app, const char*);
 				const char* IP_VERSION_STR = va_arg(*app, const char*);
+				int t_idx = __tsip_stack_get_transport_idx_by_name(self, TRANSPORT_STR);
+				if(t_idx < 0) { TSK_DEBUG_ERROR("%s not valid as transport or you're probably using deprecated function", TRANSPORT_STR); return -1; }
+
+				if(TSIP_STACK_MODE_IS_CLIENT(self)){
+					// "client" mode support a unique proxy_cscf -> reset previous transports
+					int k;
+					for(k = 0; k < sizeof(self->network.proxy_cscf_type)/sizeof(self->network.proxy_cscf_type[0]); ++k) { 
+						self->network.proxy_cscf_type[k] = tnet_socket_type_invalid; 
+					}
+				}
 
 				/* IP Address */
-				tsk_strupdate(&self->network.proxy_cscf, FQDN_STR);
+				tsk_strupdate(&self->network.proxy_cscf[t_idx], FQDN_STR);
 				
 				/* Port */
 				if(PORT_UINT){
-					self->network.proxy_cscf_port = PORT_UINT;
+					self->network.proxy_cscf_port[t_idx] = PORT_UINT;
 				}
 
 				/* Transport */
 				if(tsk_strnullORempty(TRANSPORT_STR) || tsk_striequals(TRANSPORT_STR, "UDP")){
-					TNET_SOCKET_TYPE_SET_UDP(self->network.proxy_cscf_type);
+					TNET_SOCKET_TYPE_SET_UDP(self->network.proxy_cscf_type[t_idx]);
+				}
+				else if(tsk_striequals(TRANSPORT_STR, "DTLS")){
+					TNET_SOCKET_TYPE_SET_DTLS(self->network.proxy_cscf_type[t_idx]);
 				}
 				else if(tsk_striequals(TRANSPORT_STR, "TCP")){
-					TNET_SOCKET_TYPE_SET_TCP(self->network.proxy_cscf_type);
+					TNET_SOCKET_TYPE_SET_TCP(self->network.proxy_cscf_type[t_idx]);
 				}
 				else if(tsk_striequals(TRANSPORT_STR, "TLS")){
-					TNET_SOCKET_TYPE_SET_TLS(self->network.proxy_cscf_type);
+					TNET_SOCKET_TYPE_SET_TLS(self->network.proxy_cscf_type[t_idx]);
 				}
 				else if(tsk_striequals(TRANSPORT_STR, "SCTP")){
-					TNET_SOCKET_TYPE_SET_SCTP(self->network.proxy_cscf_type);
+					TNET_SOCKET_TYPE_SET_SCTP(self->network.proxy_cscf_type[t_idx]);
 				}
 				else if(tsk_striequals(TRANSPORT_STR, "WS")){
-					TNET_SOCKET_TYPE_SET_WS(self->network.proxy_cscf_type);
+					TNET_SOCKET_TYPE_SET_WS(self->network.proxy_cscf_type[t_idx]);
 				}
 				else if(tsk_striequals(TRANSPORT_STR, "WSS")){
-					TNET_SOCKET_TYPE_SET_WSS(self->network.proxy_cscf_type);
-				}
-				else{
-					TSK_DEBUG_ERROR("%s not a valid transport", TRANSPORT_STR);
-					/* not mandatoy */
+					TNET_SOCKET_TYPE_SET_WSS(self->network.proxy_cscf_type[t_idx]);
 				}
 				/* whether to use ipv6 or not */
 				if(!tsk_strnullORempty(IP_VERSION_STR)){
 					if(tsk_strcontains(IP_VERSION_STR, tsk_strlen(IP_VERSION_STR), "6")){
-						TNET_SOCKET_TYPE_SET_IPV6Only(self->network.proxy_cscf_type);
+						TNET_SOCKET_TYPE_SET_IPV6Only(self->network.proxy_cscf_type[t_idx]);
 					}
 					if(tsk_strcontains(IP_VERSION_STR, tsk_strlen(IP_VERSION_STR), "4")){
-						TNET_SOCKET_TYPE_SET_IPV4(self->network.proxy_cscf_type); /* Not IPV4only ==> '46'/'64' */
+						TNET_SOCKET_TYPE_SET_IPV4(self->network.proxy_cscf_type[t_idx]); /* Not IPV4only ==> '46'/'64' */
 					}
 				}
+				/* use same transport type as the proxy-cscf */
+				self->network.transport_types[t_idx] = self->network.proxy_cscf_type[t_idx]; 
+				/* set default transport */
+				self->network.transport_idx_default = t_idx;
 				break;
 			}
 			case tsip_pname_dnsserver:
@@ -269,9 +304,14 @@ int __tsip_stack_set(tsip_stack_t *self, va_list* app)
 					}
 					break;
 				}
-			case tsip_pname_mode_server:
-				{	/* No parameter */
-					self->network.mode_server = tsk_true;
+			case tsip_pname_max_fds:
+				{	/* (unsigned)MAX_FDS_UINT */
+					self->network.max_fds = va_arg(*app, unsigned);
+					break;
+				}
+			case tsip_pname_mode:
+				{	/* (tsip_stack_mode_t)MODE_ENUM */
+					self->network.mode = va_arg(*app, tsip_stack_mode_t);
 					break;
 				}
 			
@@ -284,13 +324,17 @@ int __tsip_stack_set(tsip_stack_t *self, va_list* app)
 					break;
 				}
 			case tsip_pname_secagree_ipsec:
-				{	/* (tsk_bool_t)ENABLED_BOOL */
-					if((self->security.enable_secagree_ipsec = va_arg(*app, tsk_bool_t))){
+				{	/* (const char*)TRANSPORT_STR, (tsk_bool_t)ENABLED_BOOL */
+					const char* TRANSPORT_STR = va_arg(*app, const char*);
+					tsk_bool_t ENABLED_BOOL = va_arg(*app, tsk_bool_t);
+					int t_idx = __tsip_stack_get_transport_idx_by_name(self, TRANSPORT_STR);
+					if(t_idx < 0) { TSK_DEBUG_ERROR("%s not valid as transport or you're probably using deprecated function", TRANSPORT_STR); return -1; }
+					if(ENABLED_BOOL){
 						tsk_strupdate(&self->security.secagree_mech, "ipsec-3gpp");
-						TNET_SOCKET_TYPE_SET_IPSEC(self->network.proxy_cscf_type);
+						TNET_SOCKET_TYPE_SET_IPSEC(self->network.proxy_cscf_type[t_idx]);
 					}
 					else{
-						TNET_SOCKET_TYPE_UNSET(self->network.proxy_cscf_type, IPSEC);
+						TNET_SOCKET_TYPE_UNSET(self->network.proxy_cscf_type[t_idx], IPSEC);
 					}
 					break;
 				}
@@ -348,10 +392,11 @@ int __tsip_stack_set(tsip_stack_t *self, va_list* app)
 					break;
 				}
 			case tsip_pname_tls_certs:
-				{	/* (const char*)CA_FILE_STR, (const char*)PUB_FILE_STR, (const char*)PRIV_FILE_STR */
+				{	/* (const char*)CA_FILE_STR, (const char*)PUB_FILE_STR, (const char*)PRIV_FILE_STR, (tsk_bool_t)VERIF_BOOL */
 					tsk_strupdate(&self->security.tls.ca, va_arg(*app, const char*));
 					tsk_strupdate(&self->security.tls.pbk, va_arg(*app, const char*));
 					tsk_strupdate(&self->security.tls.pvk, va_arg(*app, const char*));
+					self->security.tls.verify = va_arg(*app, tsk_bool_t);
 					break;
 				}
 			
@@ -387,6 +432,16 @@ int __tsip_stack_set(tsip_stack_t *self, va_list* app)
 					const char* PASSORD_STR = va_arg(*app, const char*);
 					tsk_strupdate(&self->natt.stun.login, USR_STR);
 					tsk_strupdate(&self->natt.stun.pwd, PASSORD_STR);
+					break;
+				}
+			case tsip_pname_stun_enabled:
+				{ /* (tsk_bool_t)ENABLED_BOOL */
+					self->natt.stun.enabled = va_arg(*app, tsk_bool_t);
+					break;
+				}
+			case tsip_pname_icestun_enabled:
+				{ /* (tsk_bool_t)ENABLED_BOOL */
+					self->natt.ice.stun_enabled = va_arg(*app, tsk_bool_t);
 					break;
 				}
 
@@ -446,7 +501,8 @@ tsip_stack_handle_t* stack = tsip_stack_create(app_callback, realm_uri, impi_uri
 tsip_stack_handle_t* tsip_stack_create(tsip_stack_callback_f callback, const char* realm_uri, const char* impi_uri, const char* impu_uri, ...)
 {
 	tsip_stack_t* stack = tsk_null;
-	va_list ap;	
+	va_list ap;
+	int i;
 
 	/* === check values === */
 	if(!realm_uri || !impi_uri || !impu_uri){
@@ -472,12 +528,13 @@ tsip_stack_handle_t* tsip_stack_create(tsip_stack_callback_f callback, const cha
 		goto bail;
 	}
 	
-	/* === Default values === */
-	stack->network.local_ip = TNET_SOCKET_HOST_ANY;
-	stack->network.local_port = TNET_SOCKET_PORT_ANY;
+	/* === Default values (Network) === */
+	stack->network.mode = tsip_stack_mode_ua;
+	for(i = 0; i < sizeof(stack->network.local_port)/sizeof(stack->network.local_port[0]); ++i) { stack->network.local_port[i] = TNET_SOCKET_PORT_ANY; }
+	for(i = 0; i < sizeof(stack->network.proxy_cscf_port)/sizeof(stack->network.proxy_cscf_port[0]); ++i) { stack->network.proxy_cscf_port[i] = 5060; }
+	for(i = 0; i < sizeof(stack->network.proxy_cscf_type)/sizeof(stack->network.proxy_cscf_type[0]); ++i) { stack->network.proxy_cscf_type[i] = tnet_socket_type_invalid; }
+	stack->network.max_fds = tmedia_defaults_get_max_fds();
 	
-	stack->network.proxy_cscf_port = 5060;
-	stack->network.proxy_cscf_type = tnet_socket_type_udp_ipv4;
 	// all events should be delivered to the user before the stack stop
 	tsk_runnable_set_important(TSK_RUNNABLE(stack), tsk_true);
 
@@ -496,6 +553,20 @@ tsip_stack_handle_t* tsip_stack_create(tsip_stack_callback_f callback, const cha
 
 	/* === DHCP context === */
 
+	/* === NAT Traversal === */
+	{
+		const char *server_ip, *usr_name, *usr_pwd;
+		uint16_t server_port;
+		stack->natt.stun.enabled = tmedia_defaults_get_stun_enabled();
+		stack->natt.ice.stun_enabled = tmedia_defaults_get_icestun_enabled();
+		if(tmedia_defaults_get_stun_server(&server_ip, &server_port, &usr_name, &usr_pwd) == 0){
+			tsk_strupdate(&stack->natt.stun.ip, server_ip);
+			tsk_strupdate(&stack->natt.stun.login, usr_name);
+			tsk_strupdate(&stack->natt.stun.pwd, usr_pwd);
+			stack->natt.stun.port = server_port;
+		}
+	}
+
 	/* === Set user supplied parameters === */
 	va_start(ap, impu_uri);
 	if(__tsip_stack_set(stack, &ap)){
@@ -508,16 +579,29 @@ tsip_stack_handle_t* tsip_stack_create(tsip_stack_callback_f callback, const cha
 
 	/* === Internals === */
 	stack->callback = callback;
-	tsk_timer_mgr_global_ref();
-	stack->ssessions = tsk_list_create();
+	if(!stack->ssessions){
+		stack->ssessions = tsk_list_create();
+	}
 	if(!stack->headers){ /* could be created by tsk_params_add_param() */
 		stack->headers = tsk_list_create();
 	}
 
 	/* ===	Layers === */
-	stack->layer_dialog = tsip_dialog_layer_create(stack);
-	stack->layer_transac = tsip_transac_layer_create(stack);
-	stack->layer_transport = tsip_transport_layer_create(stack);
+	if(!(stack->layer_dialog = tsip_dialog_layer_create(stack))){
+		TSK_DEBUG_ERROR("Failed to create Dialog layer");
+		TSK_OBJECT_SAFE_FREE(stack);
+		goto bail;
+	}
+	if(!(stack->layer_transac = tsip_transac_layer_create(stack))){
+		TSK_DEBUG_ERROR("Failed to create Transac layer");
+		TSK_OBJECT_SAFE_FREE(stack);
+		goto bail;
+	}
+	if(!(stack->layer_transport = tsip_transport_layer_create(stack))){
+		TSK_DEBUG_ERROR("Failed to create Transport layer");
+		TSK_OBJECT_SAFE_FREE(stack);
+		goto bail;
+	}
 
 bail:
 	return stack;
@@ -531,8 +615,9 @@ bail:
 */
 int tsip_stack_start(tsip_stack_handle_t *self)
 {
-	int ret = -1;
+	int ret = -1, t_idx, tx_count;
 	tsip_stack_t *stack = self;
+	tnet_socket_type_t* tx_values;
 	const char* stack_error_desc = "Failed to start the stack";
 
 	if(!stack){
@@ -541,96 +626,116 @@ int tsip_stack_start(tsip_stack_handle_t *self)
 	}
 
 	if(stack->started){
-		TSK_DEBUG_WARN("Stack Already started");
+		TSK_DEBUG_INFO("Stack Already started");
 		return 0;
 	}
 
-	// Debug info
-	if(stack->network.mode_server){
+	tsk_safeobj_lock(stack);	
+
+	// transports
+	if(TSIP_STACK_MODE_IS_SERVER(stack)){
 		TSK_DEBUG_INFO("Stack running in SERVER mode");
+		tx_values = &stack->network.transport_types[0];
+		tx_count = sizeof(stack->network.transport_types) / sizeof(stack->network.transport_types[0]);
 	}
 	else{
 		TSK_DEBUG_INFO("Stack running in CLIENT mode");
+		tx_values = &stack->network.proxy_cscf_type[0];
+		tx_count = sizeof(stack->network.proxy_cscf_type) / sizeof(stack->network.proxy_cscf_type[0]);
 	}
 	
 	/* === Timer manager === */
-	if((ret = tsk_timer_mgr_global_start())){
-		goto bail;
+    if(!stack->timer_mgr_global){
+		stack->timer_mgr_global = tsk_timer_mgr_global_ref();
 	}
-	else{
-		stack->timer_mgr_started = tsk_true;
+	if((ret = tsk_timer_manager_start(stack->timer_mgr_global))){
+		goto bail;
 	}
 
 	/* === Set P-Preferred-Identity === */
 	if(!stack->identity.preferred && stack->identity.impu){
 		stack->identity.preferred = tsk_object_ref((void*)stack->identity.impu);
 	}
+
+	/* === Set Max FDs === */
+	if (stack->network.max_fds > 0 && stack->network.max_fds < 0xFFFF) {
+		TSK_DEBUG_INFO("Setting max FDs to %u", stack->network.max_fds);
+		ret = tnet_set_fd_max_allowed(stack->network.max_fds);
+		if (ret) {
+			TSK_DEBUG_ERROR("Failed to set max FDs to %u", stack->network.max_fds);
+			/* goto bail; */ // Not fatal error
+		}
+	}
+
 	/* === Transport type === */
 	if(!tsk_strnullORempty(stack->security.secagree_mech)){
 		if(tsk_striequals(stack->security.secagree_mech, "ipsec-3gpp") && stack->security.enable_secagree_ipsec){
+#if 0
 			TNET_SOCKET_TYPE_SET_IPSEC(stack->network.proxy_cscf_type);
+#endif
+			TSK_DEBUG_ERROR("Not implemented");
 		}
 		//else if if(tsk_striquals(stack->security.secagree_mech, "ipsec-ike"))
 	}
 
-	/* === Use DNS NAPTR+SRV for the P-CSCF discovery if we are in client mode === */
-	if(!stack->network.mode_server){
-		if(tsk_strnullORempty(stack->network.proxy_cscf) || (stack->network.discovery_dhcp || stack->network.discovery_naptr)){
-			if(stack->network.discovery_dhcp){ /* DHCP v4/v6 */
-				/* FIXME: */
-				TSK_DEBUG_ERROR("Unexpected code called");
-				ret = -2;
-			} /* DHCP */
-			else{ /* DNS NAPTR + SRV*/
-				char* hostname = tsk_null;
-				tnet_port_t port = 0;
-
-				if(!(ret = tnet_dns_query_naptr_srv(stack->dns_ctx, stack->network.realm->host, 
-					TNET_SOCKET_TYPE_IS_DGRAM(stack->network.proxy_cscf_type) ? "SIP+D2U" :
-					(TNET_SOCKET_TYPE_IS_TLS(stack->network.proxy_cscf_type) ? "SIPS+D2T" : "SIP+D2T"),
-					&hostname, &port))){
-					tsk_strupdate(&stack->network.proxy_cscf, hostname);
-					if(!stack->network.proxy_cscf_port || stack->network.proxy_cscf_port==5060){ /* Only if the Proxy-CSCF port is missing or default */
-						stack->network.proxy_cscf_port = port;
+	for(t_idx = 0; t_idx < tx_count; ++t_idx){
+		if(!TNET_SOCKET_TYPE_IS_VALID(tx_values[t_idx])){
+			continue;
+		}
+		/* === Use DNS NAPTR+SRV for the P-CSCF discovery if we are in client mode === */
+		if(TSIP_STACK_MODE_IS_CLIENT(stack)){
+			if(tsk_strnullORempty(stack->network.proxy_cscf[t_idx]) || (stack->network.discovery_dhcp || stack->network.discovery_naptr)){
+				if(stack->network.discovery_dhcp){ /* DHCP v4/v6 */
+					/* FIXME: */
+					TSK_DEBUG_ERROR("Unexpected code called");
+					ret = -2;
+				} /* DHCP */
+				else{ /* DNS NAPTR + SRV*/
+					char* hostname = tsk_null;
+					tnet_port_t port = 0;
+					const char* service = TNET_SOCKET_TYPE_IS_DGRAM(tx_values[t_idx]) ? "SIP+D2U" : (TNET_SOCKET_TYPE_IS_TLS(tx_values[t_idx]) ? "SIPS+D2T" : "SIP+D2T");
+					if((ret = tnet_dns_query_naptr_srv(stack->dns_ctx, stack->network.realm->host, service, &hostname, &port)) == 0){
+						TSK_DEBUG_INFO("DNS SRV(NAPTR(%s, %s) = [%s / %d]", stack->network.realm->host, service, hostname, port);
+						tsk_strupdate(&stack->network.proxy_cscf[t_idx], hostname);
+						if(!stack->network.proxy_cscf_port[t_idx] || stack->network.proxy_cscf_port[t_idx]==5060){ /* Only if the Proxy-CSCF port is missing or default */
+							stack->network.proxy_cscf_port[t_idx] = port;
+						}
 					}
-				}
-				else{
-					TSK_DEBUG_ERROR("P-CSCF discovery using DNS NAPTR failed. The stack will use the user supplied address and port.");
-				}
-				
-				TSK_FREE(hostname);
-			} /* NAPTR */
-		}
+					else{
+						TSK_DEBUG_ERROR("P-CSCF discovery using DNS NAPTR failed. The stack will use the user supplied address and port.");
+					}
+					
+					TSK_FREE(hostname);
+				} /* NAPTR */
+			}
 
-		/* Check Proxy-CSCF IP address */
-		if(stack->network.proxy_cscf){
-			TSK_DEBUG_INFO("Proxy-CSCF=[%s]:%d", stack->network.proxy_cscf, stack->network.proxy_cscf_port);
-		}
-		else{
-			TSK_DEBUG_ERROR("Proxy-CSCF IP address is Null.");
-			ret = -1983;
-			goto bail;
-		}
-	}// !Server mode
-	
-	/* === Get Best source address ===  */
-	if(tsk_strnullORempty(stack->network.local_ip) || tsk_striequals(stack->network.local_ip, "127.0.0.1")){ /* loacal-ip is missing? */
-		if(stack->network.mode_server){
-			stack_error_desc = "In mode server you must provide a valid local ip";
-			ret = -1984;
-			goto bail;
-		}
-		else{	/* client mode: try to find best source address */
+			/* Check Proxy-CSCF IP address */
+			if(!tsk_strnullORempty(stack->network.proxy_cscf[t_idx])){
+				TSK_DEBUG_INFO("Proxy-CSCF=[%s]:%d", stack->network.proxy_cscf[t_idx], stack->network.proxy_cscf_port[t_idx]);
+			}
+			else{
+				TSK_DEBUG_ERROR("Proxy-CSCF IP address is Null.");
+				ret = -1983;
+				goto bail;
+			}
+		}// !Server mode
+		
+		/* === Get Best source address ===  */
+		if(tsk_strnullORempty(stack->network.local_ip[t_idx]) || tsk_striequals(stack->network.local_ip[t_idx], "127.0.0.1")){ /* loacal-ip is missing? */
 			tnet_ip_t bestsource;
-			if((ret = tnet_getbestsource(stack->network.proxy_cscf, stack->network.proxy_cscf_port, stack->network.proxy_cscf_type, &bestsource))){ /* FIXME: what about linux version? */
+			if((ret = tnet_getbestsource(stack->network.proxy_cscf[t_idx] ? stack->network.proxy_cscf[t_idx] : "google.com", 
+				stack->network.proxy_cscf_port[t_idx] ? stack->network.proxy_cscf_port[t_idx] : 5060, 
+				tx_values[t_idx], 
+				&bestsource)))
+			{
 				TSK_DEBUG_ERROR("Failed to get best source [%d].", ret);
 				/* do not exit ==> will use default IP address */
 			}
 			else{
-				tsk_strupdate(&stack->network.local_ip, bestsource);
+				tsk_strupdate(&stack->network.local_ip[t_idx], bestsource);
 			}
 		}
-	}
+	} /* for (t_idx...) */
 
 	/* === Runnable === */
 	TSK_RUNNABLE(stack)->run = run;
@@ -639,26 +744,34 @@ int tsip_stack_start(tsip_stack_handle_t *self)
 		TSK_DEBUG_ERROR("%s", stack_error_desc);
 		goto bail;
 	}
+
+	// must be here because the runnable object is only valid after start()
+	TSIP_STACK_SIGNAL(self, tsip_event_code_stack_starting, "Stack starting");
 	
 	/* === Nat Traversal === */
 	// delete previous context
 	TSK_OBJECT_SAFE_FREE(stack->natt.ctx);
-	if(stack->natt.stun.ip){
+	if(stack->natt.stun.enabled && !tsk_strnullORempty(stack->natt.stun.ip)){
 		if(stack->natt.stun.port == 0){
 			/* FIXME: for now only UDP(IPv4/IPv6) is supported */
 			stack->natt.stun.port = TNET_STUN_TCP_UDP_DEFAULT_PORT;
 		}
-		stack->natt.ctx = tnet_nat_context_create(TNET_SOCKET_TYPE_IS_IPV6(stack->network.proxy_cscf_type)? tnet_socket_type_udp_ipv6: tnet_socket_type_udp_ipv4, 
+		TSK_DEBUG_INFO("STUN server = %s:%u", stack->natt.stun.ip, stack->natt.stun.port);
+		stack->natt.ctx = tnet_nat_context_create(TNET_SOCKET_TYPE_IS_IPV6(tx_values[stack->network.transport_idx_default])? tnet_socket_type_udp_ipv6: tnet_socket_type_udp_ipv4, 
 			stack->natt.stun.login, stack->natt.stun.pwd);
-		tnet_nat_set_server(stack->natt.ctx, stack->natt.stun.ip, stack->natt.stun.port);
+		ret = tnet_nat_set_server(stack->natt.ctx, stack->natt.stun.ip, stack->natt.stun.port);
 	}
 
 	/* === Transport Layer === */
-	/* Adds the default transport to the transport Layer */
-	if((ret = tsip_transport_layer_add(stack->layer_transport, stack->network.local_ip, stack->network.local_port, stack->network.proxy_cscf_type, "SIP transport"))){
-		stack_error_desc = "Failed to add new transport";
-		TSK_DEBUG_ERROR("%s", stack_error_desc);
-		goto bail;
+	for(t_idx = 0; t_idx < tx_count; ++t_idx){
+		if(!TNET_SOCKET_TYPE_IS_VALID(tx_values[t_idx])){
+			continue;
+		}
+		if((ret = tsip_transport_layer_add(stack->layer_transport, stack->network.local_ip[t_idx], stack->network.local_port[t_idx], tx_values[t_idx], "SIP transport"))){
+			stack_error_desc = "Failed to add new transport";
+			TSK_DEBUG_ERROR("%s", stack_error_desc);
+			goto bail;
+		}
 	}
 	/* Starts the transport Layer */
 	if((ret = tsip_transport_layer_start(stack->layer_transport))){
@@ -666,25 +779,30 @@ int tsip_stack_start(tsip_stack_handle_t *self)
 		TSK_DEBUG_ERROR("%s", stack_error_desc);
 		goto bail;
 	}
-	else if(!stack->network.local_ip){
-		/* Update the local_ip */
-		if(!TSK_LIST_IS_EMPTY(stack->layer_transport->transports)){
-			tnet_ip_t ip;
-			if(!tnet_transport_get_ip_n_port_2(stack->layer_transport->transports->head->data, &ip, tsk_null)){
-				stack->network.local_ip = tsk_strdup(ip);
-			}
-			else{
-				TSK_DEBUG_WARN("Failed to get local_ip");
-				/* Do not exit */
+	
+	/* Update the local_ip */
+	for(t_idx = 0; t_idx < tx_count; ++t_idx){
+		if(!TNET_SOCKET_TYPE_IS_VALID(tx_values[t_idx])){
+			continue;
+		}
+		if(tsk_strnullORempty(stack->network.local_ip[t_idx])){
+			const tsip_transport_t* transport = tsip_transport_layer_find_by_type(stack->layer_transport, tx_values[t_idx]);
+			
+			if(transport){
+				tnet_ip_t ip;
+				if(!tnet_transport_get_ip_n_port_2(transport->net_transport, &ip, tsk_null)){
+					tsk_strupdate(&stack->network.local_ip[t_idx], ip);
+				}
+				else{
+					TSK_DEBUG_WARN("Failed to get local_ip for transport type = %d", tx_values[t_idx]);
+					/* Do not exit */
+				}
 			}
 		}
 	}
 
 
 	/* ===	ALL IS OK === */
-	if(stack->layer_transac){ /* For transaction layer */
-		stack->layer_transac->reliable = TNET_SOCKET_TYPE_IS_STREAM(stack->network.proxy_cscf_type);
-	}
 	
 	stack->started = tsk_true;
 
@@ -693,23 +811,22 @@ int tsip_stack_start(tsip_stack_handle_t *self)
 	
 	TSK_DEBUG_INFO("SIP STACK -- START");
 
+	tsk_safeobj_unlock(stack);
+
 	return 0;
 	
 
 bail:
 	TSIP_STACK_SIGNAL(self, tsip_event_code_stack_failed_to_start, stack_error_desc);
 	/* stop all running instances */
-	if(stack->timer_mgr_started){
-		if(tsk_timer_mgr_global_stop() == 0){
-			stack->timer_mgr_started = tsk_false;
-		}
-	}
 	if(stack->layer_transport){
 		tsip_transport_layer_shutdown(stack->layer_transport);
 	}
 	if(TSK_RUNNABLE(stack)->running){
 		tsk_runnable_stop(TSK_RUNNABLE(stack));
 	}
+
+	tsk_safeobj_unlock(stack);
 
 	return ret;
 }
@@ -826,16 +943,19 @@ int tsip_stack_get_local_ip_n_port(const tsip_stack_handle_t *self, const char* 
 int tsip_stack_stop(tsip_stack_handle_t *self)
 {
 	tsip_stack_t *stack = self;
-
-    TSK_DEBUG_INFO("In tsip_stack_stop( %p )", self);
+	
 	if(stack){
-		int ret;
 		tsk_bool_t one_failed = tsk_false;
+		int ret = 0;
+		
+		tsk_safeobj_lock(stack);
 
 		if(!stack->started){
-			TSK_DEBUG_WARN("Stack already stopped");
-			return 0;
+			TSK_DEBUG_INFO("Stack already stopped");
+			goto bail;
 		}
+
+		TSIP_STACK_SIGNAL(self, tsip_event_code_stack_stopping, "Stack stopping");
 
 		/* Hangup all dialogs starting by REGISTER */	
 		if((ret = tsip_dialog_layer_shutdownAll(stack->layer_dialog))){
@@ -847,15 +967,7 @@ int tsip_stack_stop(tsip_stack_handle_t *self)
 		* see tsip_dialog_deinit() which call tsip_transac_layer_cancel_by_dialog() */
 
 		/* Stop the timer manager */
-		if(stack->timer_mgr_started){
-			if((ret = tsk_timer_mgr_global_stop())){
-				TSK_DEBUG_WARN("Failed to stop the timer manager");
-				one_failed = tsk_true;
-			}
-			else{
-				stack->timer_mgr_started = tsk_false;
-			}
-		}
+		// not done as it's global (shared). Will be done when all instance are destoyed
 		
 		/* Stop the transport layer */
 		if((ret = tsip_transport_layer_shutdown(stack->layer_transport))){
@@ -887,14 +999,22 @@ int tsip_stack_stop(tsip_stack_handle_t *self)
 		}
 
 		/* reset AoR */
-		TSK_FREE(stack->network.aor.ip);
-		stack->network.aor.port = 0;
+		TSK_FREE_TABLE(stack->network.aor.ip);
+		memset(stack->network.aor.port, 0, sizeof(stack->network.aor.port));
 
+        /* stops timer manager */
+        if(stack->timer_mgr_global){
+            tsk_timer_mgr_global_unref(&stack->timer_mgr_global);
+        }
+        
 		if(!one_failed){
 			stack->started = tsk_false;
 		}
 
 		TSK_DEBUG_INFO("SIP STACK -- STOP");
+
+bail:
+		tsk_safeobj_unlock(stack);
 
 		return ret;
 	}
@@ -925,35 +1045,41 @@ tsip_uri_t* tsip_stack_get_contacturi(const tsip_stack_t *stack, const char* pro
 }
 
 /* internal function used to construct a valid Proxy-CSCF URI used as the default first route */
-tsip_uri_t* tsip_stack_get_pcscf_uri(const tsip_stack_t *stack, tsk_bool_t lr)
+tsip_uri_t* tsip_stack_get_pcscf_uri(const tsip_stack_t *stack, tnet_socket_type_t type, tsk_bool_t lr)
 {
 	if(stack){
-		if(stack->layer_transport->transports && !TSK_LIST_IS_EMPTY(stack->layer_transport->transports)){
-			tsip_transport_t *transport = stack->layer_transport->transports->head->data;
-			if(transport){
-				tsip_uri_t* uri = tsk_null;
-				tsk_bool_t ipv6 = TNET_SOCKET_TYPE_IS_IPV6(transport->type);
-				tsk_bool_t quote_ip = (ipv6 && tsk_strcontains(stack->network.proxy_cscf, tsk_strlen(stack->network.proxy_cscf), ":")) /* IPv6 IP string?*/;
-			
-				char* uristring = tsk_null;
-				tsk_sprintf(&uristring, "%s:%s%s%s:%d;%s;transport=%s",
-					transport->scheme,
-					quote_ip ? "[" : "",
-					stack->network.proxy_cscf,
-					quote_ip ? "]" : "",
-					stack->network.proxy_cscf_port,
-					lr ? "lr" : "",
-					transport->protocol);
-				if(uristring){
-					if((uri = tsip_uri_parse(uristring, tsk_strlen(uristring)))){
-						//uri->host_type = ipv6 ? thttp_host_ipv6 : thttp_host_ipv4;
-					}
-					TSK_FREE(uristring);
-				}
-				
-				return uri;
-			}
+		const tsip_transport_t *transport = tsk_null;
+		if(!TNET_SOCKET_TYPE_IS_VALID(type) && !TSK_LIST_IS_EMPTY(stack->layer_transport->transports)){
+			transport = stack->layer_transport->transports->head->data;
 		}
+		else{
+			transport = tsip_transport_layer_find_by_type(stack->layer_transport, type);
+		}
+		
+		if(transport){
+			tsip_uri_t* uri = tsk_null;
+			tsk_bool_t ipv6 = TNET_SOCKET_TYPE_IS_IPV6(transport->type);
+			tsk_bool_t quote_ip = (ipv6 && tsk_strcontains(stack->network.proxy_cscf[transport->idx], tsk_strlen(stack->network.proxy_cscf[transport->idx]), ":")) /* IPv6 IP string?*/;
+		
+			char* uristring = tsk_null;
+			tsk_sprintf(&uristring, "%s:%s%s%s:%d;%s;transport=%s",
+				transport->scheme,
+				quote_ip ? "[" : "",
+				stack->network.proxy_cscf[transport->idx],
+				quote_ip ? "]" : "",
+				stack->network.proxy_cscf_port[transport->idx],
+				lr ? "lr" : "",
+				transport->protocol);
+			if(uristring){
+				if((uri = tsip_uri_parse(uristring, tsk_strlen(uristring)))){
+					//uri->host_type = ipv6 ? thttp_host_ipv6 : thttp_host_ipv4;
+				}
+				TSK_FREE(uristring);
+			}
+			
+			return uri;
+		}
+		
 	}
 	return tsk_null;
 }
@@ -967,7 +1093,7 @@ tsip_uri_t* tsip_stack_get_pcscf_uri(const tsip_stack_t *stack, tsk_bool_t lr)
 
 
 
-static void *run(void* self)
+static void* TSK_STDCALL run(void* self)
 {
 	tsk_list_item_t *curr;
 	tsip_stack_t *stack = self;
@@ -1007,6 +1133,7 @@ static tsk_object_t* tsip_stack_ctor(tsk_object_t * self, va_list * app)
 {
 	tsip_stack_t *stack = self;
 	if(stack){
+		tsk_safeobj_init(stack);
 	}
 	return self;
 }
@@ -1031,7 +1158,9 @@ static tsk_object_t* tsip_stack_dtor(tsk_object_t * self)
 		TSK_OBJECT_SAFE_FREE(stack->layer_transport);
 
 		/* Internals(1/2) */
-		tsk_timer_mgr_global_unref();
+        if(stack->timer_mgr_global){
+            tsk_timer_mgr_global_unref(&stack->timer_mgr_global);
+        }
 
 		/* Identity */
 		TSK_FREE(stack->identity.display_name);
@@ -1042,12 +1171,12 @@ static tsk_object_t* tsip_stack_dtor(tsk_object_t * self)
 		TSK_FREE(stack->identity.password);
 
 		/* Network(1/1) */
-		TSK_FREE(stack->network.local_ip);
+		TSK_FREE_TABLE(stack->network.local_ip);
 		TSK_OBJECT_SAFE_FREE(stack->network.realm);
-		TSK_FREE(stack->network.proxy_cscf);
+		TSK_FREE_TABLE(stack->network.proxy_cscf);
 		TSK_OBJECT_SAFE_FREE(stack->paths);
 
-		TSK_FREE(stack->network.aor.ip);
+		TSK_FREE_TABLE(stack->network.aor.ip);
 
 		TSK_OBJECT_SAFE_FREE(stack->service_routes);
 		TSK_OBJECT_SAFE_FREE(stack->associated_uris);
@@ -1085,6 +1214,8 @@ static tsk_object_t* tsip_stack_dtor(tsk_object_t * self)
 		/* Internals (2/2) */
 		TSK_OBJECT_SAFE_FREE(stack->ssessions);
 		TSK_OBJECT_SAFE_FREE(stack->headers);
+
+		tsk_safeobj_deinit(stack);
 
 		TSK_DEBUG_INFO("*** SIP Stack destroyed ***");
 	}

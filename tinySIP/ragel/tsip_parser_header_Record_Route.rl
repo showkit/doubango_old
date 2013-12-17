@@ -139,9 +139,13 @@ int tsip_header_Record_Route_serialize(const tsip_header_t* header, tsk_buffer_t
 	tsip_header_Record_Routes_L_t *hdr_record_routes = tsk_list_create();
 	tsip_header_Record_Route_t *curr_route = tsk_null;
 	
-	const char *tag_start;
+	const char *tag_start = tsk_null;
 
 	%%write data;
+	(void)(eof);
+	(void)(tsip_machine_parser_header_Record_Route_first_final);
+	(void)(tsip_machine_parser_header_Record_Route_error);
+	(void)(tsip_machine_parser_header_Record_Route_en_main);
 	%%write init;
 	%%write exec;
 	

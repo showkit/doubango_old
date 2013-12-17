@@ -3,16 +3,16 @@
 ######
 
 ifeq ($(ANDROID_NDK_ROOT),)
-	export ANDROID_NDK_ROOT=/Users/akelani/Development/SDKs/android-ndk
+	export ANDROID_NDK_ROOT=/cygdrive/c/android-ndk-r7c
 endif
 ifeq ($(ANDROID_SDK_ROOT),)
-	export ANDROID_SDK_ROOT=/Users/akelani/Development/SDKs/adt-bundle-mac-x86_64/sdk
+	export ANDROID_SDK_ROOT=/cygdrive/c/android-sdk
 endif
 ifeq ($(ANDROID_PLATFORM),)
 	export ANDROID_PLATFORM=android-3
 endif
 ifeq ($(ANDROID_HOST),)
-	export ANDROID_HOST=darwin-x86_64
+	export ANDROID_HOST=windows
 endif
 ifeq ($(NEON), yes)
 	export MARCH=armv7-a
@@ -22,8 +22,7 @@ else
 	export ANDROID_EABI=armeabi
 endif
 
-export ANDROID_GCC_VER=4.4.3
-export ANDROID_GCC_VERSIONS=4.4.3 4.4.0 4.gcc -v.1 # list of preferred GCC versions seperated by SPACE (most preferred first)
+export ANDROID_GCC_VERSIONS=4.6 4.4.3 4.4.0 4.2.1 # list of preferred GCC versions seperated by SPACE (most preferred first)
 export ANDROID_GCC_PREFIXES=arm-eabi arm-linux-androideabi # list of preferred GCC prefixes seperated by SPACE (most preferred first)
 
 # Output directory
@@ -121,9 +120,6 @@ endif
 
 
 export CFLAGS_COMMON=$(CFLAGS) $(DEBUG_FLAGS) -I$(ANDROID_NDK_BASE)/$(ANDROID_PLATFORM)/arch-arm/usr/include -L$(ANDROID_GNU_STL_ROOT)/include \
--I/Users/akelani/Development/CuriousMinds/Android/ShowKit/ios-ngn-stack/cmstack/include \
--I/Users/akelani/Development/CuriousMinds/Android/ShowKit/ios-ngn-stack/doubango/branches/2.0/doubango/tinyMEDIA/include \
--I/Users/akelani/Development/CuriousMinds/Android/ShowKit/ios-ngn-stack/doubango/branches/2.0/doubango/bindings/_common \
 -msoft-float \
 -fpic \
 -fno-exceptions \
@@ -143,7 +139,6 @@ export CFLAGS_COMMON=$(CFLAGS) $(DEBUG_FLAGS) -I$(ANDROID_NDK_BASE)/$(ANDROID_PL
 -DWEBRTC_ARCH_ARM \
 -D__ANDROID__ \
 -DANDROID=1 \
--std=gnu99
 
 # Size reduction: use separate sections ("-ffunction-sections -fdata-sections") then link executable/shared lib using "-Wl,-gc-sections,-u,main"
 export CFLAGS_COMMON+=-ffunction-sections -fdata-sections

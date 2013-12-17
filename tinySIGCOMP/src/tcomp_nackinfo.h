@@ -32,10 +32,13 @@
 
 #include "tinysigcomp_config.h"
 #include "tcomp_buffer.h"
+
 #include "tsk_sha1.h"
 #include "tsk_object.h"
 
 TCOMP_BEGIN_DECLS
+
+struct tcomp_message_s;
 
 /*
 +---+---+---+---+---+---+---+---+
@@ -69,25 +72,40 @@ typedef struct tcomp_nackinfo_s
 	uint8_t version; 	/**< Gives the version of the NACK mechanism being employed. */
 	uint8_t reasonCode; /**< The Reason Code is a one-byte value that indicates the nature of the decompression failure. */
 	uint8_t opcode; /**< The "OPCODE of failed instruction" is a one-byte field that includes the opcode to which the PC was pointing when the failure occurred */
-	uint16_t pc; /**< "PC of failed instruction" is a two-byte field containing the value of the program counter when failure occurred (i.e., the memory address of the failed UDVM instruction) */
+	uint32_t pc; /**< "PC of failed instruction" is a two-byte field containing the value of the program counter when failure occurred (i.e., the memory address of the failed UDVM instruction) */
 	uint8_t sha1[TSK_SHA1_DIGEST_SIZE]; /**<"SHA-1 Hash of failed message" contains the full 20-byte SHA-1 hash of the SigComp message that could not be decompressed */
 	tcomp_buffer_handle_t *details; /**< "Error Details" provides additional information that might be useful in correcting the problem that caused decompression failure.*/
-} tcomp_nackinfo_t;
-
-//#include "tcomp_message.h"
+}
+tcomp_nackinfo_t;
 
 tcomp_nackinfo_t* tcomp_nackinfo_create();
+int tcomp_nackinfo_write(tcomp_buffer_handle_t* buffer, 
+						 uint8_t reasonCode, 
+						 uint8_t opCode, 
+						 int16_t memory_address_of_instruction, 
+						 const void* sigCompMessagePtr, tsk_size_t sigCompMessageSize, 
+						 tcomp_buffer_handle_t* lpDetails,
+						 uint16_t udvm_size,
+						 uint8_t cpbValue);
+int tcomp_nackinfo_write_2(tcomp_buffer_handle_t* buffer, 
+						 uint8_t reasonCode, 
+						 uint8_t opCode, 
+						 int16_t memory_address_of_instruction, 
+						 const struct tcomp_message_s* sigCompMessage, 
+						 tcomp_buffer_handle_t* lpDetails,
+						 uint16_t udvm_size,
+						 uint8_t cpbValue);
+int tcomp_nackinfo_write_3(tcomp_buffer_handle_t* buffer, 
+						 uint8_t reasonCode, 
+						 const void* sigCompMessagePtr, tsk_size_t sigCompMessageSize);
+int tcomp_nackinfo_write_4(tcomp_buffer_handle_t* buffer, 
+						 uint8_t reasonCode, 
+						 const struct tcomp_message_s* sigCompMessage);
+TINYSIGCOMP_API const char* tcomp_nackinfo_get_description(const tcomp_buffer_handle_t* buffer);
+
 
 TINYSIGCOMP_GEXTERN const tsk_object_def_t *tcomp_nackinfo_def_t;
-struct tcomp_message_s;
-int tcomp_nackinfo_write_2(tcomp_buffer_handle_t* buffer,
-                           uint8_t reasonCode,
-                           uint8_t opCode,
-                           int16_t memory_address_of_instruction,
-                           const struct tcomp_message_s* sigCompMessage,
-                           tcomp_buffer_handle_t* lpDetails,
-                           uint16_t udvm_size,
-                           uint8_t cpbValue);
+
 TCOMP_END_DECLS
 
 #endif /* TCOMP_NAKINFO_H */

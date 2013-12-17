@@ -37,6 +37,8 @@ typedef tsk_plugin_def_ptr_const_t (*symbol_get_def_at)(int index);
 #	include <dlfcn.h>
 #endif
 
+#include <sys/stat.h> /* stat() */
+
 static int _tsk_plugin_handle_destroy(tsk_plugin_handle_t** self);
 static tsk_plugin_symbol_t* _tsk_plugin_handle_get_symbol(tsk_plugin_handle_t* handle, const char* symbol_name);
 
@@ -80,11 +82,23 @@ tsk_plugin_t* tsk_plugin_create(const char* path)
 {
 	tsk_plugin_t* plugin;
 	symbol_get_def_count funcptr_get_def_count;
-	tsk_plugin_handle_t* handle =
+	tsk_plugin_handle_t* handle;
+
 #if TSK_UNDER_WINDOWS
-	LoadLibraryA(path);
+#	if TSK_UNDER_WINDOWS_RT
+	wchar_t* szPath = (wchar_t*)tsk_calloc(tsk_strlen(path) + 1, sizeof(wchar_t));
+	static const wchar_t* szFormat = L"%hs";
+	swprintf(szPath, tsk_strlen(path) * sizeof(wchar_t), szFormat, path);
+	handle = LoadPackagedLibrary(szPath, 0x00000000);
+	TSK_FREE(szPath);
+#	else /* Windows desktop */
+	UINT currErrMode = SetErrorMode(SEM_FAILCRITICALERRORS); // save current ErrorMode. GetErrorMode() not supported on XP.
+	SetErrorMode(currErrMode | SEM_FAILCRITICALERRORS);
+	handle = LoadLibraryA(path);
+	SetErrorMode(currErrMode); // restore ErrorMode
+#	endif
 #else
-	dlopen(path, RTLD_NOW);
+	handle = dlopen(path, RTLD_NOW);
 #endif
 
 	if(!handle){
@@ -92,13 +106,13 @@ tsk_plugin_t* tsk_plugin_create(const char* path)
 		return tsk_null;
 	}
 
-	if(!(funcptr_get_def_count = _tsk_plugin_handle_get_symbol(handle, TSK_PLUGIN_FUNC_NAME_DEF_COUNT))){
+	if(!(funcptr_get_def_count = (symbol_get_def_count)_tsk_plugin_handle_get_symbol(handle, TSK_PLUGIN_FUNC_NAME_DEF_COUNT))){
 		TSK_DEBUG_ERROR("Cannot find function with name=%s", TSK_PLUGIN_FUNC_NAME_DEF_COUNT);
 		_tsk_plugin_handle_destroy(&handle);
 		return tsk_null;
 	}
 
-	if(!(plugin = tsk_object_new(&tsk_plugin_def_s))){
+	if(!(plugin = (tsk_plugin_t*)tsk_object_new(&tsk_plugin_def_s))){
 		TSK_DEBUG_ERROR("Failed to create plugin object");
 		_tsk_plugin_handle_destroy(&handle);
 		return tsk_null;
@@ -113,13 +127,14 @@ tsk_plugin_t* tsk_plugin_create(const char* path)
 	return plugin;
 }
 
-tsk_plugin_def_ptr_const_t tsk_plugin_get_def(tsk_plugin_t* self, tsk_plugin_def_type_t type, tsk_plugin_def_media_type_t media_type)
+tsk_plugin_def_ptr_const_t tsk_plugin_get_def_2(struct tsk_plugin_s* self, tsk_plugin_def_type_t type, tsk_plugin_def_media_type_t media_type, tsk_size_t index)
 {
 	tsk_plugin_def_ptr_const_t def_ptr_const;
 	symbol_get_def_type_at funcptr_get_def_type_at;
 	symbol_get_def_media_type_at funcptr_get_def_media_type_at;
 	symbol_get_def_at funcptr_get_def_at;
 	int i;
+	tsk_size_t _index = 0;
 
 	if(!self){
 		TSK_DEBUG_ERROR("Invalid parameter");
@@ -142,11 +157,18 @@ tsk_plugin_def_ptr_const_t tsk_plugin_get_def(tsk_plugin_t* self, tsk_plugin_def
 	for(i = 0; i < self->def_count; ++i){
 		if((funcptr_get_def_type_at(i) & type) && (funcptr_get_def_media_type_at(i) & media_type)){
 			if((def_ptr_const = funcptr_get_def_at(i))){
-				return def_ptr_const;
+				if(_index++ == index){
+					return def_ptr_const;
+				}
 			}
 		}
 	}
 	return tsk_null;
+}
+
+tsk_plugin_def_ptr_const_t tsk_plugin_get_def(tsk_plugin_t* self, tsk_plugin_def_type_t type, tsk_plugin_def_media_type_t media_type)
+{
+	return tsk_plugin_get_def_2(self, type, media_type, 0);
 }
 
 tsk_plugin_symbol_t* tsk_plugin_get_symbol(tsk_plugin_t* self, const char* symbol_name)
@@ -156,6 +178,15 @@ tsk_plugin_symbol_t* tsk_plugin_get_symbol(tsk_plugin_t* self, const char* symbo
 		return tsk_null;
 	}
 	return _tsk_plugin_handle_get_symbol(self->handle, symbol_name);
+}
+
+tsk_bool_t tsk_plugin_file_exist(const char* path)
+{
+	if(path){
+		struct stat _stat;
+		return (stat(path, &_stat) == 0 && _stat.st_size > 0);
+	}
+	return tsk_false;
 }
 
 static tsk_plugin_symbol_t* _tsk_plugin_handle_get_symbol(tsk_plugin_handle_t* handle, const char* symbol_name)

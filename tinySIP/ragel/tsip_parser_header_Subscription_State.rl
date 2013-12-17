@@ -119,9 +119,13 @@ tsip_header_Subscription_State_t *tsip_header_Subscription_State_parse(const cha
 	const char *eof = pe;
 	tsip_header_Subscription_State_t *hdr_Subscription_State = tsip_header_Subscription_State_create();
 	
-	const char *tag_start;
+	const char *tag_start = tsk_null;
 
 	%%write data;
+	(void)(eof);
+	(void)(tsip_machine_parser_header_Subscription_State_first_final);
+	(void)(tsip_machine_parser_header_Subscription_State_error);
+	(void)(tsip_machine_parser_header_Subscription_State_en_main);
 	%%write init;
 	%%write exec;
 	

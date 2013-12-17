@@ -112,9 +112,13 @@ tsip_header_Privacy_t *tsip_header_Privacy_parse(const char *data, tsk_size_t si
 	const char *eof = pe;
 	tsip_header_Privacy_t *hdr_privacy = tsip_header_Privacy_create();
 	
-	const char *tag_start;
+	const char *tag_start = tsk_null;
 
 	%%write data;
+	(void)(eof);
+	(void)(tsip_machine_parser_header_Privacy_first_final);
+	(void)(tsip_machine_parser_header_Privacy_error);
+	(void)(tsip_machine_parser_header_Privacy_en_main);
 	%%write init;
 	%%write exec;
 	
