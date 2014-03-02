@@ -1,6 +1,7 @@
 /*
 * Copyright (C) 2009 Mamadou Diop.
-* Copyright (C) 2012 Doubango Telecom <http://doubango.org>.
+*
+* Contact: Mamadou Diop <diopmamadou(at)doubango.org>
 *	
 * This file is part of Open Source Doubango Framework.
 *
@@ -30,5 +31,9 @@
 #endif
 
 #include <string.h>
+
+
+//#define TINYSAK_IMPORTS
+//#define TINYSIGCOMP_IMPORTS
 
 #endif /* TEST_TINYSIGCOMP_STDAFX_H */

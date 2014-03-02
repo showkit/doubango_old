@@ -100,13 +100,9 @@ tsip_header_RAck_t *tsip_header_RAck_parse(const char *data, tsk_size_t size)
 	const char *eof = pe;
 	tsip_header_RAck_t *hdr_rack = tsip_header_RAck_create_null();
 	
-	const char *tag_start = tsk_null;
+	const char *tag_start;
 
 	%%write data;
-	(void)(eof);
-	(void)(tsip_machine_parser_header_RAck_first_final);
-	(void)(tsip_machine_parser_header_RAck_error);
-	(void)(tsip_machine_parser_header_RAck_en_main);
 	%%write init;
 	%%write exec;
 	

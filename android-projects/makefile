@@ -1,38 +1,36 @@
 include ./root.mk
 
-ifeq ($(PROJECT), tinyWRAP)
-PROJECT_ROOT:=../bindings/java/android
-else
-PROJECT_ROOT:=../$(PROJECT)
-endif
-
-ifeq ($(STRIP_LIB), )
-	STRIP_LIB:=no
-	ifeq ($(DEBUG), no)
-		ifeq ($(BT), shared)
-			STRIP_LIB:=yes
-		endif
-	endif
-endif
 
 
-ifeq ($(STRIP_LIB), yes)
+
+
+
+ifeq ($(PROJECT), tinyWRAP) ##### tinyWRAP
 all:
-	(cd $(PROJECT_ROOT); \
-	$(MAKE) -f droid-makefile all; \
-	$(STRIP) --strip-all --remove-section=.comment --remove-section=.note ./lib$(PROJECT)_$(MARCH).$(EXT); \
-	cp -f ./lib$(PROJECT)_$(MARCH).$(EXT) $(OUTPUT_DIR);\
-	)
-else
+	(cd ../bindings/java/android; $(MAKE) -f droid-makefile all; cp -f lib$(PROJECT)_$(MARCH).$(EXT) $(OUTPUT_DIR))
+clean:
+	(cd ../bindings/java/android; $(MAKE) -f droid-makefile clean)
+
+
+
+else ifeq ($(PROJECT), tinyDEMO) ##### tinyDEMO
 all:
-	(cd $(PROJECT_ROOT); $(MAKE) -f droid-makefile all; cp -f lib$(PROJECT)_$(MARCH).$(EXT) $(OUTPUT_DIR))
-endif
-	
+	(cd ../tinyDEMO $(MAKE) -f droid-makefile all; $(MAKE) -f droid-makefile install; cp -f demo $(OUTPUT_DIR))
+clean:
+	(cd ../tinyDEMO; $(MAKE) -f droid-makefile clean)
+
+
+
+else ##### All other libraries (tiny*)
+all:
+	(cd ../$(PROJECT) ; $(MAKE) -f droid-makefile all; cp -f lib$(PROJECT)_$(MARCH).$(EXT) $(OUTPUT_DIR))
 install:
-	(cd $(PROJECT_ROOT) ; $(MAKE) -f droid-makefile install)
+	(cd ../$(PROJECT) ; $(MAKE) -f droid-makefile install)
 
 clean:
-	(cd $(PROJECT_ROOT); $(MAKE) -f droid-makefile clean)
+	(cd ../$(PROJECT); $(MAKE) -f droid-makefile clean)
+endif
+
 
 gdbserver:
 	$(ANDROID_SDK_ROOT)/tools/adb forward tcp:1234: tcp:1234

@@ -76,7 +76,7 @@ tsip_header_Min_Expires_t *tsip_header_Min_Expires_parse(const char *data, tsk_s
 	const char *eof = pe;
 	tsip_header_Min_Expires_t *hdr_minE = tsip_header_Min_Expires_create_null();
 	
-	const char *tag_start = tsk_null;
+	const char *tag_start;
 
 	
 /* #line 83 "./src/headers/tsip_header_Min_Expires.c" */
@@ -148,19 +148,15 @@ static const int tsip_machine_parser_header_Min_Expires_en_main = 1;
 
 
 /* #line 100 "./ragel/tsip_parser_header_Min_Expires.rl" */
-	(void)(eof);
-	(void)(tsip_machine_parser_header_Min_Expires_first_final);
-	(void)(tsip_machine_parser_header_Min_Expires_error);
-	(void)(tsip_machine_parser_header_Min_Expires_en_main);
 	
-/* #line 157 "./src/headers/tsip_header_Min_Expires.c" */
+/* #line 153 "./src/headers/tsip_header_Min_Expires.c" */
 	{
 	cs = tsip_machine_parser_header_Min_Expires_start;
 	}
 
-/* #line 105 "./ragel/tsip_parser_header_Min_Expires.rl" */
+/* #line 101 "./ragel/tsip_parser_header_Min_Expires.rl" */
 	
-/* #line 164 "./src/headers/tsip_header_Min_Expires.c" */
+/* #line 160 "./src/headers/tsip_header_Min_Expires.c" */
 	{
 	int _klen;
 	unsigned int _trans;
@@ -251,7 +247,7 @@ _match:
 	{
 	}
 	break;
-/* #line 255 "./src/headers/tsip_header_Min_Expires.c" */
+/* #line 251 "./src/headers/tsip_header_Min_Expires.c" */
 		}
 	}
 
@@ -264,12 +260,12 @@ _again:
 	_out: {}
 	}
 
-/* #line 106 "./ragel/tsip_parser_header_Min_Expires.rl" */
+/* #line 102 "./ragel/tsip_parser_header_Min_Expires.rl" */
 	
 	if( cs < 
-/* #line 271 "./src/headers/tsip_header_Min_Expires.c" */
+/* #line 267 "./src/headers/tsip_header_Min_Expires.c" */
 19
-/* #line 107 "./ragel/tsip_parser_header_Min_Expires.rl" */
+/* #line 103 "./ragel/tsip_parser_header_Min_Expires.rl" */
  ){
 		TSK_DEBUG_ERROR("Failed to parse 'Min-Expires' header.");
 		TSK_OBJECT_SAFE_FREE(hdr_minE);

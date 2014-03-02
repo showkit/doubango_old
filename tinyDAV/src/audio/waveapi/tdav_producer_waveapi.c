@@ -118,14 +118,7 @@ static int record_wavehdr(tdav_producer_waveapi_t* producer, LPWAVEHDR lpHdr)
 	// Alert the session that there is new data to send over the network
 	//
 	if(TMEDIA_PRODUCER(producer)->enc_cb.callback){
-#if 0
-		{
-			static FILE* f = NULL;
-			if(!f) f = fopen("./waveapi_producer.raw", "w+");
-			fwrite(lpHdr->lpData, 1, lpHdr->dwBytesRecorded, f);
-		}
-#endif
-		TMEDIA_PRODUCER(producer)->enc_cb.callback(TMEDIA_PRODUCER(producer)->enc_cb.callback_data, lpHdr->lpData, lpHdr->dwBytesRecorded);
+		TMEDIA_PRODUCER(producer)->enc_cb.callback(TMEDIA_PRODUCER(producer)->enc_cb.callback_data, lpHdr->lpData, (lpHdr->dwBytesRecorded/2));
 	}
 
 	if(!producer->started){
@@ -153,7 +146,7 @@ static int record_wavehdr(tdav_producer_waveapi_t* producer, LPWAVEHDR lpHdr)
 	return 0;
 }
 
-static void* TSK_STDCALL __record_thread(void *param)
+static void *__record_thread(void *param)
 {
 	tdav_producer_waveapi_t* producer = (tdav_producer_waveapi_t*)param;  
 	DWORD dwEvent;
@@ -161,7 +154,7 @@ static void* TSK_STDCALL __record_thread(void *param)
 
 	TSK_DEBUG_INFO("__record_thread -- START");
 
-	// SetPriorityClass(GetCurrentThread(), REALTIME_PRIORITY_CLASS);
+	SetPriorityClass(GetCurrentThread(), REALTIME_PRIORITY_CLASS);
 
 	for(;;){
 		dwEvent = WaitForMultipleObjects(2, producer->events, FALSE, INFINITE);
@@ -172,7 +165,7 @@ static void* TSK_STDCALL __record_thread(void *param)
 
 		else if (dwEvent == 0){
 			EnterCriticalSection(&producer->cs);
-			for(i = 0; i< sizeof(producer->hWaveHeaders)/sizeof(producer->hWaveHeaders[0]); i++){
+			for(i = 0; i< sizeof(producer->hWaveHeaders)/sizeof(LPWAVEHDR); i++){
 				if(producer->hWaveHeaders[i] && (producer->hWaveHeaders[i]->dwFlags & WHDR_DONE)){
 					record_wavehdr(producer, producer->hWaveHeaders[i]);
 				}
@@ -205,9 +198,9 @@ int tdav_producer_waveapi_prepare(tmedia_producer_t* self, const tmedia_codec_t*
 		return -1;
 	}
 	
-	TMEDIA_PRODUCER(producer)->audio.channels = TMEDIA_CODEC_CHANNELS_AUDIO_ENCODING(codec);
-	TMEDIA_PRODUCER(producer)->audio.rate = TMEDIA_CODEC_RATE_ENCODING(codec);
-	TMEDIA_PRODUCER(producer)->audio.ptime = TMEDIA_CODEC_PTIME_AUDIO_ENCODING(codec);
+	TMEDIA_PRODUCER(producer)->audio.channels = codec->plugin->audio.channels;
+	TMEDIA_PRODUCER(producer)->audio.rate = codec->plugin->rate;
+	TMEDIA_PRODUCER(producer)->audio.ptime = codec->plugin->audio.ptime;
 	/* codec should have ptime */
 	
 
@@ -224,7 +217,7 @@ int tdav_producer_waveapi_prepare(tmedia_producer_t* self, const tmedia_codec_t*
 	producer->bytes_per_notif = ((producer->wfx.nAvgBytesPerSec * TMEDIA_PRODUCER(producer)->audio.ptime)/1000);
 
 	/* create buffers */
-	for(i = 0; i< sizeof(producer->hWaveHeaders)/sizeof(producer->hWaveHeaders[0]); i++){
+	for(i = 0; i< sizeof(producer->hWaveHeaders)/sizeof(LPWAVEHDR); i++){
 		create_wavehdr(producer, i);
 	}
 

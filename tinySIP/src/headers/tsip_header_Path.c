@@ -84,7 +84,7 @@ tsip_header_Paths_L_t *tsip_header_Path_parse(const char *data, tsk_size_t size)
 	const char *eof = pe;
 	tsip_header_Paths_L_t *hdr_paths = tsk_list_create();
 	
-	const char *tag_start = tsk_null;
+	const char *tag_start;
 	tsip_header_Path_t *curr_path = tsk_null;
 
 	
@@ -320,19 +320,15 @@ static const int tsip_machine_parser_header_Path_en_main = 1;
 
 
 /* #line 149 "./ragel/tsip_parser_header_Path.rl" */
-	(void)(eof);
-	(void)(tsip_machine_parser_header_Path_first_final);
-	(void)(tsip_machine_parser_header_Path_error);
-	(void)(tsip_machine_parser_header_Path_en_main);
 	
-/* #line 329 "./src/headers/tsip_header_Path.c" */
+/* #line 325 "./src/headers/tsip_header_Path.c" */
 	{
 	cs = tsip_machine_parser_header_Path_start;
 	}
 
-/* #line 154 "./ragel/tsip_parser_header_Path.rl" */
+/* #line 150 "./ragel/tsip_parser_header_Path.rl" */
 	
-/* #line 336 "./src/headers/tsip_header_Path.c" */
+/* #line 332 "./src/headers/tsip_header_Path.c" */
 	{
 	int _klen;
 	unsigned int _trans;
@@ -463,7 +459,7 @@ _match:
 	{
 	}
 	break;
-/* #line 467 "./src/headers/tsip_header_Path.c" */
+/* #line 463 "./src/headers/tsip_header_Path.c" */
 		}
 	}
 
@@ -476,12 +472,12 @@ _again:
 	_out: {}
 	}
 
-/* #line 155 "./ragel/tsip_parser_header_Path.rl" */
+/* #line 151 "./ragel/tsip_parser_header_Path.rl" */
 	
 	if( cs < 
-/* #line 483 "./src/headers/tsip_header_Path.c" */
+/* #line 479 "./src/headers/tsip_header_Path.c" */
 91
-/* #line 156 "./ragel/tsip_parser_header_Path.rl" */
+/* #line 152 "./ragel/tsip_parser_header_Path.rl" */
  ){
 		TSK_DEBUG_ERROR("Failed to parse 'Path' header.");
 		TSK_OBJECT_SAFE_FREE(curr_path);

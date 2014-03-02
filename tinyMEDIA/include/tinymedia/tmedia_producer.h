@@ -86,11 +86,6 @@ typedef struct tmedia_producer_s
 	uint64_t session_id;
 
 	struct{
-		enum tmedia_codec_id_e codec_id;
-		// other options to be added
-	} encoder;
-
-	struct{
 		tmedia_producer_enc_cb_f callback;
 		const void* callback_data;
 	} enc_cb;

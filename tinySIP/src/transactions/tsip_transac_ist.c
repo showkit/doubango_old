@@ -320,6 +320,7 @@ int tsip_transac_ist_init(tsip_transac_ist_t *self)
 		reliable transports.
 	*/
 	self->timerH.timeout = TSIP_TIMER_GET(H);
+	self->timerI.timeout = TSIP_TRANSAC(self)->reliable ? 0 : TSIP_TIMER_GET(I);
 	self->timerG.timeout = TSIP_TIMER_GET(G);
 	self->timerL.timeout = TSIP_TIMER_GET(L);
 	self->timerX.timeout = TSIP_TIMER_GET(G);
@@ -327,21 +328,9 @@ int tsip_transac_ist_init(tsip_transac_ist_t *self)
 	return 0;
 }
 
-tsip_transac_ist_t* tsip_transac_ist_create(int32_t cseq_value, const char* callid, tsip_transac_dst_t* dst)
+tsip_transac_ist_t* tsip_transac_ist_create(tsk_bool_t reliable, int32_t cseq_value, const char* callid, tsip_dialog_t* dialog)
 {
-	tsip_transac_ist_t* transac = tsk_object_new(tsip_transac_ist_def_t);
-	if(transac){
-		// initialize base class
-		tsip_transac_init(TSIP_TRANSAC(transac), tsip_transac_type_ist, cseq_value, "INVITE", callid, dst, _fsm_state_Started, _fsm_state_Terminated);
-
-		// init FSM
-		TSIP_TRANSAC_GET_FSM(transac)->debug = DEBUG_STATE_MACHINE;
-		tsk_fsm_set_callback_terminated(TSIP_TRANSAC_GET_FSM(transac), TSK_FSM_ONTERMINATED_F(tsip_transac_ist_OnTerminated), (const void*)transac);
-
-		// initialize IST object
-		tsip_transac_ist_init(transac);
-	}
-	return transac;
+	return tsk_object_new(tsip_transac_ist_def_t, reliable, cseq_value, callid, dialog);
 }
 
 int tsip_transac_ist_start(tsip_transac_ist_t *self, const tsip_request_t* request)
@@ -373,13 +362,6 @@ int tsip_transac_ist_Started_2_Proceeding_X_INVITE(va_list *app)
 	const tsip_request_t *request = va_arg(*app, const tsip_request_t *);
 	int ret = -1;
 
-	if(TNET_SOCKET_TYPE_IS_VALID(request->src_net_type)){
-		TSIP_TRANSAC(self)->reliable = TNET_SOCKET_TYPE_IS_STREAM(request->src_net_type);
-	}
-	
-	/* Set Timers */
-	self->timerI.timeout =  TSIP_TRANSAC(self)->reliable ? 0 : TSIP_TIMER_GET(I);
-
 	/*	RFC 3261 - 17.2.1 INVITE Server Transaction
 		When a server transaction is constructed for a request, it enters the
 		"Proceeding" state.  The server transaction MUST generate a 100
@@ -399,7 +381,7 @@ int tsip_transac_ist_Started_2_Proceeding_X_INVITE(va_list *app)
 		}
 	}
 	if(!ret){ /* Send "100 Trying" is OK ==> alert dialog for the incoming INVITE */
-		ret = tsip_transac_deliver(TSIP_TRANSAC(self), tsip_dialog_i_msg, request);
+		ret = TSIP_TRANSAC(self)->dialog->callback(TSIP_TRANSAC(self)->dialog, tsip_dialog_i_msg, request);
 	}
 	return ret;
 }
@@ -433,7 +415,7 @@ int tsip_transac_ist_Proceeding_2_Proceeding_X_1xx(va_list *app)
 	int ret;
 
 	/* Send to the transport layer */
-	ret = tsip_transac_send(TSIP_TRANSAC(self), TSIP_TRANSAC(self)->branch, TSIP_MESSAGE(response));
+	ret = tsip_transac_send(TSIP_TRANSAC(self), TSIP_TRANSAC(self)->branch, response);
 
 	/* Update last response */
 	TRANSAC_IST_SET_LAST_RESPONSE(self, response);
@@ -461,7 +443,7 @@ int tsip_transac_ist_Proceeding_2_Completed_X_300_to_699(va_list *app)
 	}
 
 	/* Send to the transport layer */
-	ret = tsip_transac_send(TSIP_TRANSAC(self), TSIP_TRANSAC(self)->branch, TSIP_MESSAGE(response));
+	ret = tsip_transac_send(TSIP_TRANSAC(self), TSIP_TRANSAC(self)->branch, response);
 
 	/* Update last response */
 	TRANSAC_IST_SET_LAST_RESPONSE(self, response);
@@ -491,7 +473,7 @@ int tsip_transac_ist_Proceeding_2_Accepted_X_2xx(va_list *app)
 		responses are handled by the TU.  The server transaction MUST then
 		transition to the "Accepted" state.
 	*/
-	ret = tsip_transac_send(TSIP_TRANSAC(self), TSIP_TRANSAC(self)->branch, TSIP_MESSAGE(response));
+	ret = tsip_transac_send(TSIP_TRANSAC(self), TSIP_TRANSAC(self)->branch, response);
 
 	/* Update last response */
 	TRANSAC_IST_SET_LAST_RESPONSE(self, response);
@@ -576,7 +558,7 @@ int tsip_transac_ist_Completed_2_Terminated_timerH(va_list *app)
 		transition to the "Terminated" state, and MUST indicate to the TU
 		that a transaction failure has occurred.
 	*/
-	return tsip_transac_deliver(TSIP_TRANSAC(self), tsip_dialog_transport_error, tsk_null);
+	return TSIP_TRANSAC(self)->dialog->callback(TSIP_TRANSAC(self)->dialog, tsip_dialog_transport_error, tsk_null);
 }
 
 /*	Completed --> (recv ACK) --> Confirmed
@@ -643,7 +625,7 @@ int tsip_transac_ist_Accepted_2_Accepted_2xx(va_list *app)
 		the server transaction MUST pass the response to the transport
 		layer for transmission.
 	*/
-	ret = tsip_transac_send(TSIP_TRANSAC(self), TSIP_TRANSAC(self)->branch, TSIP_MESSAGE(response));
+	ret = tsip_transac_send(TSIP_TRANSAC(self), TSIP_TRANSAC(self)->branch, response);
 
 	/* Update last response */
 	TRANSAC_IST_SET_LAST_RESPONSE(self, response);
@@ -673,16 +655,15 @@ int tsip_transac_ist_Accepted_2_Accepted_iACK(va_list *app)
 {
 	tsip_transac_ist_t *self = va_arg(*app, tsip_transac_ist_t *);
 	const tsip_request_t *request = va_arg(*app, const tsip_request_t *);
-	self->acked = tsk_true;
 	TRANSAC_TIMER_CANCEL(X);
-	return tsip_transac_deliver(TSIP_TRANSAC(self), tsip_dialog_i_msg, request);
+	return TSIP_TRANSAC(self)->dialog->callback(TSIP_TRANSAC(self)->dialog, tsip_dialog_i_msg, request);
 }
 
 /*	Accepted --> (timerL) --> Terminated
 */
 static int tsip_transac_ist_Accepted_2_Terminated_timerL(va_list *app)
 {
-	tsip_transac_ist_t *self = va_arg(*app, tsip_transac_ist_t *);
+	//tsip_transac_ist_t *self = va_arg(*app, tsip_transac_ist_t *);
 	//const tsip_message_t *message = va_arg(*app, const tsip_message_t *);
 
 	/*	draft-sparks-sip-invfix-03 - 8.7. Page 137
@@ -690,10 +671,6 @@ static int tsip_transac_ist_Accepted_2_Terminated_timerL(va_list *app)
 		MUST transition to the "Terminated" state. Once the transaction is in the "Terminated" state, it MUST be
 		destroyed immediately.
 	*/
-	if(!self->acked){
-		TSK_DEBUG_ERROR("ACK not received");
-		return tsip_transac_deliver(TSIP_TRANSAC(self), tsip_dialog_transport_error, tsk_null);
-	}
 	return 0;
 }
 
@@ -721,7 +698,7 @@ static int tsip_transac_ist_Any_2_Terminated_X_transportError(va_list *app)
 
 	/* Timers will be canceled by "tsip_transac_nict_OnTerminated" */
 
-	return tsip_transac_deliver(TSIP_TRANSAC(self), tsip_dialog_transport_error, tsk_null);
+	return TSIP_TRANSAC(self)->dialog->callback(TSIP_TRANSAC(self)->dialog, tsip_dialog_transport_error, tsk_null);
 }
 
 /* Any -> (Error) -> Terminated
@@ -733,7 +710,7 @@ static int tsip_transac_ist_Any_2_Terminated_X_Error(va_list *app)
 
 	/* Timers will be canceled by "tsip_transac_nict_OnTerminated" */
 
-	return tsip_transac_deliver(TSIP_TRANSAC(self), tsip_dialog_error, tsk_null);
+	return TSIP_TRANSAC(self)->dialog->callback(TSIP_TRANSAC(self)->dialog, tsip_dialog_error, tsk_null);
 }
 
 /* Any -> (cancel) -> Terminated
@@ -779,6 +756,21 @@ static tsk_object_t* tsip_transac_ist_ctor(tsk_object_t * self, va_list * app)
 {
 	tsip_transac_ist_t *transac = self;
 	if(transac){
+		tsk_bool_t reliable = va_arg(*app, tsk_bool_t);
+		int32_t cseq_value = va_arg(*app, int32_t);
+		const char *cseq_method = "INVITE";
+		const char *callid = va_arg(*app, const char *);
+		tsip_dialog_t* dialog = va_arg(*app, tsip_dialog_t*);
+
+		/* Initialize base class */
+		tsip_transac_init(TSIP_TRANSAC(transac), tsip_ist, reliable, cseq_value, cseq_method, callid, dialog, _fsm_state_Started, _fsm_state_Terminated);
+
+		/* init FSM */
+		TSIP_TRANSAC_GET_FSM(transac)->debug = DEBUG_STATE_MACHINE;
+		tsk_fsm_set_callback_terminated(TSIP_TRANSAC_GET_FSM(transac), TSK_FSM_ONTERMINATED_F(tsip_transac_ist_OnTerminated), (const void*)transac);
+
+		/* Initialize ICT object */
+		tsip_transac_ist_init(transac);
 	}
 	return self;
 }

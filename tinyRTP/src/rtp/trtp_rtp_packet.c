@@ -26,6 +26,23 @@
  *
 
  */
+
+#if !defined(__clang__) && !defined(__gcc__)
+
+#define SWAP_UINT16(x) ((x >> 8) | (x << 8))
+#define SWAP_UINT32(x) ((x >> 24) | ((x << 8) & 0x00FF0000) | ((x >> 8) & 0x0000FF00) | (x << 24))
+#define SWAP_UINT64(x) ((x >> 56) | ((x << 40) & 0x00FF000000000000) | \
+((x << 24) & 0x0000FF0000000000) | \
+((x << 8)  & 0x000000FF00000000) | \
+((x >> 8)  & 0x00000000FF000000) | \
+((x >> 24) & 0x0000000000FF0000) | \
+((x >> 40) & 0x000000000000FF00) | (x << 56))
+#else
+#define SWAP_UINT16(x) ((short)(__builtin_bswap32(x)>>16))
+#define SWAP_UINT32(x) __builtin_bswap32(x)
+#define SWAP_UINT64(x) __builtin_bswap64(x)
+#endif
+
 #include "tinyrtp/rtp/trtp_rtp_packet.h"
 
 #include "tnet_endianness.h"
@@ -74,7 +91,7 @@ tsk_size_t trtp_rtp_packet_guess_serialbuff_size(const trtp_rtp_packet_t *self)
 	}
 	size += trtp_rtp_header_guess_serialbuff_size(self->header);
 	if(self->extension.data && self->extension.size && self->header->extension){
-		size += self->extension.size;
+		size += (self->extension.size * sizeof(uint32_t));
 	}
 	size += self->payload.size;
 	return size;
@@ -99,8 +116,19 @@ tsk_size_t trtp_rtp_packet_serialize_to(const trtp_rtp_packet_t *self, void* buf
 
 	/* extension */
 	if(self->extension.data && self->extension.size && self->header->extension){
-		memcpy(pbuff, self->extension.data, self->extension.size);
-		pbuff += self->extension.size;
+		
+		int i ;
+
+        *((uint16_t*)pbuff) = SWAP_UINT16(self->extension.profile);
+        pbuff += 2;
+        *((uint16_t*)pbuff) = SWAP_UINT16(self->extension.size);
+        pbuff += 2;
+		
+		for ( i = 0 ; i < self->extension.size ; ++i )
+        {
+            *((uint32_t*)pbuff) = SWAP_UINT32(self->extension.data[i]);
+            pbuff+=4;
+        }
 	}
 	/* append payload */
 	memcpy(pbuff, self->payload.data_const ? self->payload.data_const : self->payload.data, self->payload.size);
@@ -187,11 +215,22 @@ trtp_rtp_packet_t* trtp_rtp_packet_deserialize(const void *data, tsk_size_t size
 		   |                             ....                              |
 		*/
 		if(packet->header->extension && payload_size>=4 /* extension min-size */){
-			packet->extension.size = 4 /* first two 16-bit fields */ + (tnet_ntohs(*((uint16_t*)&pdata[2])) << 2/*words(32-bit)*/);
-			if((packet->extension.data = tsk_calloc(packet->extension.size, sizeof(uint8_t)))){
-				memcpy(packet->extension.data, pdata, packet->extension.size);
-			}
-			payload_size -= packet->extension.size;
+            packet->extension.profile = SWAP_UINT16(*((uint16_t*)pdata));
+            pdata+=2 ;
+            packet->extension.size = SWAP_UINT16(*((uint16_t*)pdata));
+            pdata+=2;
+            if(packet->extension.size > 0 )
+            {
+				int i ;
+                packet->extension.data = malloc(packet->extension.size * sizeof(uint32_t));
+                for ( i = 0 ; i < packet->extension.size ; ++i )
+                {
+                    packet->extension.data[i] = SWAP_UINT32(*((uint32_t*)pdata));
+                    pdata+=4;
+                }
+            }
+           
+			payload_size -= (packet->extension.size * sizeof(uint32_t) + 4);
 		}
 
 		packet->payload.size = payload_size;
@@ -199,7 +238,7 @@ trtp_rtp_packet_t* trtp_rtp_packet_deserialize(const void *data, tsk_size_t size
 			memcpy(packet->payload.data, (pdata + packet->extension.size), packet->payload.size);
 		}
 		else{
-			TSK_DEBUG_ERROR("Failed to allocate new buffer");
+			//TSK_DEBUG_ERROR("Failed to allocate new buffer");
 			packet->payload.size = 0;
 		}
 	}

@@ -56,16 +56,15 @@ typedef struct tcomp_message_s
 	
 	tcomp_buffer_handle_t* stateId; /**< */
 	
-	uint32_t bytecodes_destination; /**< */
+	uint16_t bytecodes_destination; /**< */
 	tcomp_buffer_handle_t* remaining_sigcomp_buffer; /**< */
 	tcomp_buffer_handle_t* uploaded_UDVM_buffer; /**< */
 	tcomp_buffer_handle_t* ret_feedback_buffer; /**< */
 	
 	tcomp_nackinfo_t* nack_info; /**< */
-}
-tcomp_message_t;
+} tcomp_message_t;
 
-tcomp_message_t* tcomp_message_create(const void* input_ptr, tsk_size_t input_size, tsk_bool_t stream, int32_t *nack_code);
+tcomp_message_t* tcomp_message_create(const void* input_ptr, tsk_size_t input_size, tsk_bool_t stream);
 
 TINYSIGCOMP_GEXTERN const tsk_object_def_t *tcomp_message_def_t;
 

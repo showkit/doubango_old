@@ -37,7 +37,7 @@
 	tsip_invite_event_signal(type, TSIP_DIALOG(self)->ss, code, phrase, message)
 #define TSIP_DIALOG_INVITE_TIMER_SCHEDULE(TX)						TSIP_DIALOG_TIMER_SCHEDULE(invite, TX)
 
-#define TSIP_DIALOG_INVITE_ICE_CONNCHECK_TIMEOUT	6000
+#define TSIP_DIALOG_INVITE_ICE_CONNCHECK_TIMEOUT	10000
 
 /* ======================== actions ======================== */
 typedef enum _fsm_action_e
@@ -57,7 +57,6 @@ typedef enum _fsm_action_e
 	_fsm_action_oINFO = tsip_atype_info_send,
 	_fsm_action_oBYE = tsip_atype_hangup,
 	_fsm_action_oShutdown = tsip_atype_shutdown,
-	_fsm_action_transporterror = tsip_atype_transport_error,
 
 	_fsm_action_iINVITE = 0xFF,
 	_fsm_action_oUPDATE,
@@ -85,6 +84,7 @@ typedef enum _fsm_action_e
 	_fsm_action_i422,
 
 	_fsm_action_shutdown_timedout, /* Any -> Terminated */
+	_fsm_action_transporterror,
 	_fsm_action_error,
 }
 _fsm_action_t;

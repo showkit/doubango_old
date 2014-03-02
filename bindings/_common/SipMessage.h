@@ -22,10 +22,9 @@
 #ifndef TINYWRAP_SIPMESSAGE_H
 #define TINYWRAP_SIPMESSAGE_H
 
-#include "tinyWRAP_config.h"
 #include "tinysip.h"
 
-class TINYWRAP_API SdpMessage
+class SdpMessage
 {
 public:
 	SdpMessage();
@@ -36,15 +35,12 @@ public:
 
 	char* getSdpHeaderValue(const char* media, char name, unsigned index = 0);
 	char* getSdpHeaderAValue(const char* media, const char* attributeName);
-#if !defined(SWIG)
-	const tsdp_message_t * getWrappedSdpMessage(){ return m_pSdpMessage; }
-#endif
 
 private:
 	tsdp_message_t *m_pSdpMessage;
 };
 
-class TINYWRAP_API SipMessage
+class SipMessage
 {
 public:
 	SipMessage();
@@ -56,14 +52,12 @@ public:
 	bool isResponse();
 	tsip_request_type_t getRequestType();
 	short getResponseCode();
-	const char* getResponsePhrase();
 	char* getSipHeaderValue(const char* name, unsigned index = 0);
 	char* getSipHeaderParamValue(const char* name, const char* param, unsigned index = 0);
 	unsigned getSipContentLength();
 	unsigned getSipContent(void* output, unsigned maxsize);
 #if !defined(SWIG)
 	const void* getSipContentPtr();
-	const tsip_message_t* getWrappedSipMessage()const{ return m_pSipMessage; }
 #endif
 	const SdpMessage* getSdpMessage();
 

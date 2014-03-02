@@ -1,18 +1,12 @@
-include ../android-projects/root.mk
+include ./root.mk
 
-ifeq ($(BT), shared)
 all:
-	($(MAKE) -f droid-makefile all; \
-	$(STRIP) --strip-all --remove-section=.comment --remove-section=.note ./lib$(PROJECT)_$(MARCH).$(EXT); \
-	cp -f ./lib$(PROJECT)_$(MARCH).$(EXT) $(OUTPUT_DIR); \
-	)
-else
-all:
-	($(MAKE) -f droid-makefile all; cp -f lib$(PROJECT)_$(MARCH).$(EXT) $(OUTPUT_DIR))
-endif
+	($(MAKE) -f $(PROJECT)-makefile all; cp -f lib$(PROJECT)_$(MARCH).$(EXT) $(OUTPUT_DIR))
+install:
+	(cd ../$(PROJECT) ; $(MAKE) -f droid-makefile install)
 
 clean:
-	($(MAKE) -f droid-makefile clean)
+	($(MAKE) -f $(PROJECT)-makefile clean)
 
 
 gdbserver:

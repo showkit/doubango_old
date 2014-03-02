@@ -97,7 +97,6 @@ typedef enum _fsm_action_e
 	_fsm_action_cancel = tsip_atype_cancel,
 	_fsm_action_hangup = tsip_atype_unpublish,
 	_fsm_action_shutdown = tsip_atype_shutdown,
-	_fsm_action_transporterror = tsip_atype_transport_error,
 
 	_fsm_action_1xx = 0xFF,
 	_fsm_action_2xx,
@@ -105,6 +104,7 @@ typedef enum _fsm_action_e
 	_fsm_action_423,
 	_fsm_action_300_to_699,
 	_fsm_action_shutdown_timedout, /* Any -> Terminated */
+	_fsm_action_transporterror,
 	_fsm_action_error,
 }
 _fsm_action_t;
@@ -182,8 +182,6 @@ int tsip_dialog_publish_event_callback(const tsip_dialog_publish_t *self, tsip_d
 			ret = tsip_dialog_fsm_act(TSIP_DIALOG(self), _fsm_action_transporterror, msg, tsk_null);
 			break;
 		}
-            
-    default: break;
 	}
 	
 	return ret;

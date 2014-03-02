@@ -76,7 +76,7 @@ tmsrp_header_Min_Expires_t *tmsrp_header_Min_Expires_parse(const char *data, tsk
 	const char *eof = pe;
 	tmsrp_header_Min_Expires_t *hdr_Min_Expires = tmsrp_header_Min_Expires_create_null();
 	
-	const char *tag_start = tsk_null;
+	const char *tag_start;
 
 	
 /* #line 83 "./src/headers/tmsrp_header_Min-Expires.c" */
@@ -150,19 +150,15 @@ static const int tmsrp_machine_parser_header_Min_Expires_en_main = 1;
 
 
 /* #line 98 "./ragel/tmsrp_parser_header_Min-Expires.rl" */
-	(void)(eof);
-	(void)(tmsrp_machine_parser_header_Min_Expires_first_final);
-	(void)(tmsrp_machine_parser_header_Min_Expires_error);
-	(void)(tmsrp_machine_parser_header_Min_Expires_en_main);
 	
-/* #line 159 "./src/headers/tmsrp_header_Min-Expires.c" */
+/* #line 155 "./src/headers/tmsrp_header_Min-Expires.c" */
 	{
 	cs = tmsrp_machine_parser_header_Min_Expires_start;
 	}
 
-/* #line 103 "./ragel/tmsrp_parser_header_Min-Expires.rl" */
+/* #line 99 "./ragel/tmsrp_parser_header_Min-Expires.rl" */
 	
-/* #line 166 "./src/headers/tmsrp_header_Min-Expires.c" */
+/* #line 162 "./src/headers/tmsrp_header_Min-Expires.c" */
 	{
 	int _klen;
 	unsigned int _trans;
@@ -248,7 +244,7 @@ _match:
 		TSK_PARSER_SET_INTEGER_EX(hdr_Min_Expires->value, int64_t, atoi64)
 	}
 	break;
-/* #line 252 "./src/headers/tmsrp_header_Min-Expires.c" */
+/* #line 248 "./src/headers/tmsrp_header_Min-Expires.c" */
 		}
 	}
 
@@ -270,7 +266,7 @@ _again:
 		TSK_PARSER_SET_INTEGER_EX(hdr_Min_Expires->value, int64_t, atoi64)
 	}
 	break;
-/* #line 274 "./src/headers/tmsrp_header_Min-Expires.c" */
+/* #line 270 "./src/headers/tmsrp_header_Min-Expires.c" */
 		}
 	}
 	}
@@ -278,12 +274,12 @@ _again:
 	_out: {}
 	}
 
-/* #line 104 "./ragel/tmsrp_parser_header_Min-Expires.rl" */
+/* #line 100 "./ragel/tmsrp_parser_header_Min-Expires.rl" */
 	
 	if( cs < 
-/* #line 285 "./src/headers/tmsrp_header_Min-Expires.c" */
+/* #line 281 "./src/headers/tmsrp_header_Min-Expires.c" */
 16
-/* #line 105 "./ragel/tmsrp_parser_header_Min-Expires.rl" */
+/* #line 101 "./ragel/tmsrp_parser_header_Min-Expires.rl" */
  ){
 		TSK_DEBUG_ERROR("Failed to parse 'Min-Expires' header.");
 		TSK_OBJECT_SAFE_FREE(hdr_Min_Expires);

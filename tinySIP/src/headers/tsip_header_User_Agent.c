@@ -76,7 +76,7 @@ tsip_header_User_Agent_t *tsip_header_User_Agent_parse(const char *data, tsk_siz
 	const char *eof = pe;
 	tsip_header_User_Agent_t *hdr_user_agent = tsip_header_User_Agent_create_null();
 	
-	const char *tag_start = tsk_null;
+	const char *tag_start;
 
 	
 /* #line 83 "./src/headers/tsip_header_User_Agent.c" */
@@ -141,19 +141,15 @@ static const int tsip_machine_parser_header_User_Agent_en_main = 1;
 
 
 /* #line 100 "./ragel/tsip_parser_header_User_Agent.rl" */
-	(void)(eof);
-	(void)(tsip_machine_parser_header_User_Agent_first_final);
-	(void)(tsip_machine_parser_header_User_Agent_error);
-	(void)(tsip_machine_parser_header_User_Agent_en_main);
 	
-/* #line 150 "./src/headers/tsip_header_User_Agent.c" */
+/* #line 146 "./src/headers/tsip_header_User_Agent.c" */
 	{
 	cs = tsip_machine_parser_header_User_Agent_start;
 	}
 
-/* #line 105 "./ragel/tsip_parser_header_User_Agent.rl" */
+/* #line 101 "./ragel/tsip_parser_header_User_Agent.rl" */
 	
-/* #line 157 "./src/headers/tsip_header_User_Agent.c" */
+/* #line 153 "./src/headers/tsip_header_User_Agent.c" */
 	{
 	int _klen;
 	unsigned int _trans;
@@ -244,7 +240,7 @@ _match:
 	{
 	}
 	break;
-/* #line 248 "./src/headers/tsip_header_User_Agent.c" */
+/* #line 244 "./src/headers/tsip_header_User_Agent.c" */
 		}
 	}
 
@@ -257,12 +253,12 @@ _again:
 	_out: {}
 	}
 
-/* #line 106 "./ragel/tsip_parser_header_User_Agent.rl" */
+/* #line 102 "./ragel/tsip_parser_header_User_Agent.rl" */
 	
 	if( cs < 
-/* #line 264 "./src/headers/tsip_header_User_Agent.c" */
+/* #line 260 "./src/headers/tsip_header_User_Agent.c" */
 15
-/* #line 107 "./ragel/tsip_parser_header_User_Agent.rl" */
+/* #line 103 "./ragel/tsip_parser_header_User_Agent.rl" */
  ){
 		TSK_DEBUG_ERROR("Failed to parse 'User-Agent' header.");
 		TSK_OBJECT_SAFE_FREE(hdr_user_agent);

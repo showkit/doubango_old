@@ -83,7 +83,7 @@ tsip_header_Service_Routes_L_t *tsip_header_Service_Route_parse(const char *data
 	const char *eof = pe;
 	tsip_header_Service_Routes_L_t *hdr_services = tsk_list_create();
 	
-	const char *tag_start = tsk_null;
+	const char *tag_start;
 	tsip_header_Service_Route_t *curr_service = tsk_null;
 
 	
@@ -329,19 +329,15 @@ static const int tsip_machine_parser_header_Service_Route_en_main = 1;
 
 
 /* #line 148 "./ragel/tsip_parser_header_Service_Route.rl" */
-	(void)(eof);
-	(void)(tsip_machine_parser_header_Service_Route_first_final);
-	(void)(tsip_machine_parser_header_Service_Route_error);
-	(void)(tsip_machine_parser_header_Service_Route_en_main);
 	
-/* #line 338 "./src/headers/tsip_header_Service_Route.c" */
+/* #line 334 "./src/headers/tsip_header_Service_Route.c" */
 	{
 	cs = tsip_machine_parser_header_Service_Route_start;
 	}
 
-/* #line 153 "./ragel/tsip_parser_header_Service_Route.rl" */
+/* #line 149 "./ragel/tsip_parser_header_Service_Route.rl" */
 	
-/* #line 345 "./src/headers/tsip_header_Service_Route.c" */
+/* #line 341 "./src/headers/tsip_header_Service_Route.c" */
 	{
 	int _klen;
 	unsigned int _trans;
@@ -472,7 +468,7 @@ _match:
 	{
 	}
 	break;
-/* #line 476 "./src/headers/tsip_header_Service_Route.c" */
+/* #line 472 "./src/headers/tsip_header_Service_Route.c" */
 		}
 	}
 
@@ -485,12 +481,12 @@ _again:
 	_out: {}
 	}
 
-/* #line 154 "./ragel/tsip_parser_header_Service_Route.rl" */
+/* #line 150 "./ragel/tsip_parser_header_Service_Route.rl" */
 	
 	if( cs < 
-/* #line 492 "./src/headers/tsip_header_Service_Route.c" */
+/* #line 488 "./src/headers/tsip_header_Service_Route.c" */
 100
-/* #line 155 "./ragel/tsip_parser_header_Service_Route.rl" */
+/* #line 151 "./ragel/tsip_parser_header_Service_Route.rl" */
  ){
 		TSK_DEBUG_ERROR("Failed to parse 'Service-Route' header.");
 		TSK_OBJECT_SAFE_FREE(curr_service);

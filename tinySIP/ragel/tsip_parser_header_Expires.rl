@@ -89,13 +89,9 @@ tsip_header_Expires_t *tsip_header_Expires_parse(const char *data, tsk_size_t si
 	const char *eof = pe;
 	tsip_header_Expires_t *hdr_expires = tsip_header_Expires_create(TSIP_HEADER_EXPIRES_NONE);
 	
-	const char *tag_start = tsk_null;
+	const char *tag_start;
 
 	%%write data;
-	(void)(eof);
-	(void)(tsip_machine_parser_header_Expires_first_final);
-	(void)(tsip_machine_parser_header_Expires_error);
-	(void)(tsip_machine_parser_header_Expires_en_main);
 	%%write init;
 	%%write exec;
 	

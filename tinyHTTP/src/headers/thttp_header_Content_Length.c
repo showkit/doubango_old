@@ -66,7 +66,7 @@ thttp_header_Content_Length_t *thttp_header_Content_Length_parse(const char *dat
 	const char *eof = pe;
 	thttp_header_Content_Length_t *hdr_clength = thttp_header_content_length_create(0);
 	
-	const char *tag_start = tsk_null;
+	const char *tag_start;
 
 	
 /* #line 73 "./src/headers/thttp_header_Content_Length.c" */
@@ -139,19 +139,15 @@ static const int thttp_machine_parser_header_Content_Length_en_main = 1;
 
 
 /* #line 90 "./ragel/thttp_parser_header_Content_Length.rl" */
-	(void)(eof);
-	(void)(thttp_machine_parser_header_Content_Length_first_final);
-	(void)(thttp_machine_parser_header_Content_Length_error);
-	(void)(thttp_machine_parser_header_Content_Length_en_main);
 	
-/* #line 148 "./src/headers/thttp_header_Content_Length.c" */
+/* #line 144 "./src/headers/thttp_header_Content_Length.c" */
 	{
 	cs = thttp_machine_parser_header_Content_Length_start;
 	}
 
-/* #line 95 "./ragel/thttp_parser_header_Content_Length.rl" */
+/* #line 91 "./ragel/thttp_parser_header_Content_Length.rl" */
 	
-/* #line 155 "./src/headers/thttp_header_Content_Length.c" */
+/* #line 151 "./src/headers/thttp_header_Content_Length.c" */
 	{
 	int _klen;
 	unsigned int _trans;
@@ -242,7 +238,7 @@ _match:
 	{
 	}
 	break;
-/* #line 246 "./src/headers/thttp_header_Content_Length.c" */
+/* #line 242 "./src/headers/thttp_header_Content_Length.c" */
 		}
 	}
 
@@ -255,12 +251,12 @@ _again:
 	_out: {}
 	}
 
-/* #line 96 "./ragel/thttp_parser_header_Content_Length.rl" */
+/* #line 92 "./ragel/thttp_parser_header_Content_Length.rl" */
 	
 	if( cs < 
-/* #line 262 "./src/headers/thttp_header_Content_Length.c" */
+/* #line 258 "./src/headers/thttp_header_Content_Length.c" */
 22
-/* #line 97 "./ragel/thttp_parser_header_Content_Length.rl" */
+/* #line 93 "./ragel/thttp_parser_header_Content_Length.rl" */
  ){
 		TSK_OBJECT_SAFE_FREE(hdr_clength);
 	}

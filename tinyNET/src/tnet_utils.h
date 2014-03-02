@@ -123,10 +123,6 @@ TINYNET_API int tnet_get_peerip_n_port(tnet_fd_t localFD, tnet_ip_t *ip, tnet_po
 #	define tnet_soccket(family, type, protocol) socket((family), (type), (protocol))
 #endif
 
-TINYNET_API int tnet_get_fd_max_allowed(tsk_size_t* size);
-TINYNET_API int tnet_set_fd_max_allowed(tsk_size_t size);
-TINYNET_API int tnet_get_fd_opened_count(tsk_size_t* count);
-
 TINYNET_API int tnet_getnameinfo(const struct sockaddr *sa, socklen_t salen, char* node, socklen_t nodelen, char* service, socklen_t servicelen, int flags);
 TINYNET_API int tnet_gethostname(tnet_host_t* result);
 
@@ -135,8 +131,6 @@ TINYNET_API int tnet_sockfd_waitUntil(tnet_fd_t fd, long timeout, tsk_bool_t wri
 #define tnet_sockfd_waitUntilReadable(fd, timeout) tnet_sockfd_waitUntil(fd, timeout, tsk_false)
 TINYNET_API int tnet_sockfd_joingroup6(tnet_fd_t fd, const char* multiaddr, unsigned iface_index);
 TINYNET_API int tnet_sockfd_leavegroup6(tnet_fd_t fd, const char* multiaddr, unsigned iface_index);
-
-TINYNET_API int tnet_resolve(const char *fqdn, tnet_port_t port, tnet_socket_type_t type, tnet_ip_t* out_ip, tnet_port_t* out_port);
 
 TINYNET_API int tnet_sockaddrinfo_init(const char *host, tnet_port_t port, tnet_socket_type_t type, struct sockaddr_storage *ai_addr, int *ai_family, int *ai_socktype, int *ai_protocol);
 TINYNET_API int tnet_sockaddr_init(const char *host, tnet_port_t port, tnet_socket_type_t type, struct sockaddr_storage *addr);
@@ -154,8 +148,9 @@ TINYNET_API int tnet_sockfd_connectto(tnet_fd_t fd, const struct sockaddr_storag
 TINYNET_API int tnet_sockfd_listen(tnet_fd_t fd, int backlog);
 TINYNET_API tnet_fd_t tnet_sockfd_accept(tnet_fd_t fd, struct sockaddr *addr, socklen_t *addrlen);
 
+
+
 TINYNET_API int tnet_sockfd_close(tnet_fd_t *fd);
-TINYNET_API int tnet_sockfd_shutdown(tnet_fd_t fd);
 
 /**Prints last network error to @b stderr.
 */

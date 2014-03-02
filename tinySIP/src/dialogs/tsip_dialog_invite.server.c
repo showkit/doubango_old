@@ -127,8 +127,6 @@ static tsk_bool_t _fsm_cond_bad_content(tsip_dialog_invite_t* self, tsip_message
 			ret = send_ERROR(self, message, 488, "Not Acceptable", "SIP; cause=488; text=\"No common codecs\"");
 			return tsk_true;
 		}
-		// media type could change if there are zombies (medias with port equal to zero)
-		TSIP_DIALOG_GET_SS(self)->media.type = self->msession_mgr->type;
 	}
 	else{
 		ret = send_ERROR(self, message, 488, "Not Acceptable", "SIP; cause=488; text=\"Bad content\"");
@@ -338,9 +336,7 @@ int s0000_Started_2_Ringing_X_iINVITE(va_list *app)
 	tsip_dialog_update_2(TSIP_DIALOG(self), request);
 
 	/* send Ringing */
-	/*if(TSIP_DIALOG_GET_STACK(self)->network.mode != tsip_stack_mode_webrtc2sip)*/{
-		send_RESPONSE(self, request, 180, "Ringing", tsk_false);
-	}
+	send_RESPONSE(self, request, 180, "Ringing", tsk_false);
 
 	/* alert the user (session) */
 	TSIP_DIALOG_INVITE_SIGNAL(self, tsip_i_newcall, 
@@ -459,9 +455,7 @@ int s0000_InProgress_2_Ringing_X_iPRACK(va_list *app)
 	}
 
 	/* Send Ringing */
-	/*if(TSIP_DIALOG_GET_STACK(self)->network.mode != tsip_stack_mode_webrtc2sip)*/{
-		ret = send_RESPONSE(self, self->last_iInvite, 180, "Ringing", tsk_false);
-	}
+	ret = send_RESPONSE(self, self->last_iInvite, 180, "Ringing", tsk_false);
 
 	/* Alert the user (session) */
 	TSIP_DIALOG_INVITE_SIGNAL(self, tsip_i_newcall, 
@@ -515,9 +509,7 @@ int s0000_InProgress_2_Ringing_X_iUPDATE(va_list *app)
 		(self->msession_mgr && (force_sdp || self->msession_mgr->ro_changed || self->msession_mgr->state_changed)));
 
 	/* Send Ringing */
-	/*if(TSIP_DIALOG_GET_STACK(self)->network.mode != tsip_stack_mode_webrtc2sip)*/{
-		ret = send_RESPONSE(self, self->last_iInvite, 180, "Ringing", tsk_false);
-	}
+	ret = send_RESPONSE(self, self->last_iInvite, 180, "Ringing", tsk_false);
 
 	/* alert the user */
 	TSIP_DIALOG_INVITE_SIGNAL(self, tsip_i_newcall, 
@@ -587,7 +579,6 @@ int s0000_Ringing_2_Connected_X_Accept(va_list *app)
 
 	tsip_dialog_invite_t *self;
 	const tsip_action_t* action;
-	tsk_bool_t mediaType_changed;
 
 	self = va_arg(*app, tsip_dialog_invite_t *);
 	va_arg(*app, const tsip_message_t *);
@@ -596,20 +587,18 @@ int s0000_Ringing_2_Connected_X_Accept(va_list *app)
 	/* Determine whether the remote party support UPDATE */
 	self->support_update = tsip_message_allowed(self->last_iInvite, "UPDATE");
 
-	/* Get Media type from the action */
-	mediaType_changed = (TSIP_DIALOG_GET_SS(self)->media.type != action->media.type && action->media.type != tmedia_none);
-	if(self->msession_mgr && mediaType_changed){
-		ret = tmedia_session_mgr_set_media_type(self->msession_mgr, action->media.type);
-	}
-
 	/* Appy media params received from the user */
 	if(!TSK_LIST_IS_EMPTY(action->media.params)){
-		ret = tmedia_session_mgr_set_3(self->msession_mgr, action->media.params);
+		tmedia_session_mgr_set_3(self->msession_mgr, action->media.params);
 	}
-
-	/* set MSRP callback */
-	if((self->msession_mgr->type & tmedia_msrp) == tmedia_msrp){
-		ret = tmedia_session_mgr_set_msrp_cb(self->msession_mgr, TSIP_DIALOG_GET_SS(self)->userdata, TSIP_DIALOG_GET_SS(self)->media.msrp.callback);
+	/* start session manager */
+	if(self->msession_mgr && !self->msession_mgr->started && (self->msession_mgr->sdp.lo && self->msession_mgr->sdp.ro)){
+		/* Set MSRP Callback */
+		if((self->msession_mgr->type & tmedia_msrp) == tmedia_msrp){
+			tmedia_session_mgr_set_msrp_cb(self->msession_mgr, TSIP_DIALOG_GET_SS(self)->userdata, TSIP_DIALOG_GET_SS(self)->media.msrp.callback);
+		}
+		// starts session manager
+		ret = tsip_dialog_invite_msession_start(self);
 	}
 
 	/* Cancel 100rel timer */
@@ -617,15 +606,6 @@ int s0000_Ringing_2_Connected_X_Accept(va_list *app)
 
 	/* send 2xx OK */
 	ret = send_RESPONSE(self, self->last_iInvite, 200, "OK", tsk_true);
-
-	/* do not start the session until we get the ACK message
-	* http://code.google.com/p/doubango/issues/detail?id=157
-	*/
-	// FIXME: (chrome) <-RTCWeb Breaker-> (chrome) do not work if media session is not started on i200
-	// http://code.google.com/p/webrtc2sip/issues/detail?id=45
-	/*if(TSIP_DIALOG_GET_STACK(self)->network.mode == tsip_stack_mode_webrtc2sip)*/{
-		ret = tsip_dialog_invite_msession_start(self);
-	}
 
 	/* Session Timers */
 	if(self->stimers.timer.timeout){

@@ -83,7 +83,7 @@ tsip_header_P_Associated_URIs_L_t *tsip_header_P_Associated_URI_parse(const char
 	const char *eof = pe;
 	tsip_header_P_Associated_URIs_L_t *hdr_p_associated_uris = tsk_list_create();
 	
-	const char *tag_start = tsk_null;
+	const char *tag_start;
 	tsip_header_P_Associated_URI_t *curr_p_associated_uri = tsk_null;
 
 	
@@ -335,19 +335,15 @@ static const int tsip_machine_parser_header_P_Associated_URI_en_main = 1;
 
 
 /* #line 147 "./ragel/tsip_parser_header_P_Associated_URI.rl" */
-	(void)(eof);
-	(void)(tsip_machine_parser_header_P_Associated_URI_first_final);
-	(void)(tsip_machine_parser_header_P_Associated_URI_error);
-	(void)(tsip_machine_parser_header_P_Associated_URI_en_main);
 	
-/* #line 344 "./src/headers/tsip_header_P_Associated_URI.c" */
+/* #line 340 "./src/headers/tsip_header_P_Associated_URI.c" */
 	{
 	cs = tsip_machine_parser_header_P_Associated_URI_start;
 	}
 
-/* #line 152 "./ragel/tsip_parser_header_P_Associated_URI.rl" */
+/* #line 148 "./ragel/tsip_parser_header_P_Associated_URI.rl" */
 	
-/* #line 351 "./src/headers/tsip_header_P_Associated_URI.c" */
+/* #line 347 "./src/headers/tsip_header_P_Associated_URI.c" */
 	{
 	int _klen;
 	unsigned int _trans;
@@ -478,7 +474,7 @@ _match:
 	{
 	}
 	break;
-/* #line 482 "./src/headers/tsip_header_P_Associated_URI.c" */
+/* #line 478 "./src/headers/tsip_header_P_Associated_URI.c" */
 		}
 	}
 
@@ -491,12 +487,12 @@ _again:
 	_out: {}
 	}
 
-/* #line 153 "./ragel/tsip_parser_header_P_Associated_URI.rl" */
+/* #line 149 "./ragel/tsip_parser_header_P_Associated_URI.rl" */
 	
 	if( cs < 
-/* #line 498 "./src/headers/tsip_header_P_Associated_URI.c" */
+/* #line 494 "./src/headers/tsip_header_P_Associated_URI.c" */
 103
-/* #line 154 "./ragel/tsip_parser_header_P_Associated_URI.rl" */
+/* #line 150 "./ragel/tsip_parser_header_P_Associated_URI.rl" */
  ){
 		TSK_DEBUG_ERROR("Failed to parse 'P-Associated-URI' header.");
 		TSK_OBJECT_SAFE_FREE(curr_p_associated_uri);

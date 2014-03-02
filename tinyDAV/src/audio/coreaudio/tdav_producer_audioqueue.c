@@ -36,10 +36,11 @@
 
 #if HAVE_COREAUDIO_AUDIO_QUEUE
 
-#include "tsk_string.h"
 #include "tsk_thread.h"
 #include "tsk_memory.h"
 #include "tsk_debug.h"
+
+static char zeroes[640] = {0};
 
 static void __handle_input_buffer (void *userdata, AudioQueueRef queue, AudioQueueBufferRef buffer, const AudioTimeStamp *start_time, UInt32 number_packet_descriptions, const AudioStreamPacketDescription *packet_descriptions ) {
 	tdav_producer_audioqueue_t* producer = (tdav_producer_audioqueue_t*)userdata;
@@ -50,7 +51,12 @@ static void __handle_input_buffer (void *userdata, AudioQueueRef queue, AudioQue
 	
 	// Alert the session that there is new data to send
 	if(TMEDIA_PRODUCER(producer)->enc_cb.callback) {
-		TMEDIA_PRODUCER(producer)->enc_cb.callback(TMEDIA_PRODUCER(producer)->enc_cb.callback_data, buffer->mAudioData, buffer->mAudioDataByteSize);
+        if(producer->muted)
+        {           
+            TMEDIA_PRODUCER(producer)->enc_cb.callback(TMEDIA_PRODUCER(producer)->enc_cb.callback_data, zeroes, buffer->mAudioDataByteSize);
+        } else {
+            TMEDIA_PRODUCER(producer)->enc_cb.callback(TMEDIA_PRODUCER(producer)->enc_cb.callback_data, buffer->mAudioData, buffer->mAudioDataByteSize);
+        }
 	}
     
     // Re-enqueue the buffer
@@ -58,8 +64,20 @@ static void __handle_input_buffer (void *userdata, AudioQueueRef queue, AudioQue
 }
 
 /* ============ Media Producer Interface ================= */
-#define tdav_producer_audioqueue_set tsk_null
-
+//#define tdav_producer_audioqueue_set tsk_null
+int tdav_producer_audioqueue_set(tmedia_producer_t* self, const tmedia_param_t* param)
+{
+    tdav_producer_audioqueue_t* producer = (tdav_producer_audioqueue_t*)self;
+	if(param->plugin_type == tmedia_ppt_producer){
+		if(param->value_type == tmedia_pvt_int32){
+			if(tsk_striequals(param->key, "mute")){
+				producer->muted = TSK_TO_INT32((uint8_t*)param->value);
+	            return 1;
+			}
+		}
+	}
+	return tdav_producer_audio_set(TDAV_PRODUCER_AUDIO(self), param);
+}
 static int tdav_producer_audioqueue_prepare(tmedia_producer_t* self, const tmedia_codec_t* codec)
 {
     OSStatus ret;
@@ -70,10 +88,10 @@ static int tdav_producer_audioqueue_prepare(tmedia_producer_t* self, const tmedi
 		TSK_DEBUG_ERROR("Invalid parameter");
 		return -1;
 	}
-
-	TMEDIA_PRODUCER(producer)->audio.channels = TMEDIA_CODEC_CHANNELS_AUDIO_ENCODING(codec);
-	TMEDIA_PRODUCER(producer)->audio.rate = TMEDIA_CODEC_RATE_ENCODING(codec);
-	TMEDIA_PRODUCER(producer)->audio.ptime = TMEDIA_CODEC_PTIME_AUDIO_ENCODING(codec);
+	
+	TMEDIA_PRODUCER(producer)->audio.channels = codec->plugin->audio.channels;
+	TMEDIA_PRODUCER(producer)->audio.rate = codec->plugin->rate;
+	TMEDIA_PRODUCER(producer)->audio.ptime = codec->plugin->audio.ptime;
 	/* codec should have ptime */
 	
 	

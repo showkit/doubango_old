@@ -78,7 +78,7 @@ tsip_header_Call_ID_t *tsip_header_Call_ID_parse(const char *data, tsk_size_t si
 	const char *eof = pe;
 	tsip_header_Call_ID_t *hdr_call_id = tsip_header_Call_ID_create(0);
 	
-	const char *tag_start = tsk_null;
+	const char *tag_start;
 
 	
 /* #line 85 "./src/headers/tsip_header_Call_ID.c" */
@@ -162,19 +162,15 @@ static const int tsip_machine_parser_header_Call_ID_en_main = 1;
 
 
 /* #line 103 "./ragel/tsip_parser_header_Call_ID.rl" */
-	(void)(eof);
-	(void)(tsip_machine_parser_header_Call_ID_first_final);
-	(void)(tsip_machine_parser_header_Call_ID_error);
-	(void)(tsip_machine_parser_header_Call_ID_en_main);
 	
-/* #line 171 "./src/headers/tsip_header_Call_ID.c" */
+/* #line 167 "./src/headers/tsip_header_Call_ID.c" */
 	{
 	cs = tsip_machine_parser_header_Call_ID_start;
 	}
 
-/* #line 108 "./ragel/tsip_parser_header_Call_ID.rl" */
+/* #line 104 "./ragel/tsip_parser_header_Call_ID.rl" */
 	
-/* #line 178 "./src/headers/tsip_header_Call_ID.c" */
+/* #line 174 "./src/headers/tsip_header_Call_ID.c" */
 	{
 	int _klen;
 	unsigned int _trans;
@@ -265,7 +261,7 @@ _match:
 	{
 	}
 	break;
-/* #line 269 "./src/headers/tsip_header_Call_ID.c" */
+/* #line 265 "./src/headers/tsip_header_Call_ID.c" */
 		}
 	}
 
@@ -278,12 +274,12 @@ _again:
 	_out: {}
 	}
 
-/* #line 109 "./ragel/tsip_parser_header_Call_ID.rl" */
+/* #line 105 "./ragel/tsip_parser_header_Call_ID.rl" */
 	
 	if( cs < 
-/* #line 285 "./src/headers/tsip_header_Call_ID.c" */
+/* #line 281 "./src/headers/tsip_header_Call_ID.c" */
 17
-/* #line 110 "./ragel/tsip_parser_header_Call_ID.rl" */
+/* #line 106 "./ragel/tsip_parser_header_Call_ID.rl" */
  ){
 		TSK_DEBUG_ERROR("Failed to parse SIP 'Call-ID' header.");
 		TSK_OBJECT_SAFE_FREE(hdr_call_id);

@@ -76,7 +76,7 @@
 	fmt = token>tag %parse_fmt;
 	
 	#// media SP port ["/" integer] SP proto 1*(SP fmt)
-	M = 'm' SP* "=" SP*<: media SP port ("/" nports)? SP proto (SP fmt)* (SP{1})?; # The last SP is for buggy browsers (e.g. Nightly 20.0a1 => "m=application 51713 SCTP/DTLS 5000 \r\n")
+	M = 'm' SP* "=" SP*<: media SP port ("/" nports)? SP proto (SP fmt)*;
 	
 	# Entry point
 	main := M :>CRLF?;
@@ -218,12 +218,9 @@ tsdp_header_M_t *tsdp_header_M_parse(const char *data, tsk_size_t size)
 	const char *eof = pe;
 	tsdp_header_M_t *hdr_M = tsdp_header_M_create_null();
 	
-	const char *tag_start = tsk_null;
+	const char *tag_start;
 
 	%%write data;
-	(void)(tsdp_machine_parser_header_M_first_final);
-	(void)(tsdp_machine_parser_header_M_error);
-	(void)(tsdp_machine_parser_header_M_en_main);
 	%%write init;
 	%%write exec;
 	
@@ -363,7 +360,7 @@ int tsdp_header_M_add_headers_2(tsdp_header_M_t* self, const tsdp_headers_L_t* h
 int tsdp_header_M_add_fmt(tsdp_header_M_t* self, const char* fmt)
 {
 	tsdp_fmt_t* _fmt;
-	if(!self || tsk_strnullORempty(fmt)){
+	if(!self){
 		TSK_DEBUG_ERROR("Invalid parameter");
 		return -1;
 	}
@@ -376,63 +373,6 @@ int tsdp_header_M_add_fmt(tsdp_header_M_t* self, const char* fmt)
 		TSK_DEBUG_ERROR("Failed to create fmt object");
 		return -2;
 	}
-}
-
-int tsdp_header_M_remove_fmt(tsdp_header_M_t* self, const char* fmt)
-{
-	const tsk_list_item_t* itemM;
-	const tsdp_fmt_t* _fmt;
-	char* fmt_plus_space = tsk_null;
-	tsk_size_t fmt_plus_space_len;
-	if(!self || tsk_strnullORempty(fmt)){
-		TSK_DEBUG_ERROR("Invalid parameter");
-		return -1;
-	}
-	tsk_sprintf(&fmt_plus_space, "%s ", fmt);
-	if((fmt_plus_space_len = tsk_strlen(fmt_plus_space))){
-		tsk_list_foreach(itemM, self->FMTs){
-			if(!(_fmt = (const tsdp_fmt_t*)itemM->data)){
-				continue;
-			}
-			if(tsk_striequals(_fmt->value, fmt)){
-				// remove all A headers using this attribute
-				const tsdp_header_A_t* A;
-				const tsk_list_item_t* itemA;
-removeAttributes:
-				tsk_list_foreach(itemA, self->Attributes){
-					if(!(A = (const tsdp_header_A_t*)itemA->data)){
-						continue;
-					}
-					if(tsk_strindexOf(A->value, fmt_plus_space_len, fmt_plus_space) == 0){
-						tsk_list_remove_item(self->Attributes, (tsk_list_item_t*)itemA);
-						goto removeAttributes;
-					}
-				}
-				tsk_list_remove_item(self->FMTs, (tsk_list_item_t*)itemM);
-				break;
-			}
-		}
-	}
-	TSK_FREE(fmt_plus_space);
-	return 0;
-}
-
-tsk_bool_t tsdp_header_M_have_fmt(tsdp_header_M_t* self, const char* fmt)
-{
-	if(self &&! tsk_strnullORempty(fmt)){
-		const tsk_list_item_t* item;
-		const tsdp_fmt_t* _fmt;
-		tsk_list_foreach(item, self->FMTs){
-			if(!(_fmt = (const tsdp_fmt_t*)item->data)){
-				continue;
-			}
-			if(tsk_striequals(_fmt->value, fmt)){
-				return tsk_true;
-			}
-		}
-	}
-	
-	return tsk_false;
 }
 
 const tsdp_header_A_t* tsdp_header_M_findA_at(const tsdp_header_M_t* self, const char* field, tsk_size_t index)
@@ -549,23 +489,6 @@ int tsdp_header_M_set_holdresume_att(tsdp_header_M_t* self, tsk_bool_t lo_held, 
 	}
 	
 	return 0;
-}
-
-const char* tsdp_header_M_get_holdresume_att(const tsdp_header_M_t* self)
-{
-	static const char* hold_resume_atts[4] = {"sendrecv"/*first because most likely to be present*/, "recvonly", "sendonly", "inactive"};
-	static tsk_size_t hold_resume_atts_count = sizeof(hold_resume_atts)/sizeof(hold_resume_atts[0]);
-	tsk_size_t i;
-	if(!self){
-		TSK_DEBUG_ERROR("Invalid parameter");
-		return hold_resume_atts[0];
-	}
-	for(i = 0; i < hold_resume_atts_count; ++i){
-		if(tsdp_header_M_findA(self, hold_resume_atts[i])){
-			return hold_resume_atts[i];
-		}
-	}
-	return hold_resume_atts[0];
 }
 
 tsk_bool_t tsdp_header_M_is_held(const tsdp_header_M_t* self, tsk_bool_t local)

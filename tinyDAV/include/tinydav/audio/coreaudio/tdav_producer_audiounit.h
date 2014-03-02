@@ -43,6 +43,8 @@ typedef struct tdav_producer_audiounit_s
 	unsigned started:1;
 	unsigned paused:1;
     unsigned muted;
+	void* senderThreadId[1];
+	tsk_condwait_handle_t* senderCondWait;
 	
 	struct {
 		struct {
@@ -51,6 +53,7 @@ typedef struct tdav_producer_audiounit_s
 		} chunck;
 		SpeexBuffer* buffer;
 		tsk_size_t size;
+		tsk_mutex_handle_t* mutex;
 	} ring;
 }
 tdav_producer_audiounit_t;

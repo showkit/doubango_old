@@ -70,11 +70,10 @@ typedef struct tsip_dialog_invite
 		tsk_bool_t start_smgr;
 		struct tnet_ice_ctx_s *ctx_audio;
 		struct tnet_ice_ctx_s *ctx_video;
-		struct tnet_ice_ctx_s *ctx_data;
+        struct tnet_ice_ctx_s *ctx_data;
 		tsk_fsm_action_id last_action_id;
 		tsip_action_t* last_action;
 		tsip_message_t* last_message;
-		int32_t last_sdp_ro_ver;
 	} ice;
 	
 	/* Session Timers */

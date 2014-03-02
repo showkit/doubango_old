@@ -50,8 +50,6 @@ TINYNET_API int tnet_ice_ctx_set_stun(
 	const char* software, 
 	const char* username, 
 	const char* password);
-TINYNET_API int tnet_ice_ctx_set_sync_mode(struct tnet_ice_ctx_s* self, tsk_bool_t sync_mode);
-TINYNET_API int tnet_ice_ctx_set_silent_mode(struct tnet_ice_ctx_s* self, tsk_bool_t silent_mode);
 TINYNET_API int tnet_ice_ctx_start(struct tnet_ice_ctx_s* self);
 TINYNET_API int tnet_ice_ctx_rtp_callback(struct tnet_ice_ctx_s* self, tnet_ice_rtp_callback_f rtp_callback, const void* rtp_callback_data);
 TINYNET_API int tnet_ice_ctx_set_concheck_timeout(struct tnet_ice_ctx_s* self, int64_t timeout);

@@ -40,7 +40,7 @@
 	machine thttp_machine_parser_url;
 
 	# Includes
-	include thttp_machine_utils "./ragel/thttp_machine_utils.rl";
+	include thttp_machine_utils "./thttp_machine_utils.rl";
 			
 	action tag{
 		tag_start = p;
@@ -83,8 +83,7 @@
 	port = DIGIT+ >tag %parse_port;
 	myhost = ((IPv6reference >is_ipv6) | (IPv4address >is_ipv4) | (hostname >is_hostname)) >tag %parse_host;
 	hostport = myhost ( ":" port )?;
-	main := ( (("http:"i>tag %is_http | "https:"i>tag %is_https) "//")? hostport? :>("/" hpath :>("?" search)?)? ) @eob;
-	#main := ( hostport? :>("/" hpath :>("?" search)?)? ) @eob;
+	main := (("http:"i>tag %is_http | "https:"i>tag %is_https) "//" hostport :>("/" hpath :>("?" search)?)? ) @eob;
 	
 }%%
 
@@ -117,18 +116,11 @@ thttp_url_t *thttp_url_parse(const char *urlstring, tsk_size_t length)
 	const char *tag_start = 0;
 	
 	%%write data;
-	(void)(ts);
-	(void)(te);
-	(void)(act);
-	(void)(eof);
-	(void)(thttp_machine_parser_url_first_final);
-	(void)(thttp_machine_parser_url_error);
-	(void)(thttp_machine_parser_url_en_main);
 	%%write init;
 	%%write exec;
 	
 	if( cs < %%{ write first_final; }%% ){
-		TSK_DEBUG_ERROR("Failed to parse HTTP/HTTPS URL: '%.*s'", length, urlstring);
+		TSK_DEBUG_ERROR("Failed to parse HTTP/HTTPS URL.");
 		TSK_OBJECT_SAFE_FREE(url);
 	}
 	else if(!have_port){

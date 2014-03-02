@@ -75,7 +75,7 @@
 
 #include "tsk_debug.h"
 
-#define DEBUG_STATE_MACHINE						1
+#define DEBUG_STATE_MACHINE						0
 
 #define TRANSAC_NIST_TIMER_SCHEDULE(TX)			TRANSAC_TIMER_SCHEDULE(nist, TX)
 #define TRANSAC_NIST_SET_LAST_RESPONSE(self, response) \
@@ -207,8 +207,6 @@ int tsip_transac_nist_init(tsip_transac_nist_t *self)
 			/*=======================
 			* === Trying === 
 			*/
-			// Trying -> (receive request retransmission) -> Trying
-			TSK_FSM_ADD_ALWAYS(_fsm_state_Trying, _fsm_action_request, _fsm_state_Trying, tsk_null, "tsip_transac_nist_Trying_2_Trying_X_request"),
 			// Trying -> (send 1xx) -> Proceeding
 			TSK_FSM_ADD_ALWAYS(_fsm_state_Trying, _fsm_action_send_1xx, _fsm_state_Proceeding, tsip_transac_nist_Trying_2_Proceeding_X_send_1xx, "tsip_transac_nist_Trying_2_Proceeding_X_send_1xx"),
 			// Trying -> (send 200 to 699) -> Completed
@@ -249,25 +247,15 @@ int tsip_transac_nist_init(tsip_transac_nist_t *self)
 	*/
 	TSIP_TRANSAC(self)->callback = TSIP_TRANSAC_EVENT_CALLBACK_F(tsip_transac_nist_event_callback);
 
+	/* Set Timers */
+	self->timerJ.timeout = TSIP_TRANSAC(self)->reliable ? 0 : TSIP_TIMER_GET(J); /* RFC 3261 - 17.2.2*/
+
 	 return 0;
 }
 
-tsip_transac_nist_t* tsip_transac_nist_create(int32_t cseq_value, const char* cseq_method, const char* callid, tsip_transac_dst_t* dst)
+tsip_transac_nist_t* tsip_transac_nist_create(tsk_bool_t reliable, int32_t cseq_value, const char* cseq_method, const char* callid, tsip_dialog_t* dialog)
 {
-	tsip_transac_nist_t* transac = tsk_object_new(tsip_transac_nist_def_t);
-	
-	if(transac){
-		// initialize base class
-		tsip_transac_init(TSIP_TRANSAC(transac), tsip_transac_type_nist, cseq_value, cseq_method, callid, dst, _fsm_state_Started, _fsm_state_Terminated);
-
-		// init FSM
-		TSIP_TRANSAC_GET_FSM(transac)->debug = DEBUG_STATE_MACHINE;
-		tsk_fsm_set_callback_terminated(TSIP_TRANSAC_GET_FSM(transac), TSK_FSM_ONTERMINATED_F(tsip_transac_nist_OnTerminated), (const void*)transac);
-
-		// initialize NICT object
-		tsip_transac_nist_init(transac);
-	}
-	return transac;
+	return tsk_object_new(tsip_transac_nist_def_t, reliable, cseq_value, cseq_method, callid, dialog);
 }
 
 int tsip_transac_nist_start(tsip_transac_nist_t *self, const tsip_request_t* request)
@@ -302,13 +290,6 @@ int tsip_transac_nist_Started_2_Trying_X_request(va_list *app)
 	tsip_transac_nist_t *self = va_arg(*app, tsip_transac_nist_t *);
 	const tsip_request_t *request = va_arg(*app, const tsip_request_t *);
 
-	if(TNET_SOCKET_TYPE_IS_VALID(request->src_net_type)){
-		TSIP_TRANSAC(self)->reliable = TNET_SOCKET_TYPE_IS_STREAM(request->src_net_type);
-	}
-
-	/* Set Timers */
-	self->timerJ.timeout = TSIP_TRANSAC(self)->reliable ? 0 : TSIP_TIMER_GET(J); /* RFC 3261 - 17.2.2*/
-
 	/*	RFC 3261 - 17.2.2
 		The state machine is initialized in the "Trying" state and is passed
 		a request other than INVITE or ACK when initialized.  This request is
@@ -317,7 +298,7 @@ int tsip_transac_nist_Started_2_Trying_X_request(va_list *app)
 		matches the same server transaction, using the rules specified in
 		Section 17.2.3.
 	*/
-	return tsip_transac_deliver(TSIP_TRANSAC(self), tsip_dialog_i_msg, request);
+	return TSIP_TRANSAC(self)->dialog->callback(TSIP_TRANSAC(self)->dialog, tsip_dialog_i_msg, request);
 }
 
 /* Trying --> (1xx) --> Proceeding
@@ -334,7 +315,7 @@ int tsip_transac_nist_Trying_2_Proceeding_X_send_1xx(va_list *app)
 		"Proceeding" state.  The response MUST be passed to the transport
 		layer for transmission.
 	*/
-	ret = tsip_transac_send(TSIP_TRANSAC(self), TSIP_TRANSAC(self)->branch, TSIP_MESSAGE(response));
+	ret = tsip_transac_send(TSIP_TRANSAC(self), TSIP_TRANSAC(self)->branch, response);
 
 	/* Update last response */
 	TRANSAC_NIST_SET_LAST_RESPONSE(self, response);
@@ -350,7 +331,7 @@ int tsip_transac_nist_Trying_2_Completed_X_send_200_to_699(va_list *app)
 	const tsip_response_t *response = va_arg(*app, const tsip_response_t *);
 	int ret;
 
-	ret = tsip_transac_send(TSIP_TRANSAC(self), TSIP_TRANSAC(self)->branch, TSIP_MESSAGE(response));
+	ret = tsip_transac_send(TSIP_TRANSAC(self), TSIP_TRANSAC(self)->branch, response);
 
 	/*	RFC 3261 - 17.2.2
 		When the server transaction enters the "Completed" state, it MUST set
@@ -377,7 +358,7 @@ int tsip_transac_nist_Proceeding_2_Proceeding_X_send_1xx(va_list *app)
 		received from the TU while in the "Proceeding" state MUST be passed
 		to the transport layer for transmission.
 	*/
-	tsip_transac_send(TSIP_TRANSAC(self), TSIP_TRANSAC(self)->branch, TSIP_MESSAGE(response));
+	tsip_transac_send(TSIP_TRANSAC(self), TSIP_TRANSAC(self)->branch, response);
 
 	/* Update last response */
 	TRANSAC_NIST_SET_LAST_RESPONSE(self, response);
@@ -418,7 +399,7 @@ int tsip_transac_nist_Proceeding_2_Completed_X_send_200_to_699(va_list *app)
 		transaction MUST enter the "Completed" state, and the response MUST
 		be passed to the transport layer for transmission.
 	*/
-	ret = tsip_transac_send(TSIP_TRANSAC(self), TSIP_TRANSAC(self)->branch, TSIP_MESSAGE(response));
+	ret = tsip_transac_send(TSIP_TRANSAC(self), TSIP_TRANSAC(self)->branch, response);
 
 	/*	RFC 3261 - 17.2.2
 		When the server transaction enters the "Completed" state, it MUST set
@@ -478,7 +459,7 @@ int tsip_transac_nist_Any_2_Terminated_X_transportError(va_list *app)
 
 	/* Timers will be canceled by "tsip_transac_nict_OnTerminated" */
 
-	return tsip_transac_deliver(TSIP_TRANSAC(self), tsip_dialog_transport_error, tsk_null);
+	return TSIP_TRANSAC(self)->dialog->callback(TSIP_TRANSAC(self)->dialog, tsip_dialog_transport_error, tsk_null);
 }
 
 /* Any -> (Error) -> Terminated
@@ -490,7 +471,7 @@ int tsip_transac_nist_Any_2_Terminated_X_Error(va_list *app)
 
 	/* Timers will be canceled by "tsip_transac_nict_OnTerminated" */
 
-	return tsip_transac_deliver(TSIP_TRANSAC(self), tsip_dialog_error, tsk_null);
+	return TSIP_TRANSAC(self)->dialog->callback(TSIP_TRANSAC(self)->dialog, tsip_dialog_error, tsk_null);
 }
 
 /* Any -> (cancel) -> Terminated
@@ -546,6 +527,21 @@ static tsk_object_t* tsip_transac_nist_ctor(tsk_object_t * self, va_list * app)
 {
 	tsip_transac_nist_t *transac = self;
 	if(transac){
+		tsk_bool_t reliable = va_arg(*app, tsk_bool_t);
+		int32_t cseq_value = va_arg(*app, int32_t);
+		const char *cseq_method = va_arg(*app, const char *);
+		const char *callid = va_arg(*app, const char *);
+		tsip_dialog_t* dialog = va_arg(*app, tsip_dialog_t*);
+
+		/* Initialize base class */
+		tsip_transac_init(TSIP_TRANSAC(transac), tsip_nist, reliable, cseq_value, cseq_method, callid, dialog, _fsm_state_Started, _fsm_state_Terminated);
+
+		/* init FSM */
+		TSIP_TRANSAC_GET_FSM(transac)->debug = DEBUG_STATE_MACHINE;
+		tsk_fsm_set_callback_terminated(TSIP_TRANSAC_GET_FSM(transac), TSK_FSM_ONTERMINATED_F(tsip_transac_nist_OnTerminated), (const void*)transac);
+
+		/* Initialize NICT object */
+		tsip_transac_nist_init(transac);
 	}
 	return self;
 }

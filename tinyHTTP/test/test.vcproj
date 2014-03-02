@@ -215,10 +215,6 @@
 				>
 			</File>
 			<File
-				RelativePath=".\test_transport.h"
-				>
-			</File>
-			<File
 				RelativePath=".\test_url.h"
 				>
 			</File>

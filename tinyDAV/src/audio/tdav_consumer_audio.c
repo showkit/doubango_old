@@ -138,9 +138,7 @@ int tdav_consumer_audio_put(tdav_consumer_audio_t* self, const void* data, tsk_s
 	tsk_safeobj_lock(self);
 
 	if(!TMEDIA_JITTER_BUFFER(self->jitterbuffer)->opened){
-		uint32_t rate = TMEDIA_CONSUMER(self)->audio.out.rate ? TMEDIA_CONSUMER(self)->audio.out.rate : TMEDIA_CONSUMER(self)->audio.in.rate;
-		uint32_t channels = TMEDIA_CONSUMER(self)->audio.out.channels ? TMEDIA_CONSUMER(self)->audio.out.channels : tmedia_defaults_get_audio_channels_playback();
-		if((ret = tmedia_jitterbuffer_open(self->jitterbuffer, TMEDIA_CONSUMER(self)->audio.ptime, rate, channels))){
+		if((ret = tmedia_jitterbuffer_open(self->jitterbuffer, TMEDIA_CONSUMER(self)->audio.ptime, TMEDIA_CONSUMER(self)->audio.in.rate))){
 			TSK_DEBUG_ERROR("Failed to open jitterbuffer (%d)", ret);
 			tsk_safeobj_unlock(self);
 			return ret;
@@ -169,8 +167,7 @@ tsk_size_t tdav_consumer_audio_get(tdav_consumer_audio_t* self, void* out_data, 
 		int ret;
 		uint32_t frame_duration = TMEDIA_CONSUMER(self)->audio.ptime;
 		uint32_t rate = TMEDIA_CONSUMER(self)->audio.out.rate ? TMEDIA_CONSUMER(self)->audio.out.rate : TMEDIA_CONSUMER(self)->audio.in.rate;
-		uint32_t channels = TMEDIA_CONSUMER(self)->audio.out.channels ? TMEDIA_CONSUMER(self)->audio.out.channels : tmedia_defaults_get_audio_channels_playback();
-		if((ret = tmedia_jitterbuffer_open(TMEDIA_JITTER_BUFFER(self->jitterbuffer), frame_duration, rate, channels))){
+		if((ret = tmedia_jitterbuffer_open(TMEDIA_JITTER_BUFFER(self->jitterbuffer), frame_duration, rate))){
 			TSK_DEBUG_ERROR("Failed to open jitterbuffer (%d)", ret);
 			tsk_safeobj_unlock(self);
 			return 0;
@@ -178,26 +175,22 @@ tsk_size_t tdav_consumer_audio_get(tdav_consumer_audio_t* self, void* out_data, 
 	}
 	ret_size = tmedia_jitterbuffer_get(TMEDIA_JITTER_BUFFER(self->jitterbuffer), out_data, out_size);
 
-	tsk_safeobj_unlock(self);	
+	tsk_safeobj_unlock(self);
+	// Echo process last frame 
+	if(self->denoise && self->denoise->opened && TSK_BUFFER_SIZE(self->denoise->last_frame)){
+		tmedia_denoise_echo_playback(self->denoise, TSK_BUFFER_DATA(self->denoise->last_frame));
+	}
 
 	// denoiser
-	if(self->denoise && self->denoise->opened && (self->denoise->echo_supp_enabled || self->denoise->noise_supp_enabled)){
+	if(ret_size && self->denoise && self->denoise->opened){
 		if(self->denoise->echo_supp_enabled){
-			// Echo process last frame 
-			if(self->denoise->last_frame && self->denoise->last_frame->size){
-				tmedia_denoise_echo_playback(self->denoise, self->denoise->last_frame->data, self->denoise->last_frame->size);
-			}
-			if(ret_size){
-				// save
-				tsk_buffer_copy(self->denoise->last_frame, 0, out_data, ret_size);
-			}
+			// echo playback
+			tsk_buffer_copy(self->denoise->last_frame, 0, out_data, ret_size);
 		}
 
 #if 1 // suppress noise if not supported by remote party's encoder
 		// suppress noise
-		if(self->denoise->noise_supp_enabled){
-			tmedia_denoise_process_playback(self->denoise, out_data, out_size);
-		}
+		tmedia_denoise_process_playback(self->denoise, out_data);
 #endif
 	}
 
@@ -218,7 +211,7 @@ void tdav_consumer_audio_set_denoise(tdav_consumer_audio_t* self, struct tmedia_
 {
 	tsk_safeobj_lock(self);
 	TSK_OBJECT_SAFE_FREE(self->denoise);
-	self->denoise = (struct tmedia_denoise_s*)tsk_object_ref(denoise);
+	self->denoise = tsk_object_ref(denoise);
 	tsk_safeobj_unlock(self);
 }
 
@@ -226,7 +219,7 @@ void tdav_consumer_audio_set_jitterbuffer(tdav_consumer_audio_t* self, struct tm
 {
 	tsk_safeobj_lock(self);
 	TSK_OBJECT_SAFE_FREE(self->jitterbuffer);
-	self->jitterbuffer = (struct tmedia_jitterbuffer_s*)tsk_object_ref(jitterbuffer);
+	self->jitterbuffer = tsk_object_ref(jitterbuffer);
 	tsk_safeobj_unlock(self);
 }
 

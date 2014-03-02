@@ -80,7 +80,7 @@ tsip_header_Date_t *tsip_header_Date_parse(const char *data, tsk_size_t size)
 	const char *eof = pe;
 	tsip_header_Date_t *hdr_Date = tsip_header_Date_create_null();
 	
-	const char *tag_start = tsk_null;
+	const char *tag_start;
 
 	
 /* #line 87 "./src/headers/tsip_header_Date.c" */
@@ -225,19 +225,15 @@ static const int tsip_machine_parser_header_Date_en_main = 1;
 
 
 /* #line 134 "./ragel/tsip_parser_header_Date.rl" */
-	(void)(eof);
-	(void)(tsip_machine_parser_header_Date_first_final);
-	(void)(tsip_machine_parser_header_Date_error);
-	(void)(tsip_machine_parser_header_Date_en_main);
 	
-/* #line 234 "./src/headers/tsip_header_Date.c" */
+/* #line 230 "./src/headers/tsip_header_Date.c" */
 	{
 	cs = tsip_machine_parser_header_Date_start;
 	}
 
-/* #line 139 "./ragel/tsip_parser_header_Date.rl" */
+/* #line 135 "./ragel/tsip_parser_header_Date.rl" */
 	
-/* #line 241 "./src/headers/tsip_header_Date.c" */
+/* #line 237 "./src/headers/tsip_header_Date.c" */
 	{
 	int _klen;
 	unsigned int _trans;
@@ -364,7 +360,7 @@ _match:
 	{
 	}
 	break;
-/* #line 368 "./src/headers/tsip_header_Date.c" */
+/* #line 364 "./src/headers/tsip_header_Date.c" */
 		}
 	}
 
@@ -377,12 +373,12 @@ _again:
 	_out: {}
 	}
 
-/* #line 140 "./ragel/tsip_parser_header_Date.rl" */
+/* #line 136 "./ragel/tsip_parser_header_Date.rl" */
 	
 	if( cs < 
-/* #line 384 "./src/headers/tsip_header_Date.c" */
+/* #line 380 "./src/headers/tsip_header_Date.c" */
 65
-/* #line 141 "./ragel/tsip_parser_header_Date.rl" */
+/* #line 137 "./ragel/tsip_parser_header_Date.rl" */
  ){
 		TSK_DEBUG_ERROR("Failed to parse 'Date' header.");
 		TSK_OBJECT_SAFE_FREE(hdr_Date);

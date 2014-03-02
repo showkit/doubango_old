@@ -113,13 +113,9 @@ tsip_header_Content_Type_t *tsip_header_Content_Type_parse(const char *data, tsk
 	const char *eof = pe;
 	tsip_header_Content_Type_t *hdr_ctype = tsip_header_Content_Type_create_null();
 	
-	const char *tag_start = tsk_null;
+	const char *tag_start;
 
 	%%write data;
-	(void)(eof);
-	(void)(tsip_machine_parser_header_Content_Type_first_final);
-	(void)(tsip_machine_parser_header_Content_Type_error);
-	(void)(tsip_machine_parser_header_Content_Type_en_main);
 	%%write init;
 	%%write exec;
 	

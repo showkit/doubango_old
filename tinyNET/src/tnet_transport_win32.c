@@ -64,7 +64,7 @@ typedef struct transport_context_s
 transport_context_t;
 
 static transport_socket_xt* getSocket(transport_context_t *context, tnet_fd_t fd);
-static int addSocket(tnet_fd_t fd, tnet_socket_type_t type, tnet_transport_t *transport, tsk_bool_t take_ownership, tsk_bool_t is_client, tnet_tls_socket_handle_t* tlsHandle);
+static int addSocket(tnet_fd_t fd, tnet_socket_type_t type, tnet_transport_t *transport, tsk_bool_t take_ownership, tsk_bool_t is_client);
 static int removeSocket(int index, transport_context_t *context);
 
 /* Checks if socket is connected */
@@ -123,7 +123,7 @@ const tnet_tls_socket_handle_t* tnet_transport_get_tlshandle(const tnet_transpor
 /* 
 * Add new socket to the watcher.
 */
-int tnet_transport_add_socket(const tnet_transport_handle_t *handle, tnet_fd_t fd, tnet_socket_type_t type, tsk_bool_t take_ownership, tsk_bool_t isClient, tnet_tls_socket_handle_t* tlsHandle)
+int tnet_transport_add_socket(const tnet_transport_handle_t *handle, tnet_fd_t fd, tnet_socket_type_t type, tsk_bool_t take_ownership, tsk_bool_t isClient)
 {
 	tnet_transport_t *transport = (tnet_transport_t*)handle;
 	transport_context_t* context;
@@ -143,26 +143,22 @@ int tnet_transport_add_socket(const tnet_transport_handle_t *handle, tnet_fd_t f
 		transport->tls.enabled = tsk_true;
 	}
 
-	addSocket(fd, type, transport, take_ownership, isClient, tlsHandle);
-	
+	addSocket(fd, type, transport, take_ownership, isClient);
 	if(WSAEventSelect(fd, context->events[context->count - 1], FD_ALL_EVENTS) == SOCKET_ERROR){
 		removeSocket((context->count - 1), context);
 		TNET_PRINT_LAST_ERROR("WSAEventSelect have failed.");
 		return -1;
 	}
 
-	/* Signal if transport is running */
-	if(TSK_RUNNABLE(transport)->running || TSK_RUNNABLE(transport)->started){
-		if(WSASetEvent(context->events[0])){
-			TSK_DEBUG_INFO("New socket added to the network transport.");
-			return 0;
-		}
-		TSK_DEBUG_ERROR("Transport not started yet");
-		return -1;
+	/* Signal */
+	if(WSASetEvent(context->events[0])){
+		TSK_DEBUG_INFO("New socket added to the network transport.");
+		return 0;
 	}
 
-	TSK_DEBUG_INFO("Adding socket delayed");
-	return 0;
+	// ...
+	
+	return -1;
 }
 
 int tnet_transport_pause_socket(const tnet_transport_handle_t *handle, tnet_fd_t fd, tsk_bool_t pause)
@@ -204,7 +200,6 @@ int tnet_transport_remove_socket(const tnet_transport_handle_t *handle, tnet_fd_
 		if(context->sockets[i]->fd == *fd){
 			removeSocket(i, context);
 			found = tsk_true;
-			TSK_RUNNABLE_ENQUEUE(transport, event_removed, transport->callback_data, *fd);
 			*fd = TNET_INVALID_FD;
 			break;
 		}
@@ -348,7 +343,7 @@ static transport_socket_xt* getSocket(transport_context_t *context, tnet_fd_t fd
 }
 
 /*== Add new socket ==*/
-static int addSocket(tnet_fd_t fd, tnet_socket_type_t type, tnet_transport_t *transport, tsk_bool_t take_ownership, tsk_bool_t is_client, tnet_tls_socket_handle_t* tlsHandle)
+static int addSocket(tnet_fd_t fd, tnet_socket_type_t type, tnet_transport_t *transport, tsk_bool_t take_ownership, tsk_bool_t is_client)
 {
 	transport_context_t *context;
 
@@ -366,14 +361,9 @@ static int addSocket(tnet_fd_t fd, tnet_socket_type_t type, tnet_transport_t *tr
 		sock->owner = take_ownership ? 1 : 0;
 
 		if((TNET_SOCKET_TYPE_IS_TLS(sock->type) || TNET_SOCKET_TYPE_IS_WSS(sock->type)) && transport->tls.enabled){
-			if(tlsHandle){
-				sock->tlshandle = tsk_object_ref(tlsHandle);
-			}
-			else{
 #if HAVE_OPENSSL
-				sock->tlshandle = tnet_tls_socket_create(sock->fd, is_client ? transport->tls.ctx_client : transport->tls.ctx_server);       
+			sock->tlshandle = tnet_tls_socket_create(sock->fd, is_client ? transport->tls.ctx_client : transport->tls.ctx_server);       
 #endif
-			}
 		}
 		
 		tsk_safeobj_lock(context);
@@ -381,9 +371,6 @@ static int addSocket(tnet_fd_t fd, tnet_socket_type_t type, tnet_transport_t *tr
 		context->sockets[context->count] = sock;
 		
 		context->count++;
-
-		TSK_DEBUG_INFO("Transport[%s] sockets count = %u", transport->description, context->count);
-
 		tsk_safeobj_unlock(context);
 
 		return 0;
@@ -427,7 +414,6 @@ static int removeSocket(int index, transport_context_t *context)
 		context->events[context->count-1] = 0;
 
 		context->count--;
-		TSK_DEBUG_INFO("Transport sockets count = %u", context->count);
 	}
 
 	tsk_safeobj_unlock(context);
@@ -496,7 +482,7 @@ int tnet_transport_prepare(tnet_transport_t *transport)
 	/* Add the master socket to the context. */
 	// don't take ownership: will be closed by the dctor()
 	// otherwise will be closed twice: dctor() and removeSocket()
-	if((ret = addSocket(transport->master->fd, transport->master->type, transport, tsk_false, tsk_false, tsk_null))){
+	if((ret = addSocket(transport->master->fd, transport->master->type, transport, tsk_false, tsk_false))){
 		TSK_DEBUG_ERROR("Failed to add master socket");
 		goto bail;
 	}
@@ -542,10 +528,10 @@ int tnet_transport_unprepare(tnet_transport_t *transport)
 }
 
 /*=== Main thread */
-void* TSK_STDCALL tnet_transport_mainthread(void *param)
+void *tnet_transport_mainthread(void *param)
 {
-	tnet_transport_t *transport = (tnet_transport_t*)param;
-	transport_context_t *context = (transport_context_t*)transport->context;
+	tnet_transport_t *transport = param;
+	transport_context_t *context = transport->context;
 	DWORD evt;
 	WSANETWORKEVENTS networkEvents;
 	DWORD flags = 0;
@@ -605,7 +591,7 @@ void* TSK_STDCALL tnet_transport_mainthread(void *param)
 			/* Accept the connection */
 			if((fd = WSAAccept(active_socket->fd, NULL, NULL, AcceptCondFunc, (DWORD_PTR)context)) != INVALID_SOCKET){
 				/* Add the new fd to the server context */
-				addSocket(fd, transport->master->type, transport, tsk_true, tsk_false, tsk_null);
+				addSocket(fd, transport->master->type, transport, tsk_true, tsk_false);
 				if(active_socket->tlshandle){
 					transport_socket_xt* tls_socket;
 					if((tls_socket = getSocket(context, fd))){

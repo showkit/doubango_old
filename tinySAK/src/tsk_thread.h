@@ -35,24 +35,15 @@
 typedef void tsk_thread_handle_t;
 #if TSK_UNDER_WINDOWS
 	typedef unsigned long tsk_thread_id_t;
-#	define TSK_THREAD_PRIORITY_LOW				THREAD_PRIORITY_LOWEST
-#	define TSK_THREAD_PRIORITY_MEDIUM			THREAD_PRIORITY_NORMAL
-#	define TSK_THREAD_PRIORITY_HIGH				THREAD_PRIORITY_HIGHEST
-#	define TSK_THREAD_PRIORITY_TIME_CRITICAL	THREAD_PRIORITY_TIME_CRITICAL
 #else
 #	include <pthread.h>
-#	include <sched.h>
-	typedef pthread_t tsk_thread_id_t;
-#	define TSK_THREAD_PRIORITY_LOW			sched_get_priority_min(SCHED_OTHER)
-#	define TSK_THREAD_PRIORITY_TIME_CRITICAL		sched_get_priority_max(SCHED_OTHER)
-#	define TSK_THREAD_PRIORITY_MEDIUM				((TSK_THREAD_PRIORITY_TIME_CRITICAL - TSK_THREAD_PRIORITY_LOW) >> 1)
-#	define TSK_THREAD_PRIORITY_HIGH					((TSK_THREAD_PRIORITY_MEDIUM * 3) >> 1)
+typedef pthread_t tsk_thread_id_t;
 #endif
 
 TSK_BEGIN_DECLS
 
 TINYSAK_API void tsk_thread_sleep(uint64_t ms);
-TINYSAK_API int tsk_thread_create(tsk_thread_handle_t** handle, void *(TSK_STDCALL *start) (void *), void *arg);
+TINYSAK_API int tsk_thread_create(tsk_thread_handle_t** handle, void *(*start) (void *), void *arg);
 TINYSAK_API int tsk_thread_set_priority(tsk_thread_handle_t* handle, int32_t priority);
 TINYSAK_API int tsk_thread_set_priority_2(int32_t priority);
 TINYSAK_API tsk_thread_id_t tsk_thread_get_id();

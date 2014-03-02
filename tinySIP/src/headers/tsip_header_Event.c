@@ -74,7 +74,7 @@ tsip_header_Event_t *tsip_header_Event_parse(const char *data, tsk_size_t size)
 	const char *eof = pe;
 	tsip_header_Event_t *hdr_event = tsip_header_Event_create(tsk_null);
 	
-	const char *tag_start = tsk_null;
+	const char *tag_start;
 
 	
 /* #line 81 "./src/headers/tsip_header_Event.c" */
@@ -277,19 +277,15 @@ static const int tsip_machine_parser_header_Event_en_main = 1;
 
 
 /* #line 107 "./ragel/tsip_parser_header_Event.rl" */
-	(void)(eof);
-	(void)(tsip_machine_parser_header_Event_first_final);
-	(void)(tsip_machine_parser_header_Event_error);
-	(void)(tsip_machine_parser_header_Event_en_main);
 	
-/* #line 286 "./src/headers/tsip_header_Event.c" */
+/* #line 282 "./src/headers/tsip_header_Event.c" */
 	{
 	cs = tsip_machine_parser_header_Event_start;
 	}
 
-/* #line 112 "./ragel/tsip_parser_header_Event.rl" */
+/* #line 108 "./ragel/tsip_parser_header_Event.rl" */
 	
-/* #line 293 "./src/headers/tsip_header_Event.c" */
+/* #line 289 "./src/headers/tsip_header_Event.c" */
 	{
 	int _klen;
 	unsigned int _trans;
@@ -386,7 +382,7 @@ _match:
 	{
 	}
 	break;
-/* #line 390 "./src/headers/tsip_header_Event.c" */
+/* #line 386 "./src/headers/tsip_header_Event.c" */
 		}
 	}
 
@@ -399,12 +395,12 @@ _again:
 	_out: {}
 	}
 
-/* #line 113 "./ragel/tsip_parser_header_Event.rl" */
+/* #line 109 "./ragel/tsip_parser_header_Event.rl" */
 	
 	if( cs < 
-/* #line 406 "./src/headers/tsip_header_Event.c" */
+/* #line 402 "./src/headers/tsip_header_Event.c" */
 75
-/* #line 114 "./ragel/tsip_parser_header_Event.rl" */
+/* #line 110 "./ragel/tsip_parser_header_Event.rl" */
  ){
 		TSK_DEBUG_ERROR("Failed to parse 'Event' header.");
 		TSK_OBJECT_SAFE_FREE(hdr_event);

@@ -23,7 +23,7 @@
 #include "SipStack.h"
 #include "MediaSessionMgr.h"
 #include "SipUri.h"
-#include "Msrp.h"
+//#include "Msrp.h"
 
 /* ======================== AsyncAction ========================*/
 typedef struct twrap_async_action_s
@@ -59,10 +59,7 @@ void SipSession::init(SipStack* pStack, tsip_ssession_handle_t* pHandle/*=tsk_nu
 {
 	if(pHandle){
 		/* "server-side-session" */
-		if(tsip_ssession_have_ownership(pHandle)){
-			tsk_object_ref(pHandle);
-		}
-		else if(tsip_ssession_take_ownership(pHandle) != 0){ /* should never happen */
+		if(tsip_ssession_take_ownership(pHandle)){ /* should never happen */
 			TSK_DEBUG_ERROR("Failed to take ownership");
 			return;
 		}
@@ -171,14 +168,6 @@ bool SipSession::addSigCompCompartment(const char* compId)
 		TSIP_SSESSION_SET_NULL()) == 0);
 }
 
-bool SipSession::setAuth(const char* authHa1, const char* authIMPI)
-{
-	return (tsip_ssession_set(m_pHandle,
-		TSIP_SSESSION_SET_AUTH_HA1(authHa1),
-		TSIP_SSESSION_SET_AUTH_IMPI(authIMPI),
-		TSIP_SSESSION_SET_NULL()) == 0);
-}
-
 bool SipSession::removeSigCompCompartment()
 {
 	return (tsip_ssession_set(m_pHandle,
@@ -187,17 +176,11 @@ bool SipSession::removeSigCompCompartment()
 }
 
 // FIXME: should be "uint64_t" instead of "unsigned"
-uint64_t SipSession::getId()const
+unsigned SipSession::getId()const
 {
-	return (uint64_t)tsip_ssession_get_id(m_pHandle);
+	return (unsigned)tsip_ssession_get_id(m_pHandle);
 }
 
-bool SipSession::setWebSocketSrc(const char* host, int32_t port, const char* proto)
-{
-	return (tsip_ssession_set(m_pHandle,
-		TSIP_SSESSION_SET_WEBSOCKET_SRC(host, port, proto),
-		TSIP_SSESSION_SET_NULL()) == 0);
-}
 
 const SipStack* SipSession::getStack()const
 {
@@ -225,15 +208,73 @@ InviteSession::~InviteSession()
 	}
 }
 
-bool InviteSession::hangup(ActionConfig* config/*=tsk_null*/)
-{
-	const tsip_action_handle_t* action_cfg = config ? config->getHandle() : tsk_null;
+#if ANDROID
+static void *__droid_hangup(void *param)
+{	
+	twrap_async_action_t* asyn_action = (twrap_async_action_t*)param;
+	const tsip_action_handle_t* action_cfg = asyn_action->config ? asyn_action->config->getHandle() : tsk_null;
 
-	return (tsip_api_invite_send_bye(m_pHandle,
+	tsip_action_BYE(asyn_action->session,
 		TSIP_ACTION_SET_CONFIG(action_cfg),
-		TSIP_ACTION_SET_NULL()) == 0);
+		TSIP_ACTION_SET_NULL());
+
+	return tsk_null;
 }
 
+bool InviteSession::hangup(ActionConfig* config/*=tsk_null*/)
+{
+	void* tid[1] = {0};
+	tsip_ssession_handle_t *handle;
+	int ret;
+	twrap_async_action_t asyn_action = {0};
+	
+	handle = tsk_object_ref(m_pHandle);
+	asyn_action.config = config;
+	asyn_action.session = handle;
+	ret = tsk_thread_create(tid, __droid_hangup, &asyn_action);
+	tsk_thread_join(tid);
+	tsk_object_unref(handle);
+
+	return (ret == 0);
+}
+#else
+bool InviteSession::hangup(ActionConfig* config/*=tsk_null*/)
+{
+	return (tsip_api_invite_send_bye(m_pHandle,
+		TSIP_ACTION_SET_NULL()) == 0);
+}
+#endif
+
+#if ANDROID
+static void *__droid_reject(void *param)
+{	
+	twrap_async_action_t* asyn_action = (twrap_async_action_t*)param;
+	const tsip_action_handle_t* action_cfg = asyn_action->config ? asyn_action->config->getHandle() : tsk_null;
+
+	tsip_api_common_reject(asyn_action->session,
+		TSIP_ACTION_SET_CONFIG(action_cfg),
+		TSIP_ACTION_SET_NULL());
+
+	return tsk_null;
+}
+
+bool InviteSession::reject(ActionConfig* config/*=tsk_null*/)
+{
+	void* tid[1] = {0};
+	tsip_ssession_handle_t *handle;
+	int ret;
+	twrap_async_action_t asyn_action = {0};
+	
+	handle = tsk_object_ref(m_pHandle);
+	asyn_action.config = config;
+	asyn_action.session = handle;
+	ret = tsk_thread_create(tid, __droid_reject, &asyn_action);
+	tsk_thread_join(tid);
+	tsk_object_unref(handle);
+
+	return (ret == 0);
+}
+#else
 bool InviteSession::reject(ActionConfig* config/*=tsk_null*/)
 {
 	const tsip_action_handle_t* action_cfg = config ? config->getHandle() : tsk_null;
@@ -242,7 +283,39 @@ bool InviteSession::reject(ActionConfig* config/*=tsk_null*/)
 		TSIP_ACTION_SET_CONFIG(action_cfg),
 		TSIP_ACTION_SET_NULL()) == 0);
 }
+#endif
 
+#if ANDROID
+static void *__droid_accept(void *param)
+{	
+	twrap_async_action_t* asyn_action = (twrap_async_action_t*)param;
+	const tsip_action_handle_t* action_cfg = asyn_action->config ? asyn_action->config->getHandle() : tsk_null;
+
+	tsip_api_common_accept(asyn_action->session,
+		TSIP_ACTION_SET_CONFIG(action_cfg),
+		TSIP_ACTION_SET_NULL());
+
+	return tsk_null;
+}
+
+bool InviteSession::accept(ActionConfig* config/*=tsk_null*/)
+{
+	void* tid[1] = {0};
+	tsip_ssession_handle_t *handle;
+	int ret;
+	twrap_async_action_t asyn_action = {0};
+	
+	
+	handle = tsk_object_ref(m_pHandle);
+	asyn_action.config = config;
+	asyn_action.session = handle;
+	ret = tsk_thread_create(tid, __droid_accept, &asyn_action);
+	tsk_thread_join(tid);
+	tsk_object_unref(handle);
+
+	return (ret == 0);
+}
+#else
 bool InviteSession::accept(ActionConfig* config/*=tsk_null*/)
 {
 	const tsip_action_handle_t* action_cfg = config ? config->getHandle() : tsk_null;
@@ -251,9 +324,11 @@ bool InviteSession::accept(ActionConfig* config/*=tsk_null*/)
 		TSIP_ACTION_SET_CONFIG(action_cfg),
 		TSIP_ACTION_SET_NULL()) == 0);
 }
+#endif
 
 bool InviteSession::sendInfo(const void* payload, unsigned len, ActionConfig* config/*=tsk_null*/)
 {
+
 	int ret;
 	const tsip_action_handle_t* action_cfg = config ? config->getHandle() : tsk_null;
 	if(payload && len){
@@ -269,7 +344,19 @@ bool InviteSession::sendInfo(const void* payload, unsigned len, ActionConfig* co
 	}
 	return (ret == 0);
 }
+bool InviteSession::sendMessage(const void *payload, unsigned int len, ActionConfig* config)
+{
+    int ret = 0;
+    const tsip_action_handle_t* action_cfg = config ? config->getHandle() : tsk_null;
+    if(payload && len){
+        ret = tsip_api_message_send_message(m_pHandle, TSIP_ACTION_SET_PAYLOAD(payload, len), TSIP_ACTION_SET_CONFIG(action_cfg), TSIP_ACTION_SET_NULL());
+    }
+    else{
+        ret = tsip_api_message_send_message(m_pHandle, TSIP_ACTION_SET_CONFIG(action_cfg), TSIP_ACTION_SET_NULL());
+    }
 
+    return (ret == 0);
+}
 const MediaSessionMgr* InviteSession::getMediaMgr()
 {
 	if(!m_pMediaMgr && m_pHandle){
@@ -294,8 +381,6 @@ CallSession::CallSession(SipStack* Stack)
 
 CallSession::CallSession(SipStack* Stack, tsip_ssession_handle_t* handle)
 : InviteSession(Stack, handle)
-, m_pT140Callback(tsk_null)
-, m_pRtcpCallback(tsk_null)
 {
 }
 
@@ -303,54 +388,50 @@ CallSession::~CallSession()
 {
 }
 
-/* @deprecated */
-bool CallSession::callAudio(const SipUri* remoteUri, ActionConfig* config/*=tsk_null*/)
+#define ANDROID32 1
+
+#if ANDROID
+typedef struct twrap_async_action_call_s
 {
-	return call(remoteUri, twrap_media_audio, config);
+	const tsip_ssession_handle_t *session;
+	const ActionConfig* config;
+	tmedia_type_t media_type;
+}
+twrap_async_action_call_t;
+
+static void *__droid_call_thread(void *param)
+{	
+	twrap_async_action_call_t* asyn_action = (twrap_async_action_call_t*)param;
+	const tsip_action_handle_t* action_cfg = asyn_action->config ? asyn_action->config->getHandle() : tsk_null;
+
+	tsip_action_INVITE(asyn_action->session, asyn_action->media_type,
+		TSIP_ACTION_SET_CONFIG(action_cfg),
+		TSIP_ACTION_SET_NULL());
+
+	return tsk_null;
 }
 
-/* @deprecated */
-bool CallSession::callAudio(const char* remoteUriString, ActionConfig* config/*=tsk_null*/)
+static bool __droid_call(tsip_ssession_handle_t * session_handle, tmedia_type_t type, ActionConfig* config/*=tsk_null*/)
 {
-	return call(remoteUriString, twrap_media_audio, config);
-}
-
-/* @deprecated */
-bool CallSession::callAudioVideo(const SipUri* remoteUri, ActionConfig* config/*=tsk_null*/)
-{
-	return call(remoteUri, twrap_media_audio_video, config);
-}
-
-/* @deprecated */
-bool CallSession::callAudioVideo(const char* remoteUriString, ActionConfig* config/*=tsk_null*/)
-{
-	return call(remoteUriString, twrap_media_audiovideodata, config);
-}
-
-/* @deprecated */
-bool CallSession::callVideo(const SipUri* remoteUri, ActionConfig* config/*=tsk_null*/)
-{
-	return call(remoteUri, twrap_media_video, config);
-}
-
-/* @deprecated */
-bool CallSession::callVideo(const char* remoteUriString, ActionConfig* config/*=tsk_null*/)
-{
-	return call(remoteUriString, twrap_media_video, config);
-}
-
-bool CallSession::call(const char* remoteUriString, twrap_media_type_t media, ActionConfig* config/*=tsk_null*/)
-{
+	void* tid[1] = {0};
+	tsip_ssession_handle_t *handle;
+	int ret;
+	twrap_async_action_call_t asyn_action = {0};
 	
-	SipUri sipUri(remoteUriString);
-	if(sipUri.isValid()){
-		return call(&sipUri, media, config);
-	}
-	TSK_DEBUG_ERROR("Failed to parse sip uri=%s", remoteUriString);
-	return false;
-}
+	handle = tsk_object_ref(session_handle);
+	asyn_action.config = config;
+	asyn_action.session = handle;
+	asyn_action.media_type = type;
 
-bool CallSession::call(const SipUri* remoteUri, twrap_media_type_t media, ActionConfig* config/*=tsk_null*/)
+	ret = tsk_thread_create(tid, __droid_call_thread, &asyn_action);
+	tsk_thread_join(tid);
+	tsk_object_unref(handle);
+
+	return (ret == 0);
+}
+#endif
+
+bool CallSession::callAudio(const SipUri* remoteUri, ActionConfig* config/*=tsk_null*/)
 {
 	if(!remoteUri){
 		TSK_DEBUG_ERROR("Invalid parameter");
@@ -359,37 +440,85 @@ bool CallSession::call(const SipUri* remoteUri, twrap_media_type_t media, Action
 	tsip_ssession_set(m_pHandle,
 		TSIP_SSESSION_SET_TO_OBJ(remoteUri->getWrappedUri()),
 		TSIP_SSESSION_SET_NULL());
-
+#if ANDROID
+	__droid_call(m_pHandle, tmedia_audio, config);
+	return true;
+#else
 	const tsip_action_handle_t* action_cfg = config ? config->getHandle() : tsk_null;
-	return (tsip_api_invite_send_invite(m_pHandle, twrap_get_media_type(media),
+	return (tsip_api_invite_send_invite(m_pHandle, tmedia_audio,
 		TSIP_ACTION_SET_CONFIG(action_cfg),
 		TSIP_ACTION_SET_NULL()) == 0);
+#endif
 }
 
-bool CallSession::setSupportedCodecs(int32_t codecs)
+bool CallSession::callAudio(const char* remoteUriString, ActionConfig* config/*=tsk_null*/)
 {
-	return (tsip_ssession_set(m_pHandle,
-			TSIP_SSESSION_SET_MEDIA(
-				TSIP_MSESSION_SET_CODECS(codecs),
-				TSIP_MSESSION_SET_NULL()
-			),
-			TSIP_SSESSION_SET_NULL()) == 0);
+	SipUri sipUri(remoteUriString);
+	if(sipUri.isValid()){
+		return callAudio(&sipUri, config);
+	}
+	TSK_DEBUG_ERROR("Failed to parse sip uri=%s", remoteUriString);
+	return false;
 }
 
-
-int32_t CallSession::getNegotiatedCodecs()
+bool CallSession::callAudioVideo(const SipUri* remoteUri, ActionConfig* config/*=tsk_null*/)
 {
-	return (int32_t) tsip_ssession_get_codecs_neg(m_pHandle);
+	if(!remoteUri){
+		TSK_DEBUG_ERROR("Invalid parameter");
+		return false;
+	}
+	tsip_ssession_set(m_pHandle,
+		TSIP_SSESSION_SET_TO_OBJ(remoteUri->getWrappedUri()),
+		TSIP_SSESSION_SET_NULL());
+#if ANDROID
+	__droid_call(m_pHandle, (tmedia_type_t)(tmedia_audio | tmedia_video), config);
+	return true;
+#else
+	const tsip_action_handle_t* action_cfg = config ? config->getHandle() : tsk_null;
+	return (tsip_api_invite_send_invite(m_pHandle, tmedia_audiovideodata,
+		TSIP_ACTION_SET_CONFIG(action_cfg),
+		TSIP_ACTION_SET_NULL()) == 0);
+#endif
 }
 
-bool CallSession::setMediaSSRC(twrap_media_type_t media, uint32_t ssrc)
+bool CallSession::callAudioVideo(const char* remoteUriString, ActionConfig* config/*=tsk_null*/)
 {
-	return (tsip_ssession_set(m_pHandle,
-			TSIP_SSESSION_SET_MEDIA(
-				TSIP_MSESSION_SET_RTP_SSRC(twrap_get_media_type(media), ssrc),
-				TSIP_MSESSION_SET_NULL()
-			),
-			TSIP_SSESSION_SET_NULL()) == 0);
+	SipUri sipUri(remoteUriString);
+	if(sipUri.isValid()){
+		return callAudioVideo(&sipUri, config);
+	}
+	TSK_DEBUG_ERROR("Failed to parse sip uri=%s", remoteUriString);
+	return false;
+}
+
+bool CallSession::callVideo(const SipUri* remoteUri, ActionConfig* config/*=tsk_null*/)
+{
+	if(!remoteUri){
+		TSK_DEBUG_ERROR("Invalid parameter");
+		return false;
+	}
+	tsip_ssession_set(m_pHandle,
+		TSIP_SSESSION_SET_TO_OBJ(remoteUri->getWrappedUri()),
+		TSIP_SSESSION_SET_NULL());
+#if ANDROID
+	__droid_call(m_pHandle, tmedia_video, config);
+	return true;
+#else
+	const tsip_action_handle_t* action_cfg = config ? config->getHandle() : tsk_null;
+	return (tsip_api_invite_send_invite(m_pHandle, tmedia_video,
+		TSIP_ACTION_SET_CONFIG(action_cfg),
+		TSIP_ACTION_SET_NULL()) == 0);
+#endif
+}
+
+bool CallSession::callVideo(const char* remoteUriString, ActionConfig* config/*=tsk_null*/)
+{
+	SipUri sipUri(remoteUriString);
+	if(sipUri.isValid()){
+		return callVideo(&sipUri, config);
+	}
+	TSK_DEBUG_ERROR("Failed to parse sip uri=%s", remoteUriString);
+	return false;
 }
 
 bool CallSession::setSessionTimer(unsigned timeout, const char* refresher)
@@ -512,118 +641,29 @@ unsigned CallSession::getSessionTransferId()
 	return (unsigned)tsip_ssession_get_id_parent(m_pHandle);
 }
 
-bool CallSession::sendT140Data(enum tmedia_t140_data_type_e data_type, const void* data_ptr /*= NULL*/, unsigned data_size /*= 0*/)
-{
-	const tmedia_session_mgr_t* pWrappedMgr;
-	const MediaSessionMgr* pMgr;
-	if((pMgr = getMediaMgr()) && (pWrappedMgr = pMgr->getWrappedMgr())){
-		return (tmedia_session_mgr_send_t140_data((tmedia_session_mgr_t*)pWrappedMgr, data_type, data_ptr, data_size) == 0);		
-	}
-	return false;
-}
-
-bool CallSession::setT140Callback(const T140Callback* pT140Callback)
-{
-	const tmedia_session_mgr_t* pWrappedMgr;
-	const MediaSessionMgr* pMgr;
-	if((pMgr = getMediaMgr()) && (pWrappedMgr = pMgr->getWrappedMgr())){
-		if((m_pT140Callback = pT140Callback)){
-			return (tmedia_session_mgr_set_t140_ondata_cbfn((tmedia_session_mgr_t*)pWrappedMgr, this, &CallSession::t140OnDataCallback) == 0);
-		}
-		else{
-			return (tmedia_session_mgr_set_t140_ondata_cbfn((tmedia_session_mgr_t*)pWrappedMgr, this, tsk_null) == 0);
-		}
-	}
-	return false;
-}
-
-bool CallSession::sendRtcpEvent(enum tmedia_rtcp_event_type_e event_type, twrap_media_type_t media_type, uint32_t ssrc_media /*= 0*/)
-{
-	const tmedia_session_mgr_t* pWrappedMgr;
-	const MediaSessionMgr* pMgr;
-	if((pMgr = getMediaMgr()) && (pWrappedMgr = pMgr->getWrappedMgr())){
-		return (tmedia_session_mgr_send_rtcp_event((tmedia_session_mgr_t*)pWrappedMgr, twrap_get_media_type(media_type), event_type, ssrc_media) == 0);		
-	}
-	TSK_DEBUG_ERROR("No media manager");
-	return false;
-}
-
-bool CallSession::setRtcpCallback(const RtcpCallback* pRtcpCallback, twrap_media_type_t media_type)
-{
-	const tmedia_session_mgr_t* pWrappedMgr;
-	const MediaSessionMgr* pMgr;
-	if((pMgr = getMediaMgr()) && (pWrappedMgr = pMgr->getWrappedMgr())){
-		if((m_pRtcpCallback = pRtcpCallback)){
-			return (tmedia_session_mgr_set_onrtcp_cbfn((tmedia_session_mgr_t*)pWrappedMgr, twrap_get_media_type(media_type), this, &CallSession::rtcpOnCallback) == 0);
-		}
-		else{
-			return (tmedia_session_mgr_set_onrtcp_cbfn((tmedia_session_mgr_t*)pWrappedMgr, twrap_get_media_type(media_type), this, tsk_null) == 0);
-		}
-	}
-	return false;
-}
-
-const T140Callback* CallSession::getT140Callback() const
-{
-	return m_pT140Callback;
-}
-
-int CallSession::t140OnDataCallback(const void* context, enum tmedia_t140_data_type_e data_type, const void* data_ptr, unsigned data_size)
-{
-	const CallSession* session = dyn_cast<const CallSession*>((const CallSession*)context);
-	if(session && session->getT140Callback()){
-		T140CallbackData* dataObj = new T140CallbackData(data_type, data_ptr, data_size);
-		if(dataObj){
-			int ret = const_cast<T140Callback*>(session->getT140Callback())->ondata(dataObj);
-			delete dataObj;
-			return ret;
-		}
-	}
-	return 0;
-}
-
-const RtcpCallback* CallSession::getRtcpCallback() const
-{
-	return m_pRtcpCallback;
-}
-
-int CallSession::rtcpOnCallback(const void* context, enum tmedia_rtcp_event_type_e event_type, uint32_t ssrc_media)
-{
-	const CallSession* session = dyn_cast<const CallSession*>((const CallSession*)context);
-	if(session && session->getRtcpCallback()){
-		RtcpCallbackData* dataObj = new RtcpCallbackData(event_type, ssrc_media);
-		if(dataObj){
-			int ret = const_cast<RtcpCallback*>(session->getRtcpCallback())->onevent(dataObj);
-			delete dataObj;
-			return ret;
-		}
-	}
-	TSK_DEBUG_INFO("Not Sending RTCP packet (no callback)");
-	return 0;
-}
 
 /* ======================== MsrpSession ========================*/
-
+#if 0
 MsrpSession::MsrpSession(SipStack* pStack, MsrpCallback* pCallback)
 : InviteSession(pStack), m_pCallback(pCallback)
 {
-	tsip_ssession_set(m_pHandle,
+	/*tsip_ssession_set(m_pHandle,
 		TSIP_SSESSION_SET_MEDIA(
 			TSIP_MSESSION_SET_MSRP_CB(twrap_msrp_cb),
 			TSIP_MSESSION_SET_NULL()
 		),
-		TSIP_SSESSION_SET_NULL());
+		TSIP_SSESSION_SET_NULL());*/
 }
 
 MsrpSession::MsrpSession(SipStack* pStack, tsip_ssession_handle_t* pHandle)
 : InviteSession(pStack, pHandle), m_pCallback(tsk_null)
 {
-	tsip_ssession_set(m_pHandle,
+	/*tsip_ssession_set(m_pHandle,
 		TSIP_SSESSION_SET_MEDIA(
 			TSIP_MSESSION_SET_MSRP_CB(twrap_msrp_cb),
 			TSIP_MSESSION_SET_NULL()
 		),
-		TSIP_SSESSION_SET_NULL());
+		TSIP_SSESSION_SET_NULL());*/
 }
 
 MsrpSession::~MsrpSession()
@@ -677,7 +717,7 @@ bool MsrpSession::sendFile(ActionConfig* config/*=tsk_null*/)
 {
 	return false;
 }
-
+#endif
 /* ======================== MessagingSession ========================*/
 MessagingSession::MessagingSession(SipStack* pStack)
 : SipSession(pStack)
@@ -827,12 +867,6 @@ PublicationSession::PublicationSession(SipStack* Stack)
 {
 }
 
-PublicationSession::PublicationSession(SipStack* pStack, tsip_ssession_handle_t* pHandle)
-: SipSession(pStack, pHandle)
-{
-
-}
-
 PublicationSession::~PublicationSession()
 {
 }
@@ -920,13 +954,6 @@ SubscriptionSession::SubscriptionSession(SipStack* pStack)
 : SipSession(pStack)
 {
 }
-
-SubscriptionSession::SubscriptionSession(SipStack* pStack, tsip_ssession_handle_t* pHandle)
-: SipSession(pStack, pHandle)
-{
-
-}
-
 
 SubscriptionSession::~SubscriptionSession()
 {

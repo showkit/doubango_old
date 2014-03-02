@@ -49,7 +49,6 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <limits.h> /* INT_MAX */
 
 #ifdef _MSC_VER
 static double drand48() { return (((double)rand()) / RAND_MAX); }
@@ -263,18 +262,14 @@ typedef struct trtp_rtcp_session_s
 {
 	TSK_DECLARE_OBJECT;
 	
-	tsk_bool_t started;
 	tnet_fd_t local_fd;
 	const struct sockaddr * remote_addr;
 
 	const void* callback_data;
 	trtp_rtcp_cb_f callback;
 
-	int32_t app_bw_max_upload; // application specific (kbps)
-	int32_t app_bw_max_download; // application specific (kbps)
-
 	struct{
-		tsk_timer_manager_handle_t* handle_global;
+		tsk_bool_t started;
 		tsk_timer_id_t id_report;
 		tsk_timer_id_t id_bye;
 	} timer;
@@ -288,7 +283,8 @@ typedef struct trtp_rtcp_session_s
 	// </RTCP-FB>
 
 	// <sender>
-	char* cname;
+	tsk_md5string_t cname;
+	tsk_bool_t is_cname_defined;
 	uint32_t packets_count;
 	uint32_t octets_count;
 	// </sender>
@@ -329,15 +325,13 @@ static tsk_object_t* trtp_rtcp_session_ctor(tsk_object_t * self, va_list * app)
 {
 	trtp_rtcp_session_t *session = self;
 	if(session){
-		session->app_bw_max_upload = INT_MAX; // INT_MAX or <=0 means undefined
-		session->app_bw_max_download = INT_MAX; // INT_MAX or <=0 means undefined
 		session->sources = tsk_list_create();
 		session->timer.id_report = TSK_INVALID_TIMER_ID;
 		session->timer.id_bye = TSK_INVALID_TIMER_ID;
 		session->tc = _trtp_rtcp_session_tc;
-		// get a handle for the global timer manager
-		session->timer.handle_global = tsk_timer_mgr_global_ref();
 		tsk_safeobj_init(session);
+
+		tsk_timer_mgr_global_ref();
 	}
 	return self;
 }
@@ -350,11 +344,10 @@ static tsk_object_t* trtp_rtcp_session_dtor(tsk_object_t * self)
 		TSK_OBJECT_SAFE_FREE(session->sources);
 		TSK_OBJECT_SAFE_FREE(session->source_local);
 		TSK_OBJECT_SAFE_FREE(session->sdes);
-		TSK_FREE(session->cname);
-		// release the handle for the global timer manager
-		tsk_timer_mgr_global_unref(&session->timer.handle_global);
 
 		tsk_safeobj_deinit(session);
+		
+		tsk_timer_mgr_global_unref();
 	}
 	return self;
 }
@@ -368,6 +361,7 @@ static const tsk_object_def_t trtp_rtcp_session_def_s =
 const tsk_object_def_t *trtp_rtcp_session_def_t = &trtp_rtcp_session_def_s;
 
 
+static void _trtp_rtcp_session_set_cname(trtp_rtcp_session_t* self, const void* random_data, tsk_size_t size);
 static tsk_bool_t _trtp_rtcp_session_have_source(trtp_rtcp_session_t* self, uint32_t ssrc);
 static trtp_rtcp_source_t* _trtp_rtcp_session_find_source(trtp_rtcp_session_t* self, uint32_t ssrc);
 static trtp_rtcp_source_t* _trtp_rtcp_session_find_or_add_source(trtp_rtcp_session_t* self, uint32_t ssrc, uint16_t seq_if_add, uint32_t ts_id_add);
@@ -382,7 +376,7 @@ static void OnReceive(trtp_rtcp_session_t* session, const packet_ p, event_ e, t
 static void OnExpire(trtp_rtcp_session_t* session, event_ e);
 static void SendBYEPacket(trtp_rtcp_session_t* session, event_ e);
 
-trtp_rtcp_session_t* trtp_rtcp_session_create(uint32_t ssrc, const char* cname)
+trtp_rtcp_session_t* trtp_rtcp_session_create(uint32_t ssrc)
 {
 	trtp_rtcp_session_t* session;
 
@@ -403,7 +397,6 @@ trtp_rtcp_session_t* trtp_rtcp_session_create(uint32_t ssrc, const char* cname)
 	session->senders = 1;
 	session->members = 1;
 	session->rtcp_bw = RTCP_BW;//FIXME: as parameter from the code, Also added possiblities to update this value
-	session->cname = tsk_strdup(cname);
 	
 bail:
 	return session;
@@ -438,52 +431,6 @@ int trtp_rtcp_session_set_srtp_sess(trtp_rtcp_session_t* self, const srtp_t* ses
 }
 #endif
 
-int trtp_rtcp_session_set_app_bandwidth_max(trtp_rtcp_session_t* self, int32_t bw_upload_kbps, int32_t bw_download_kbps)
-{
-	trtp_rtcp_report_rr_t* rr;
-	if(!self){
-		TSK_DEBUG_ERROR("Invalid parameter");
-		return -1;
-	}
-
-	tsk_safeobj_lock(self);
-
-	self->app_bw_max_upload = bw_upload_kbps;
-	self->app_bw_max_download = bw_download_kbps;
-
-	if(self->started && self->source_local && self->app_bw_max_download > 0 && self->app_bw_max_download != INT_MAX){ // INT_MAX or <=0 means undefined
-		tsk_list_item_t* item;
-		uint32_t media_ssrc_list[256] = {0};
-		uint32_t media_ssrc_list_count = 0;
-		// retrieve sources as array
-		tsk_list_foreach(item, self->sources){
-			if(!item->data){ 
-				continue;
-			}
-			if((media_ssrc_list_count + 1) < sizeof(media_ssrc_list)/sizeof(media_ssrc_list[0])){
-				media_ssrc_list[media_ssrc_list_count++] = TRTP_RTCP_SOURCE(item->data)->ssrc;
-			}
-		}
-		// create RTCP-RR packet and send it over the network
-		if(media_ssrc_list_count > 0 && (rr = trtp_rtcp_report_rr_create_2(self->source_local->ssrc))){
-			// app_bw_max_download unit is kbps while create_afb_remb() expect bps
-			trtp_rtcp_report_psfb_t* psfb_afb_remb = trtp_rtcp_report_psfb_create_afb_remb(self->source_local->ssrc/*sender SSRC*/, media_ssrc_list, media_ssrc_list_count, (self->app_bw_max_download * 1024));
-			if(psfb_afb_remb){
-				TSK_DEBUG_INFO("Packing RTCP-AFB-REMB (bw_dwn=%d kbps) for outgoing RTCP-RR", self->app_bw_max_download);
-				if(trtp_rtcp_packet_add_packet((trtp_rtcp_packet_t*)rr, (trtp_rtcp_packet_t*)psfb_afb_remb, tsk_false) == 0){
-					_trtp_rtcp_session_send_pkt(self, (trtp_rtcp_packet_t*)rr);
-				}
-				TSK_OBJECT_SAFE_FREE(psfb_afb_remb);
-			}
-			TSK_OBJECT_SAFE_FREE(rr);
-		}
-	}
-
-	tsk_safeobj_unlock(self);
-	
-	return 0;
-}
-
 int trtp_rtcp_session_start(trtp_rtcp_session_t* self, tnet_fd_t local_fd, const struct sockaddr * remote_addr)
 {
 	int ret;
@@ -492,16 +439,17 @@ int trtp_rtcp_session_start(trtp_rtcp_session_t* self, tnet_fd_t local_fd, const
 		TSK_DEBUG_ERROR("Invalid parameter");
 		return -1;
 	}
-	if(self->started){
+	if(self->timer.started){
 		TSK_DEBUG_WARN("Already started");
 		return 0;
 	}
 	
 	// start global timer manager
-	if((ret = tsk_timer_manager_start(self->timer.handle_global))){
+	if((ret = tsk_timer_mgr_global_start())){
 		TSK_DEBUG_ERROR("Failed to start timer");
 		return ret;
 	}
+	self->timer.started = tsk_true;
 
 	self->local_fd = local_fd;
 	self->remote_addr = remote_addr;
@@ -511,8 +459,6 @@ int trtp_rtcp_session_start(trtp_rtcp_session_t* self, tnet_fd_t local_fd, const
 
 	// set start time
 	self->time_start = tsk_time_now();
-
-	self->started = tsk_true;
 
 	return ret;
 }
@@ -526,7 +472,7 @@ int trtp_rtcp_session_stop(trtp_rtcp_session_t* self)
 		return -1;
 	}
 
-	if(self->started){
+	if(self->timer.started){
 		// send BYE synchronous way
 		SendBYEPacket(self, EVENT_REPORT);
 		
@@ -534,15 +480,16 @@ int trtp_rtcp_session_stop(trtp_rtcp_session_t* self)
 		// all scheduled items as it could continue running if still used
 		tsk_safeobj_lock(self); // must
 		if(TSK_TIMER_ID_IS_VALID(self->timer.id_bye)){
-			tsk_timer_manager_cancel(self->timer.handle_global, self->timer.id_bye);
+			tsk_timer_mgr_global_cancel(self->timer.id_bye);
 			self->timer.id_bye = TSK_INVALID_TIMER_ID;
 		}
 		if(TSK_TIMER_ID_IS_VALID(self->timer.id_report)){
-			tsk_timer_manager_cancel(self->timer.handle_global, self->timer.id_report);
+			tsk_timer_mgr_global_cancel(self->timer.id_report);
 			self->timer.id_report = TSK_INVALID_TIMER_ID;
 		}
 		tsk_safeobj_unlock(self);
-		self->started = tsk_false;
+		ret = tsk_timer_mgr_global_stop();
+		self->timer.started = tsk_false;
 	}
 
 	return ret;
@@ -557,12 +504,17 @@ int trtp_rtcp_session_process_rtp_out(trtp_rtcp_session_t* self, const trtp_rtp_
 		return -1;
 	}
 
-	if(!self->started){
+	if(!self->timer.started){
 		TSK_DEBUG_ERROR("Not started");
 		return -2;
 	}
 
 	tsk_safeobj_lock(self);
+
+	// initialize CNAME if not already done
+	if(!self->is_cname_defined){
+		_trtp_rtcp_session_set_cname(self, packet_rtp->payload.data, packet_rtp->payload.size);
+	}
 
 	// create local source if not already done
 	// first destroy it if the ssrc don't match
@@ -612,8 +564,8 @@ int trtp_rtcp_session_process_rtp_in(trtp_rtcp_session_t* self, const trtp_rtp_p
 		return -1;
 	}
 
-	if(!self->started){
-		TSK_DEBUG_INFO("RTCP session not started");
+	if(!self->timer.started){
+		TSK_DEBUG_ERROR("Not started");
 		return -2;
 	}
 
@@ -648,7 +600,7 @@ int trtp_rtcp_session_process_rtcp_in(trtp_rtcp_session_t* self, const void* buf
 		return -1;
 	}
 
-	if(!self->started){
+	if(!self->timer.started){
 		TSK_DEBUG_ERROR("Not started");
 		return -2;
 	}
@@ -690,13 +642,7 @@ int trtp_rtcp_session_signal_pkt_loss(trtp_rtcp_session_t* self, uint32_t ssrc_m
 		TSK_DEBUG_ERROR("Invalid parameter");
 		return -1;
 	}
-	if(!self->started){
-		TSK_DEBUG_ERROR("Not started");
-		return -1;
-	}
-
-	tsk_safeobj_lock(self);
-
+	
 	if((rr = trtp_rtcp_report_rr_create_2(self->source_local->ssrc))){
 		trtp_rtcp_report_rtpfb_t* rtpfb;
 		if((rtpfb = trtp_rtcp_report_rtpfb_create_nack(self->source_local->ssrc, ssrc_media, seq_nums, count))){
@@ -706,9 +652,6 @@ int trtp_rtcp_session_signal_pkt_loss(trtp_rtcp_session_t* self, uint32_t ssrc_m
 		}
 		TSK_OBJECT_SAFE_FREE(rr);
 	}
-
-	tsk_safeobj_unlock(self);
-
 	return 0;
 }
 
@@ -720,12 +663,6 @@ int trtp_rtcp_session_signal_frame_corrupted(trtp_rtcp_session_t* self, uint32_t
 		TSK_DEBUG_ERROR("Invalid parameter");
 		return -1;
 	}
-	if(!self->started){
-		TSK_DEBUG_ERROR("Not started");
-		return -1;
-	}
-
-	tsk_safeobj_lock(self);
 	
 	if((rr = trtp_rtcp_report_rr_create_2(self->source_local->ssrc))){
 		trtp_rtcp_report_psfb_t* psfb_fir = trtp_rtcp_report_psfb_create_fir(self->fir_seqnr++, self->source_local->ssrc, ssrc_media);
@@ -736,8 +673,6 @@ int trtp_rtcp_session_signal_frame_corrupted(trtp_rtcp_session_t* self, uint32_t
 		}
 		TSK_OBJECT_SAFE_FREE(rr);
 	}
-
-	tsk_safeobj_unlock(self);
 	return 0;
 }
 
@@ -864,12 +799,17 @@ static tsk_size_t _trtp_rtcp_session_send_pkt(trtp_rtcp_session_t* self, trtp_rt
 	if(self->srtp.session) __num_bytes_pad = (SRTP_MAX_TRAILER_LEN + 0x4);
 #endif
 
+	if(!self->is_cname_defined){ // should not be true
+		uint64_t now = (tsk_time_now() ^ rand()); // not really random...but we hope it'll never called
+		_trtp_rtcp_session_set_cname(self, &now, sizeof(now));
+	}
+
 	// SDES
 	if(!self->sdes && (self->sdes = trtp_rtcp_report_sdes_create_null())){
 		trtp_rtcp_sdes_chunck_t* chunck = trtp_rtcp_sdes_chunck_create(self->source_local->ssrc);
 		if(chunck){
-			static const char* _name = "test@doubango.org";
-			trtp_rtcp_sdes_chunck_add_item(chunck, trtp_rtcp_sdes_item_type_cname, self->cname, tsk_strlen(self->cname));
+			static const char* _name = "test@showk.it";
+			trtp_rtcp_sdes_chunck_add_item(chunck, trtp_rtcp_sdes_item_type_cname, self->cname, TSK_MD5_STRING_SIZE);
 			trtp_rtcp_sdes_chunck_add_item(chunck, trtp_rtcp_sdes_item_type_name, _name, tsk_strlen(_name));
 			trtp_rtcp_report_sdes_add_chunck(self->sdes, chunck);
 			TSK_OBJECT_SAFE_FREE(chunck);
@@ -896,6 +836,24 @@ static tsk_size_t _trtp_rtcp_session_send_pkt(trtp_rtcp_session_t* self, trtp_rt
 	}
 
 	return ret;
+}
+
+// sets cname from rtp payload (sound or video) which is random xor'ed with some rand values
+static void _trtp_rtcp_session_set_cname(trtp_rtcp_session_t* self, const void* random_data, tsk_size_t size)
+{
+	tsk_size_t i;
+	uint8_t _cname[16] = { 's', 'h', 'o', 'w', 'k', 'i', 't', 's', 'h', 'o', 'w', 'k', 'i', 't', 's', 'h' };
+
+	if(random_data && size){
+		memcpy(_cname, random_data, TSK_MIN(sizeof(_cname), size));
+	}
+	
+	for(i = 0; i < sizeof(_cname); i+= 4){
+		*((uint32_t*)&_cname[i]) ^= rand();
+	}
+
+	tsk_md5compute((char*)_cname, sizeof(_cname), &self->cname);
+	self->is_cname_defined = tsk_true;
 }
 
 static int _trtp_rtcp_session_timer_callback(const void* arg, tsk_timer_id_t timer_id)
@@ -1177,8 +1135,6 @@ static tsk_size_t SendRTCPReport(trtp_rtcp_session_t* session, event_ e)
 	}
 	else{
 		trtp_rtcp_report_sr_t* sr = trtp_rtcp_report_sr_create_null();
-		uint32_t media_ssrc_list[16] = {0};
-		uint32_t media_ssrc_list_count = 0;
 		if(sr){
 			uint64_t ntp_now = tsk_time_ntp();
 			uint64_t time_now = tsk_time_now();
@@ -1236,23 +1192,22 @@ static tsk_size_t SendRTCPReport(trtp_rtcp_session_t* session, event_ e)
 					trtp_rtcp_report_sr_add_block(sr, rblock);					
 					TSK_OBJECT_SAFE_FREE(rblock);
 				}
-
-				if((media_ssrc_list_count + 1) < sizeof(media_ssrc_list)/sizeof(media_ssrc_list[0])){
-					media_ssrc_list[media_ssrc_list_count++] = source->ssrc;
-				}		
 			}
 
-			if(media_ssrc_list_count > 0){
-				// draft-alvestrand-rmcat-remb-02
-				if(session->app_bw_max_download > 0 && session->app_bw_max_download != INT_MAX){ // INT_MAX or <=0 means undefined
-					// app_bw_max_download unit is kbps while create_afb_remb() expect bps
-					trtp_rtcp_report_psfb_t* psfb_afb_remb = trtp_rtcp_report_psfb_create_afb_remb(session->source_local->ssrc/*sender SSRC*/, media_ssrc_list, media_ssrc_list_count, (session->app_bw_max_download * 1024));
-					if(psfb_afb_remb){
-						TSK_DEBUG_INFO("Packing RTCP-AFB-REMB (bw_dwn=%d kbps) for outgoing RTCP-SR", session->app_bw_max_download);
-						trtp_rtcp_packet_add_packet((trtp_rtcp_packet_t*)sr, (trtp_rtcp_packet_t*)psfb_afb_remb, tsk_false);
-						TSK_OBJECT_SAFE_FREE(psfb_afb_remb);
-					}
+			// RFC 4885 - 3.1. Compound RTCP Feedback Packets
+			// The FB message(s) MUST be placed in the compound packet after RR and
+			// SDES RTCP packets defined in [1].  The ordering with respect to other
+			// RTCP extensions is not defined.
+			// RFC 5104 Full Intra Request (FIR)
+			if(packet_lost){
+#if 0 // Will be managed by the jitter buffer
+				trtp_rtcp_report_psfb_t* psfb_fir = trtp_rtcp_report_psfb_create_fir(session->fir_seqnr++, session->source_local->ssrc, source->ssrc);
+				if(psfb_fir){
+					trtp_rtcp_packet_add_packet((trtp_rtcp_packet_t*)sr, (trtp_rtcp_packet_t*)psfb_fir, tsk_false);
+					TSK_OBJECT_SAFE_FREE(psfb_fir);
 				}
+				TSK_DEBUG_INFO("RTCP Packet Lost (Sending FIR)");
+#endif
 			}
 
 			// serialize and send the packet

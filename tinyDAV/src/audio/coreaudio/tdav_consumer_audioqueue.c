@@ -35,7 +35,6 @@
 // http://developer.apple.com/library/mac/#documentation/MusicAudio/Reference/AudioQueueReference/Reference/reference.html
 #if HAVE_COREAUDIO_AUDIO_QUEUE
 
-#include "tsk_string.h"
 #include "tsk_thread.h"
 #include "tsk_memory.h"
 #include "tsk_debug.h"
@@ -61,6 +60,7 @@ static void __handle_output_buffer(void *userdata, AudioQueueRef queue, AudioQue
 /* ============ Media Consumer Interface ================= */
 #define tdav_consumer_audioqueue_set tsk_null
 
+
 int tdav_consumer_audioqueue_prepare(tmedia_consumer_t* self, const tmedia_codec_t* codec)
 {
     OSStatus ret;
@@ -71,10 +71,10 @@ int tdav_consumer_audioqueue_prepare(tmedia_consumer_t* self, const tmedia_codec
 		TSK_DEBUG_ERROR("Invalid parameter");
 		return -1;
 	}
-
-	TMEDIA_CONSUMER(consumer)->audio.ptime = TMEDIA_CODEC_PTIME_AUDIO_DECODING(codec);
-	TMEDIA_CONSUMER(consumer)->audio.in.channels = TMEDIA_CODEC_CHANNELS_AUDIO_DECODING(codec);
-	TMEDIA_CONSUMER(consumer)->audio.in.rate = TMEDIA_CODEC_RATE_DECODING(codec);
+	
+	TMEDIA_CONSUMER(consumer)->audio.ptime = codec->plugin->audio.ptime;
+	TMEDIA_CONSUMER(consumer)->audio.in.channels = codec->plugin->audio.channels;
+	TMEDIA_CONSUMER(consumer)->audio.in.rate = codec->plugin->rate;
 	/* codec should have ptime */
 	
 	// Set audio category
@@ -96,7 +96,9 @@ int tdav_consumer_audioqueue_prepare(tmedia_consumer_t* self, const tmedia_codec
     description->mReserved = 0;
     
     int packetperbuffer = 1000 / TMEDIA_CONSUMER(consumer)->audio.ptime;
+
     consumer->buffer_size = description->mSampleRate * description->mBytesPerFrame / packetperbuffer;
+
     
     // Create the playback audio queue
     ret = AudioQueueNewOutput(&(consumer->description),

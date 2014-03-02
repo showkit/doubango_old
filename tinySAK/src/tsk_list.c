@@ -1,5 +1,8 @@
-/* Copyright (C) 2010-2013 Mamadou Diop.
-* Copyright (C) 2013 Doubango Telecom <http://doubango.org>
+/*
+* Copyright (C) 2010-2011 Mamadou Diop.
+*
+* Contact: Mamadou Diop <diopmamadou(at)doubango[dot]org>
+*	
 * This file is part of Open Source Doubango Framework.
 *
 * DOUBANGO is free software: you can redistribute it and/or modify
@@ -20,18 +23,24 @@
 /**@file tsk_list.c
  * @brief Linked list.
  *
+ * @author Mamadou Diop <diopmamadou(at)doubango[dot]org>
+ *
+
  */
 #include "tsk_list.h"
 #include "tsk_memory.h"
 #include "tsk_debug.h"
 
+//#include <assert.h>
 #include <string.h>
 
+// FIXME: remove asserts
+
 /**@defgroup tsk_list_group Linked list.
-* @brief Linked list. For more information about linked list you can check @ref _Page_TinySAK_AnsiC_Linked_List "this page".
+* For more information about linked list you can visit http://en.wikipedia.org/wiki/Linked_list.
 */
 
-/* Predicate function to find item using memory address comparison.
+/** tsk_list_find_by_item
 */
 static int tsk_list_find_by_item(const tsk_list_item_t* item, const void* _item)
 {
@@ -39,31 +48,28 @@ static int tsk_list_find_by_item(const tsk_list_item_t* item, const void* _item)
 }
 
 /**@ingroup tsk_list_group
-* Creates a @ref _Page_TinySAK_AnsiC_Linked_List "linked-list"  object. <br />
-* You <b>MUST</b> use @ref TSK_OBJECT_SAFE_FREE() to safely free the returned @ref _Page_TinySAK_AnsiC_Object_Programming "well-defined" object.
-* @return The newly created list object.
+* Creates a linked list object.
+* You MUST use @ref TSK_OBJECT_SAFE_FREE() to safely free the object.
 */
 tsk_list_t* tsk_list_create()
 {
-	return (tsk_list_t*)tsk_object_new(tsk_list_def_t);
+	return tsk_object_new(tsk_list_def_t);
 }
 
 /**@ingroup tsk_list_group
-* Create and initialize an item to be added to a @ref tsk_list_t "linked list". 
-* You should not need to call this function by yourself. See @ref _Anchor_TinySAK_Linked_List_Add_Remove "here" for more information on how to add items.<br />
-* You <b>MUST</b> use @ref TSK_OBJECT_SAFE_FREE() to safely free the returned @ref _Page_TinySAK_AnsiC_Object_Programming "well-defined" object. <br />
-* @return The newly created @ref tsk_list_item_t "item" object.
+* Create and initialize an item to be added to a linked list.
+* You MUST use @ref TSK_OBJECT_SAFE_FREE() to safely free the object.
 */
 tsk_list_item_t* tsk_list_item_create()
 {
-	return (tsk_list_item_t*)tsk_object_new(tsk_list_item_def_t);
+	return tsk_object_new(tsk_list_item_def_t);
 }
 
 /**@ingroup tsk_list_group
-* Locks the @ref tsk_list_t "list" to avoid concurrent access. The @ref tsk_list_t "list" must be unlocked using @ref tsk_list_unlock(). <br />
-* For more information about thread-safety see @ref _Anchor_TinySAK_Linked_List_Thread_Safety "here".
+* Locks the list to avoid concurrent access. The list should be unlocked using
+* @ref tsk_list_unlock.
 * @param list The list to lock.
-* @return 0 if succeed and non-zero error code otherwise.
+* @retval zero if succeed and non-zero error code otherwise.
 * @sa @ref tsk_list_unlock
 */
 int tsk_list_lock(tsk_list_t* list)
@@ -81,10 +87,9 @@ int tsk_list_lock(tsk_list_t* list)
 }
 
 /**@ingroup tsk_list_group
-* UnLocks a previously locked @ref tsk_list_t "list". The @ref tsk_list_t "list" must be previously locked using @ref tsk_list_lock().<br />
-* For more information about thread-safety see @ref _Anchor_TinySAK_Linked_List_Thread_Safety "here".
-* @param list The @ref tsk_list_t "list" to unlock. <br />
-* @return 0 if succeed and non-zero error code otherwise.
+* UnLocks a previously locked list.
+* @param list The list to unlock.
+* @retval zero if succeed and non-zero error code otherwise.
 * @sa @ref tsk_list_lock
 */
 int tsk_list_unlock(tsk_list_t* list)
@@ -99,28 +104,24 @@ int tsk_list_unlock(tsk_list_t* list)
 }
 
 /**@ingroup tsk_list_group
-* Removes an item from the @ref tsk_list_t "list". The reference counter value of the object held by the item will be decremented. <br />
-* You should not need to call this function by yourself. See @ref _Anchor_TinySAK_Linked_List_Add_Remove "here" for more information on how to remove items.<br />
-* @param list the @ref tsk_list_t "list" from which to remove the @a item.
-* @param item the @ref tsk_list_item_t "item" to remove from the @a list.
-* @return @ref tsk_true if @a item exists and have been removed; @ref tsk_false otherwise.
+* Remove an free an item from the @a list.
+* @param list the list from which to remove the @a item.
+* @param item the item to remove (and free) from the @a list.
 */
-tsk_bool_t tsk_list_remove_item(tsk_list_t* list, tsk_list_item_t* item)
+void tsk_list_remove_item(tsk_list_t* list, tsk_list_item_t* item)
 {
 	if(item){
-		return tsk_list_remove_item_by_pred(list, tsk_list_find_by_item, (const void*)item);
+		tsk_list_remove_item_by_pred(list, tsk_list_find_by_item, (const void*)item);
 	}
-	return tsk_false;
 }
 
 /**@ingroup tsk_list_group
-* Pops an object from the @ref tsk_list_t "list". The item will be removed from the list but the refrence counter will not change.
-* @param list The @ref tsk_list_t "list" from which to pop the item.
-* @param tskobj Any @ref _Page_TinySAK_AnsiC_Object_Programming "well-defined" object to pop.
-* @return The item holding @ref tskobj or any equivalent object. @ref tsk_object_cmp(item->data, tskobj) == 0. <br />
-* @ref tsk_null will be returned if no matching object could be found.
+* Pops an object from the @a list.
+* @param list The list from which to pop the object.
+* @param tskobj Any valid object(declared using @ref TSK_DECLARE_OBJECT) to remove.
+* @retval The item.
 */
-tsk_list_item_t* tsk_list_pop_item_by_data(tsk_list_t* list, const tsk_object_t *tskobj)
+tsk_list_item_t* tsk_list_pop_item_by_data(tsk_list_t* list, const tsk_object_t * tskobj)
 {
 	if(list){
 		tsk_list_item_t *prev = tsk_null;
@@ -161,10 +162,10 @@ tsk_list_item_t* tsk_list_pop_item_by_data(tsk_list_t* list, const tsk_object_t 
 }
 
 /**@ingroup tsk_list_group
-* Removes an object from the @ref tsk_list_t "list". The reference counter value of the @ref _Page_TinySAK_AnsiC_Object_Programming "well-defined" object held by the item will be decremented.
-* @param list The @ref tsk_list_t "list" from which to remove the object.
-* @param tskobj Any valid @ref _Page_TinySAK_AnsiC_Object_Programming "well-defined" object to remove.
-* @return @ref tsk_true if an item have been removed; @ref tsk_false otherwise.
+* Removes an object from the @a list.
+* @param list The list from which to remove the object.
+* @param tskobj Any valid object(declared using @ref TSK_DECLARE_OBJECT) to remove.
+* @retval True if removed and false otherwise
 */
 tsk_bool_t tsk_list_remove_item_by_data(tsk_list_t* list, const tsk_object_t * tskobj)
 {
@@ -177,13 +178,11 @@ tsk_bool_t tsk_list_remove_item_by_data(tsk_list_t* list, const tsk_object_t * t
 }
 
 /**@ingroup tsk_list_group
-* Pops an item from the @ref tsk_list_t "list" using a @ref _Anchor_TinySAK_Linked_List_Predicates "predicate". The item will be completely removed from the list but the reference counter value will <b>not</b> be decremented.<br />
-* See @ref _Anchor_TinySAK_Linked_List_Add_Remove "here" for more information on how to use this function.
+* Pops an item from the @a list using a predicate function.
 * @param list The list from which to pop the item.
-* @param predicate The @ref _Anchor_TinySAK_Linked_List_Predicates "predicate" used to match the item.
+* @param predicate The predicate function used to match the item.
 * @param data Arbitrary data to pass to the predicate function.
-* @return An @ref tsk_list_item_t "item" matching the @ref _Anchor_TinySAK_Linked_List_Predicates "predicate" or @ref tsk_null if none match. <br />
-* You <b>must</b> free the returned item using @ref TSK_OBJECT_SAFE_FREE.
+* @retval The item
 */
 tsk_list_item_t* tsk_list_pop_item_by_pred(tsk_list_t* list, tsk_list_func_predicate predicate, const void * data)
 {
@@ -226,11 +225,11 @@ tsk_list_item_t* tsk_list_pop_item_by_pred(tsk_list_t* list, tsk_list_func_predi
 }
 
 /**@ingroup tsk_list_group
-* Removes an item from the @ref tsk_list_t "list" using a @ref _Anchor_TinySAK_Linked_List_Predicates "predicate".
-* @param list The list from which to remove the @ref tsk_list_item_t "item".
-* @param predicate The @ref _Anchor_TinySAK_Linked_List_Predicates "predicate" used to match the item to remove.
-* @param data Arbitrary data to pass to the @ref _Anchor_TinySAK_Linked_List_Predicates "predicate".
-* @return @ref tsk_true if an item have been removed and @ref tsk_false otherwise.
+* Removes an item from the @a list using a predicate function.
+* @param list The list from which to remove the item.
+* @param predicate The predicate function used to match the item.
+* @param data Arbitrary data to pass to the predicate function.
+* @retval True if removed and false otherwise
 */
 tsk_bool_t tsk_list_remove_item_by_pred(tsk_list_t* list, tsk_list_func_predicate predicate, const void * data)
 {
@@ -243,8 +242,8 @@ tsk_bool_t tsk_list_remove_item_by_pred(tsk_list_t* list, tsk_list_func_predicat
 }
 
 /**@ingroup tsk_list_group
-* Cleans up and remove all items from the @ref tsk_list_t "list". The reference counter for each item will be decremented. An item will be freed only if its new reference counter value is equal to 0.
-* @param list The list to clean up.
+* Clean up and remove all items from the @a list.
+* @param list The list ro clean up.
 */
 void tsk_list_clear_items(tsk_list_t* list)
 {
@@ -263,9 +262,9 @@ void tsk_list_clear_items(tsk_list_t* list)
 }
 
 /**@ingroup tsk_list_group
-* Pops the first item from the @ref tsk_list_t "list". The item will be definitely removed from the list but its reference counter will not be decremented.
+* Pops first item from the @a list. The item will be definitely removed from the list.
 * @param list The list from which to pop the item.
-* @return The first item from the lit. It's up to you to free the returned item using @ref TSK_OBJECT_SAFE_FREE.
+* @retval The first item. It is up to you to free the returned item (@ref TSK_OBJECT_SAFE_FREE(item)).
 */
 tsk_list_item_t* tsk_list_pop_first_item(tsk_list_t* list)
 {
@@ -286,10 +285,10 @@ tsk_list_item_t* tsk_list_pop_first_item(tsk_list_t* list)
 }
 
 /**@ingroup tsk_list_group
-* Adds an item to the @ref tsk_list_t "list". You should using @ref tsk_list_push_data instead of this function.
+* Add an item to the @a list.
 * @param list The destination @a list.
-* @param item The @a item to add. The reference to the item will be stolen(set to @ref tsk_null) instead of incrementing its reference counter.
-* @param back Indicates whether to put the item back or not (first).
+* @param item The @a item to add.
+* @param back Indicates whether to put the item back or not.
 */
 void tsk_list_push_item(tsk_list_t* list, tsk_list_item_t** item, tsk_bool_t back)
 {
@@ -310,10 +309,9 @@ void tsk_list_push_item(tsk_list_t* list, tsk_list_item_t** item, tsk_bool_t bac
 }
 
 /**@ingroup tsk_list_group
-* Add an item to the list in ascending or descending order. <br />
-* See @ref _Anchor_TinySAK_Linked_List_Sort_Items "here" for more information.
+* Add an item to the list in ascending or descending order.
 * @param list The destination @a list.
-* @param item The  @a item to add. The reference to the @a item will be stolen(set to @ref tsk_null) instead of incrementing its reference counter.
+* @param item The  @a item to add.
 * @param ascending Indicates whether to put the @a item in ascending order or not.
 */
 void tsk_list_push_filtered_item(tsk_list_t* list, tsk_list_item_t** item, tsk_bool_t ascending)
@@ -347,11 +345,10 @@ void tsk_list_push_filtered_item(tsk_list_t* list, tsk_list_item_t** item, tsk_b
 }
 
 /**@ingroup tsk_list_group
-* Add all items in @a src into @a dest. Each item will have its reference counter incremented before being added.
+* Add all items in @a src into @a dest.
 * @param dest The destination list.
 * @param src The source list.
 * @param back Indicates whether to put the list back or not.
-* @return 0 if succeed and non-zero error code otherwise.
 **/
 int tsk_list_push_list(tsk_list_t* dest, const tsk_list_t* src, tsk_bool_t back)
 {
@@ -373,22 +370,19 @@ int tsk_list_push_list(tsk_list_t* dest, const tsk_list_t* src, tsk_bool_t back)
 }
 
 /**@ingroup tsk_list_group
-* Adds a @ref _Page_TinySAK_AnsiC_Object_Programming "well-defined" object to the @a list. 
-* The reference to the @a object will be stolen(set to @ref tsk_null) instead of incrementing its reference counter.
+* Add an opaque data to the @a list.
 * @param list The destination @a list.
-* @param tskobj The @a object to add.
+* @param data The @a data to add.
 * @param back Indicates whether to put the item back or not.
-* @return 0 if succeed and non-zero error code otherwise.
-* @sa @ref tsk_list_push_back_data @ref tsk_list_push_front_data
 */
-int tsk_list_push_data(tsk_list_t* list, tsk_object_t** tskobj, tsk_bool_t back)
+int tsk_list_push_data(tsk_list_t* list, void** data, tsk_bool_t back)
 {
-	if(list && tskobj && *tskobj){
+	if(list && data && *data){
 		tsk_list_item_t *item = tsk_list_item_create();
-		item->data = *tskobj; // stolen
+		item->data = *data;
 		
 		tsk_list_push_item(list, &item, back);
-		(*tskobj) = tsk_null;
+		(*data) = tsk_null;
 
 		return 0;
 	}
@@ -399,21 +393,19 @@ int tsk_list_push_data(tsk_list_t* list, tsk_object_t** tskobj, tsk_bool_t back)
 }
 
 /**@ingroup tsk_list_group
-* Adds a @ref _Page_TinySAK_AnsiC_Object_Programming "well-defined" object to the @a list in ascending or descending order.
-* The reference to the @a object will be stolen(set to @ref tsk_null) instead of incrementing its reference counter. <br />
-* See @ref @ref _Anchor_TinySAK_Linked_List_Sort_Items "here" for more information on how to use this function.
+* Add an opaque data to the list in ascending or descending order.
 * @param list The destination @a list.
-* @param tskobj The @a tskobj to add.
-* @param ascending Indicates whether to put the object in ascending order or not.
+* @param data The @a data to add.
+* @param ascending Indicates whether to put the @a data in ascending order or not.
 */
-int tsk_list_push_filtered_data(tsk_list_t* list, tsk_object_t** tskobj, tsk_bool_t ascending)
+int tsk_list_push_filtered_data(tsk_list_t* list, void** data, tsk_bool_t ascending)
 {
-	if(list && tskobj && *tskobj){
+	if(list && data && *data){
 		tsk_list_item_t *item = tsk_list_item_create();
-		item->data = *tskobj;
+		item->data = *data;
 		
 		tsk_list_push_filtered_item(list, &item, ascending);
-		(*tskobj) = tsk_null;
+		(*data) = tsk_null;
 
 		return 0;
 	}
@@ -424,13 +416,10 @@ int tsk_list_push_filtered_data(tsk_list_t* list, tsk_object_t** tskobj, tsk_boo
 }
 
 /**@ingroup tsk_list_group
-* Finds an item helding same object as @a tskobj from a list. A matching item will be: <i>tsk_object_cmp(item->data, tskobj) == 0</i> <br />
-* See @ref _Anchor_TinySAK_Linked_List_Find_Items "here" for more information on how to use this function.
-* @param list The @a list holding the item to find.
-* @param tskobj The @a object to use for comparison to find the item.
-* @return A @ref tsk_list_item_t "item" if found and @ref tsk_null otherwize. <br />
-* Because the returned object is a constant, you <b>must</b> not try to free or decrement its reference counter.
-* @sa @ref tsk_list_find_item_by_pred
+* Find an item from a list.
+* @param list The @a list holding the item.
+* @param tskobj The @a object to find.
+* @retval A @ref tsk_list_item_t item if found and NULL otherwize.
 */
 const tsk_list_item_t* tsk_list_find_item_by_data(const tsk_list_t* list, const tsk_object_t* tskobj)
 {
@@ -447,13 +436,11 @@ const tsk_list_item_t* tsk_list_find_item_by_data(const tsk_list_t* list, const 
 }
 
 /**@ingroup tsk_list_group
-* Finds an item from a list using a @ref _Anchor_TinySAK_Linked_List_Predicates "predicate".
-* See @ref _Anchor_TinySAK_Linked_List_Find_Items "here" for more information on how to use this function.
-* @param list the list from which to find the item.
-* @param predicate the @ref _Anchor_TinySAK_Linked_List_Predicates "predicate" against which to test each item
-* @param data data passed to the predicate function for comparison
-* @return the item which match the criteria and @ref tsk_null otherwise. <br />
-* Because the returned object is a constant, you <b>must</b> not try to free or decrement its reference counter.
+* Find first item matching criteria defined by the @a predicate.
+* @param list the list to query
+* @param predicate the predicate against which to test each item
+* @param data data passed to the predicate function for comparaison
+* @retval the item which match the criteria and NULL otherwise
 * @sa @ref tsk_list_find_item_by_data
 */
 const tsk_list_item_t* tsk_list_find_item_by_pred(const tsk_list_t* list, tsk_list_func_predicate predicate, const void* data)
@@ -467,18 +454,17 @@ const tsk_list_item_t* tsk_list_find_item_by_pred(const tsk_list_t* list, tsk_li
 		}
 	}
 	else{
-		TSK_DEBUG_WARN("Cannot use a null predicate function");
+		TSK_DEBUG_WARN("Cannot use an uninitialized predicate function");
 	}
 	return tsk_null;
 }
 
 /**@ingroup tsk_list_group
-* Finds a @ref _Page_TinySAK_AnsiC_Object_Programming "well-defined" object (held by an item) from a list using a @ref _Anchor_TinySAK_Linked_List_Predicates "predicate".
-* @param list the list from which to find the object.
-* @param predicate the @ref _Anchor_TinySAK_Linked_List_Predicates "predicate" against which to test each item
+* Find first item matching criteria defined by the @a predicate.
+* @param list the list to query
+* @param predicate the predicate against which to test each item
 * @param data data passed to the predicate function for comparaison
-* @return The @ref _Page_TinySAK_AnsiC_Object_Programming "well-defined" object held by the item which match the criteria and @ref tsk_null otherwise. <br />
-* Because the returned object is a constant, you <b>must</b> not try to free or decrement its reference counter.
+* @retval the data holded by the item which match the criteria and NULL otherwise
 * @sa @ref tsk_list_find_item_by_pred
 */
 const tsk_object_t* tsk_list_find_object_by_pred(const tsk_list_t* list, tsk_list_func_predicate predicate, const void* data)
@@ -486,28 +472,17 @@ const tsk_object_t* tsk_list_find_object_by_pred(const tsk_list_t* list, tsk_lis
 	return tsk_list_find_object_by_pred_at_index(list, predicate, data, 0);
 }
 
-const tsk_object_t* tsk_list_find_object_by_data(const tsk_list_t* list, const tsk_object_t* tskobj)
-{
-	const tsk_list_item_t* item = tsk_list_find_item_by_data(list, tskobj);
-	if(item) {
-		return (const tsk_object_t*)item->data;
-	}
-	return tsk_null;
-}
-
 /**@ingroup tsk_list_group */
 const tsk_object_t* tsk_list_find_object_by_pred_at_index(const tsk_list_t* list, tsk_list_func_predicate predicate, const void* data, tsk_size_t index)
 {
 	tsk_size_t pos = 0;
 	const tsk_list_item_t *item;
-	
-	tsk_list_foreach(item, list){
-		if((!predicate || predicate(item, data) == 0) && pos++ >= index){
-			return item->data;
-		}
+	if((item = tsk_list_find_item_by_pred(list, predicate, data)) && pos++ >= index){
+		return item->data;
 	}
-	
-	return tsk_null;
+	else{
+		return tsk_null;
+	}
 }
 
 /**@ingroup tsk_list_group */
@@ -531,7 +506,7 @@ int tsk_list_find_index_by_pred(const tsk_list_t* list, tsk_list_func_predicate 
 * @param list The list containing the items to count
 * @param predicate The predicate to use to match the items. Set to null to count all items
 * @param data Data passed to the predicate function for comparaison
-* @return The number of item matching the predicate
+* @retval The number of item matching the predicate
 */
 tsk_size_t tsk_list_count(const tsk_list_t* list, tsk_list_func_predicate predicate, const void* data)
 {
@@ -566,7 +541,7 @@ tsk_size_t tsk_list_count(const tsk_list_t* list, tsk_list_func_predicate predic
 //
 static tsk_object_t* tsk_list_item_ctor(tsk_object_t * self, va_list * app)
 {
-	tsk_list_item_t *item = (tsk_list_item_t*)self;
+	tsk_list_item_t *item = self;
 	if(item){
 	}
 	return self;
@@ -574,7 +549,7 @@ static tsk_object_t* tsk_list_item_ctor(tsk_object_t * self, va_list * app)
 
 static tsk_object_t* tsk_list_item_dtor(tsk_object_t *self)
 {
-	tsk_list_item_t *item = (tsk_list_item_t*)self;
+	tsk_list_item_t *item = self;
 	if(item){
 		item->data = tsk_object_unref(item->data);
 	}
@@ -586,8 +561,8 @@ static tsk_object_t* tsk_list_item_dtor(tsk_object_t *self)
 
 static int tsk_list_item_cmp(const tsk_object_t *_item1, const tsk_object_t *_item2)
 {	
-	const tsk_list_item_t* item1 = (const tsk_list_item_t*)_item1;
-	const tsk_list_item_t* item2 = (const tsk_list_item_t*)_item2;
+	const tsk_list_item_t* item1 = _item1;
+	const tsk_list_item_t* item2 = _item2;
 	
 	if(item1 && item2){
 		return tsk_object_cmp(item1->data, item2->data);
@@ -609,7 +584,7 @@ const tsk_object_def_t *tsk_list_item_def_t = &tsk_list_item_def_s;
 //
 static tsk_object_t* tsk_list_ctor(tsk_object_t *self, va_list *app)
 {
-	tsk_list_t *list = (tsk_list_t *)self;
+	tsk_list_t *list = self;
 	if(list){
 	}
 
@@ -618,7 +593,7 @@ static tsk_object_t* tsk_list_ctor(tsk_object_t *self, va_list *app)
 
 static tsk_object_t* tsk_list_dtor(tsk_object_t *self)
 { 
-	tsk_list_t *list = (tsk_list_t *)self;
+	tsk_list_t *list = self;
 	if(list){
 #if 0
 		/* Not thread-safe */
@@ -658,247 +633,3 @@ static const tsk_object_def_t tsk_list_def_s =
 };
 const tsk_object_def_t *tsk_list_def_t = &tsk_list_def_s;
 
-
-
-/**@page _Page_TinySAK_AnsiC_Linked_List Linked list
-*
-* - @ref _Anchor_TinySAK_Linked_List_Well_Defined_Object "Our \"well-defined\" object"
-* - @ref _Anchor_TinySAK_Linked_List_Predicates "Predicates"
-* - @ref _Anchor_TinySAK_Linked_List_Create_Destroy "Create and destroy the list"
-* - @ref _Anchor_TinySAK_Linked_List_Thread_Safety "Thread safety"
-* - @ref _Anchor_TinySAK_Linked_List_Add_Remove "Add and remove items"
-* - @ref _Anchor_TinySAK_Linked_List_Dump_Items "Dump items"
-* - @ref _Anchor_TinySAK_Linked_List_Sort_Items "Sort items"
-* - @ref _Anchor_TinySAK_Linked_List_Find_Items "Find items"
-* - @ref _Anchor_TinySAK_Linked_List_Public_Functions "Public functions"
-* - @ref _Anchor_TinySAK_Linked_List_Helper_Macros "Helper macros"
-*
-* <hr />
-*
-* A linked-list is a @ref _Page_TinySAK_AnsiC_Object_Programming "well defined" object and must contain only @ref _Page_TinySAK_AnsiC_Object_Programming "well defined" objects. <br />
-* A linked-list is a @ref tsk_list_t object and contains @ref tsk_list_item_t objects which holds @ref _Anchor_TinySAK_Linked_List_Well_Defined_Object "our well defined object" in its <i>data</i> field. <br />
-* 
-* <h2>@anchor _Anchor_TinySAK_Linked_List_Well_Defined_Object Our "well-defined" object</h2>
-* Our linked-list will hold a "well defined" object defined like this:
-*
-*@code
-// (well-defined object declaration)
-typedef struct student_s 
-{	
-	TSK_DECLARE_OBJECT;
-
-	char *id;
-	char *name;
-} 
-student_t;
-
-// (constructor)
-static tsk_object_t* student_ctor(tsk_object_t* self, va_list * app)
-{
-	student_t* student = (tsk_object_t*)self;
-	if(student){
-	}
-	return self;
-}
-
-// (destructor)
-static tsk_object_t* student_dtor(tsk_object_t* self)
-{
-	student_t* student = (tsk_object_t*)self;
-	TSK_FREE(student->id);
-	TSK_FREE(student->name);
-	return self;
-}
-
-// (case insensitive comparator)
-static int student_icmp(const tsk_object_t *self, const tsk_object_t *object)
-{	
-	const student_t* student1 = (const tsk_object_t*)self;
-	const student_t* student2 = (const tsk_object_t*)object;
-
-	if(!student1 || !student2){
-		return 0;// must never happen
-	}
-
-	return tsk_stricmp(student1->id, student2->id);
-}
-
-// (well-defined object declaration)
-static const tsk_object_def_t student_def_s =
-{
-	sizeof(student_t),	
-	student_ctor,
-	student_dtor,
-	student_icmp
-};
-
-// create a student object
-static student_t* student_create(const char* id, const char* name)
-{
-	student_t* student;
-	if((student = (student_t*)tsk_object_new(&student_def_s))){
-		student->id = tsk_strdup(id);
-		student->name = tsk_strdup(name);
-	}
-	return student;
-}
-*@endcode
-*
-*
-* <h2>@anchor _Anchor_TinySAK_Linked_List_Predicates Predicates</h2>
-* A predicate is a function pointer. <br />
-* In the next sections we will need some predicates defined like this:
-*@code
-// predicate to find a student by name
-static int pred_find_student_by_name(const tsk_list_item_t *item, const void *name)
-{
-	if(item && item->data){
-		const student_t *student = (const student_t *)item->data;
-		return tsk_striequals(student->name, name);
-	}
-	return -1;
-}
-// predicate to find a student by id
-static int pred_find_student_by_id(const tsk_list_item_t *item, const void *id)
-{
-	if(item && item->data){
-		const student_t *student = (const student_t *)item->data;
-		return tsk_striequals(student->id, id);
-	}
-	return -1;
-}
-*@endcode
-*
-*
-* <h2>@anchor _Anchor_TinySAK_Linked_List_Create_Destroy Create and destroy the list</h2>
-* To create the list:
-* @code
-* tsk_list_t *list = tsk_list_create();
-* @endcode
-* To destroy the list:
-* @code
-* TSK_OBJECT_SAFE_FREE(list);
-* @endcode
-* To increment the reference counting:
-* @code
-* tsk_object_ref(list);
-* @endcode
-* To decrement the reference counting:
-* @code
-* tsk_object_unref(list);
-* @endcode
-*
-** <h2>@anchor _Anchor_TinySAK_Linked_List_Thread_Safety Thread safety</h2>
-* A linked-list is not thread-safe. It's up to you to use @ref tsk_list_lock() and @ref tsk_list_unlock() to make it thread-safe. <br />
-* @ref tsk_list_lock() and @ref tsk_list_unlock() internally use a <a target=_blank href="http://en.wikipedia.org/wiki/Reentrant_mutex">reentrant mutex</a>.
-*
-* <h2>@anchor _Anchor_TinySAK_Linked_List_Add_Remove Add and remove items</h2>
-* There are two ways to add items to the list: <br />
-* First way:
-* @code
-* // create the well-defined object 
-* student_t *student = student_create("0", "student-0");
-* // push the object at the end of the list
-* tsk_list_push_back_data(list, (void**)&student);
-* @endcode
-* Second way:
-* @code
-* // create an item
-* tsk_list_item_t* item = tsk_list_item_create();
-* // fill the data field of the item
-* item->data = (void*)student_create("0", "student-0");
-* // push the item at the end of the list
-* tsk_list_push_back_item(list, (void**)&item);
-* @endcode
-* You can also add a list to another list using @ref tsk_list_pushback_list() or @ref tsk_list_pushfront_list(). All items will be retained (reference counting incremented).<br />
-* There are many ways to remove items. <br />
-* Remove item using default comparison function:
-* @code
-* tsk_list_remove_item_by_data(list, student);
-* @endcode
-* Remove item using predicate:
-* @code
-* tsk_list_remove_item_by_pred(list, pred_find_student_by_id, "2"); // remove student with id equal to "2"
-* @endcode
-*
-* Checks @ref _Anchor_TinySAK_Linked_List_Public_Functions "the public functions" for more ways to add or remove items.
-*
-* <h2>@anchor _Anchor_TinySAK_Linked_List_Dump_Items Dump items</h2>
-* To dump the content of all items:
-* @code
-* const tsk_list_item_t* item;
-* const student_t *student;
-* tsk_list_foreach(item, list) {
-*	student = (const student_t *)item->data;
-*	TSK_DEBUG_INFO("id = %s, name = %s", student->id, student->name);
-* }
-* @endcode
-* 
-* <h2>@anchor _Anchor_TinySAK_Linked_List_Sort_Items Sort items</h2>
-* You can sort the list in ascending or descending order. The default function used for comparison is the one defined in the well-defined object (see @ref _Anchor_TinySAK_Object_Comparator "here" for more information). <br />
-* An item is sorted when it's being added to the list. It's not possible to sort items later once they are added. <br />
-* Sorting items using default comparison function:
-* @code
-// ascending order
-* tsk_list_push_ascending_data(list, (void**)&student); // comparision function will be student_icmp() defined above.
-// or descending order
-* tsk_list_push_descending_data(list, (void**)&student); // comparision function will be student_icmp() defined above.
-* @endcode
-*
-* Checks @ref _Anchor_TinySAK_Linked_List_Public_Functions "the public functions" for more ways to sort items.
-*
-* <h2>@anchor _Anchor_TinySAK_Linked_List_Find_Items Find items</h2>
-* @code
-* // find student with same id 
-* const student_t* _student = tsk_list_find_object_by_data(list, student);// comparision function will be student_icmp() defined above.
-* // find an item containing a student with name equal to "student-2"
-* const tsk_list_item_t *item = tsk_list_find_item_by_pred(list, pred_find_student_by_name, "student-2");
-* // find a student with id equal to "2"
-* const student_t *student = tsk_list_find_object_by_pred(list, pred_find_student_by_id, "2");
-* @endcode
-*
-* Checks @ref _Anchor_TinySAK_Linked_List_Public_Functions "the public functions" for more ways to find items.
-*
-* <h2>@anchor _Anchor_TinySAK_Linked_List_Public_Functions Public functions </h2>
-* - @ref tsk_list_count
-* - @ref tsk_list_create
-* - @ref tsk_list_find_index_by_pred
-* - @ref tsk_list_find_item_by_data
-* - @ref tsk_list_find_item_by_pred
-* - @ref tsk_list_find_object_by_pred
-* - @ref tsk_list_find_object_by_pred_at_index
-* - @ref tsk_list_foreach
-* - @ref tsk_list_item_create
-* - @ref tsk_list_lock
-* - @ref tsk_list_pop_first_item
-* - @ref tsk_list_pop_item_by_data
-* - @ref tsk_list_pop_item_by_pred
-* - @ref tsk_list_push_ascending_data
-* - @ref tsk_list_push_ascending_item
-* - @ref tsk_list_push_back_data
-* - @ref tsk_list_push_back_item
-* - @ref tsk_list_push_data
-* - @ref tsk_list_push_descending_data
-* - @ref tsk_list_push_descending_item
-* - @ref tsk_list_push_filtered_data
-* - @ref tsk_list_push_filtered_item
-* - @ref tsk_list_push_front_data
-* - @ref tsk_list_push_front_item
-* - @ref tsk_list_push_item
-* - @ref tsk_list_push_list
-* - @ref tsk_list_pushback_list
-* - @ref tsk_list_pushfront_list
-* - @ref tsk_list_remove_first_item
-* - @ref tsk_list_remove_item
-* - @ref tsk_list_remove_item_by_data
-* - @ref tsk_list_remove_item_by_pred
-* - @ref tsk_list_remove_last_item
-* - @ref tsk_list_unlock
-*
-* <h2>@anchor _Anchor_TinySAK_Linked_List_Helper_Macros Helper macros </h2>
-* - @ref TSK_LIST_IS_EMPTY
-* - @ref TSK_LIST_IS_FIRST
-* - @ref TSK_LIST_IS_LAST
-* - @ref TSK_LIST_FIRST_DATA
-* - @ref TSK_LIST_LAST_DATA
-*/

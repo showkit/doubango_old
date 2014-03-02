@@ -74,7 +74,7 @@ tsip_header_RSeq_t *tsip_header_RSeq_parse(const char *data, tsk_size_t size)
 	const char *eof = pe;
 	tsip_header_RSeq_t *hdr_rseq = tsip_header_RSeq_create_null();
 	
-	const char *tag_start = tsk_null;
+	const char *tag_start;
 
 	
 /* #line 81 "./src/headers/tsip_header_RSeq.c" */
@@ -135,19 +135,15 @@ static const int tsip_machine_parser_header_RSeq_en_main = 1;
 
 
 /* #line 98 "./ragel/tsip_parser_header_RSeq.rl" */
-	(void)(eof);
-	(void)(tsip_machine_parser_header_RSeq_first_final);
-	(void)(tsip_machine_parser_header_RSeq_error);
-	(void)(tsip_machine_parser_header_RSeq_en_main);
 	
-/* #line 144 "./src/headers/tsip_header_RSeq.c" */
+/* #line 140 "./src/headers/tsip_header_RSeq.c" */
 	{
 	cs = tsip_machine_parser_header_RSeq_start;
 	}
 
-/* #line 103 "./ragel/tsip_parser_header_RSeq.rl" */
+/* #line 99 "./ragel/tsip_parser_header_RSeq.rl" */
 	
-/* #line 151 "./src/headers/tsip_header_RSeq.c" */
+/* #line 147 "./src/headers/tsip_header_RSeq.c" */
 	{
 	int _klen;
 	unsigned int _trans;
@@ -238,7 +234,7 @@ _match:
 	{
 	}
 	break;
-/* #line 242 "./src/headers/tsip_header_RSeq.c" */
+/* #line 238 "./src/headers/tsip_header_RSeq.c" */
 		}
 	}
 
@@ -251,12 +247,12 @@ _again:
 	_out: {}
 	}
 
-/* #line 104 "./ragel/tsip_parser_header_RSeq.rl" */
+/* #line 100 "./ragel/tsip_parser_header_RSeq.rl" */
 	
 	if( cs < 
-/* #line 258 "./src/headers/tsip_header_RSeq.c" */
+/* #line 254 "./src/headers/tsip_header_RSeq.c" */
 12
-/* #line 105 "./ragel/tsip_parser_header_RSeq.rl" */
+/* #line 101 "./ragel/tsip_parser_header_RSeq.rl" */
  ){
 		TSK_DEBUG_ERROR("Failed to parse 'RSeq' header.");
 		TSK_OBJECT_SAFE_FREE(hdr_rseq);

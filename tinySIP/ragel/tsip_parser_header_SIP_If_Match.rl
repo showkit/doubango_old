@@ -98,13 +98,9 @@ tsip_header_SIP_If_Match_t *tsip_header_SIP_If_Match_parse(const char *data, tsk
 	const char *eof = pe;
 	tsip_header_SIP_If_Match_t *hdr_ifmatch = tsip_header_SIP_If_Match_create_null();
 	
-	const char *tag_start = tsk_null;
+	const char *tag_start;
 
 	%%write data;
-	(void)(eof);
-	(void)(tsip_machine_parser_header_SIP_If_Match_first_final);
-	(void)(tsip_machine_parser_header_SIP_If_Match_error);
-	(void)(tsip_machine_parser_header_SIP_If_Match_en_main);
 	%%write init;
 	%%write exec;
 	

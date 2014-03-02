@@ -63,12 +63,12 @@ int tmedia_imageattr_parse(tmedia_imageattr_xt* self, const void* in_data, tsk_s
 	const char *pe = p + in_size;
 	const char *eof = pe;
 	
-	const char *tag_start = tsk_null;
+	const char *tag_start;
 
-	tmedia_imageattr_set_xt* sets = tsk_null;
-	tsk_size_t* sets_count = tsk_null;
-	tmedia_imageattr_xyrange_xt* xyrange = tsk_null;
-	tmedia_imageattr_srange_xt* srange = tsk_null;
+	tmedia_imageattr_set_xt* sets;
+	tsk_size_t* sets_count;
+	tmedia_imageattr_xyrange_xt* xyrange;
+	tmedia_imageattr_srange_xt* srange;
 
 	
 /* #line 75 "./src/tmedia_imageattr.c" */

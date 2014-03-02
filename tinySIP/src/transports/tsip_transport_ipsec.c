@@ -36,8 +36,6 @@
 #include "tinysip/headers/tsip_header_Security_Client.h"
 #include "tinysip/headers/tsip_header_Security_Server.h"
 
-#include "tsip.h"
-
 #include "tnet_socket.h"
 
 #include "tsk_debug.h"
@@ -49,7 +47,7 @@ tsip_ipsec_association_t* tsip_ipsec_association_create(const tsip_transport_t* 
 	return tsk_object_new(tsip_ipsec_association_def_t, transport);
 }
 
-tsip_transport_ipsec_t* tsip_transport_ipsec_create(struct tsip_stack_s* stack, const char* host, tnet_port_t port, tnet_socket_type_t type, const char* description)
+tsip_transport_ipsec_t* tsip_transport_ipsec_create(tsip_stack_t* stack, const char* host, tnet_port_t port, tnet_socket_type_t type, const char* description)
 {
 	return tsk_object_new(tsip_transport_ipsec_def_t, stack, host, port, type, description);
 }
@@ -305,8 +303,6 @@ int tsip_transport_ipsec_updateMSG(tsip_transport_ipsec_t* self, tsip_message_t 
 				TSIP_MESSAGE_ADD_HEADER(msg, TSIP_HEADER_PROXY_REQUIRE_VA_ARGS("sec-agree"));
 				break;
 			}
-            
-        default: break;
 	}
 
 	ret = 0;
@@ -374,7 +370,7 @@ static tsk_object_t* tsip_transport_ipsec_ctor(tsk_object_t * self, va_list * ap
 {
 	tsip_transport_ipsec_t *transport = self;
 	if(transport){
-		const struct tsip_stack_s *stack = va_arg(*app, const struct tsip_stack_s*);
+		const tsip_stack_handle_t *stack = va_arg(*app, const tsip_stack_handle_t*);
 		const char *host = va_arg(*app, const char*);
 #if defined(__GNUC__)
 		tnet_port_t port = (tnet_port_t)va_arg(*app, unsigned);
@@ -478,11 +474,7 @@ static tsk_object_t* tsip_ipsec_association_ctor(tsk_object_t * self, va_list * 
 			tipsec_set_local(association->ctx, ip_local, ip_remote, association->socket_uc->port, association->socket_us->port);
 		}
 		else{
-			tipsec_set_local(association->ctx, 
-				ip_local, 
-				transport->stack->network.proxy_cscf[transport->stack->network.transport_idx_default], 
-				association->socket_uc->port, 
-				association->socket_us->port);
+			tipsec_set_local(association->ctx, ip_local, transport->stack->network.proxy_cscf, association->socket_uc->port, association->socket_us->port);
 		}
 	}	 	
 	return self;

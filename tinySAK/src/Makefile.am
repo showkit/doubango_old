@@ -15,6 +15,7 @@ libtinySAK_la_SOURCES  = tsk.c\
 	tsk_object.c\
 	tsk_options.c\
 	tsk_params.c\
+	tsk_plugin.c\
 	tsk_ppfcs16.c\
 	tsk_ppfcs32.c\
 	tsk_ragel_state.c\

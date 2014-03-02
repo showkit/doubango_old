@@ -149,14 +149,14 @@ static const tmedia_codec_plugin_def_t tdav_codec_g711u_plugin_def_s =
 	tmedia_audio,
 	tmedia_codec_id_pcmu,
 	"PCMU",
-	"G.711u codec (native)",
+	"G.711u codec (From tinyDAV)",
 	TMEDIA_CODEC_FORMAT_G711u,
 	tsk_false,
 	8000, // rate
 	
 	{ /* audio */
 		1, // channels
-		0 // ptime @deprecated
+		20 // ptime
 	},
 	
 	/* video */
@@ -302,14 +302,14 @@ static const tmedia_codec_plugin_def_t tdav_codec_g711a_plugin_def_s =
 	tmedia_audio,
 	tmedia_codec_id_pcma,
 	"PCMA",
-	"G.711a codec (native)",
+	"G.711a codec (From tinyDAV)",
 	TMEDIA_CODEC_FORMAT_G711a,
 	tsk_false,
 	8000, // rate
 	
 	{ /* audio */
 		1, // channels
-		0 // ptime @deprecated
+		20, // ptime
 	},
 
 	/* video */

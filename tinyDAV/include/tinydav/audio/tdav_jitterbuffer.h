@@ -71,9 +71,9 @@ TDAV_BEGIN_DECLS
 /* ms between growing */
 #define JB_WAIT_GROW 60
 /* ms between shrinking */
-#define JB_WAIT_SHRINK 250
+#define JB_WAIT_SHRINK 60
 /* ms that the JB max may be off */
-#define JB_MAX_DIFF 6000 //in a RTP stream the max_diff may be 3000 packets (most packets are 20ms)
+#define JB_MAX_DIFF 100 //in a RTP stream the max_diff may be 3000 packets (most packets are 20ms)
 
 //structs
 typedef struct jb_info {

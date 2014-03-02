@@ -63,10 +63,10 @@ static int twrap_producer_proxy_audio_prepare(tmedia_producer_t* self, const tme
 	if(codec && (manager = ProxyPluginMgr::getInstance())){
 		const ProxyAudioProducer* audioProducer;
 		if((audioProducer = manager->findAudioProducer(TWRAP_PRODUCER_PROXY_AUDIO(self)->id)) && audioProducer->getCallback()){
-			self->audio.channels = TMEDIA_CODEC_CHANNELS_AUDIO_ENCODING(codec);
-			self->audio.rate = TMEDIA_CODEC_RATE_ENCODING(codec);
-			self->audio.ptime = TMEDIA_CODEC_PTIME_AUDIO_ENCODING(codec);
-			ret = audioProducer->getCallback()->prepare((int)self->audio.ptime, self->audio.rate, self->audio.channels);
+			self->audio.channels = codec->plugin->audio.channels;
+			self->audio.rate = codec->plugin->rate;
+			self->audio.ptime = codec->plugin->audio.ptime;
+			ret = audioProducer->getCallback()->prepare((int)codec->plugin->audio.ptime, codec->plugin->rate, codec->plugin->audio.channels);
 		}
 	}
 	return ret;
@@ -188,7 +188,7 @@ static const tmedia_producer_plugin_def_t twrap_producer_proxy_audio_plugin_def_
 	twrap_producer_proxy_audio_stop
 };
 
-TINYWRAP_GEXTERN const tmedia_producer_plugin_def_t *twrap_producer_proxy_audio_plugin_def_t = &twrap_producer_proxy_audio_plugin_def_s;
+const tmedia_producer_plugin_def_t *twrap_producer_proxy_audio_plugin_def_t = &twrap_producer_proxy_audio_plugin_def_s;
 
 
 
@@ -204,22 +204,6 @@ ProxyAudioProducer::ProxyAudioProducer(twrap_producer_proxy_audio_t* pProducer)
 ProxyAudioProducer::~ProxyAudioProducer()
 {
 	stopPushCallback();
-}
-
-// Use this function to request resampling when your sound card can't honor negotaited record parameters
-bool ProxyAudioProducer::setActualSndCardRecordParams(int nPtime, int nRate, int nChannels)
-{
-	if(m_pWrappedPlugin){
-		TSK_DEBUG_INFO("setActualSndCardRecordParams(ptime=%d, rate=%d, channels=%d)", nPtime, nRate, nChannels);
-		TMEDIA_PRODUCER(m_pWrappedPlugin)->audio.ptime = nPtime;
-		TMEDIA_PRODUCER(m_pWrappedPlugin)->audio.rate = nRate;
-		TMEDIA_PRODUCER(m_pWrappedPlugin)->audio.channels = nChannels;
-		return true;
-	}
-	else{
-		TSK_DEBUG_ERROR("Invalid state");
-		return false;
-	}
 }
 
 bool ProxyAudioProducer::setPushBuffer(const void* pPushBufferPtr, unsigned nPushBufferSize, bool bUsePushCallback/*=false*/)
@@ -380,7 +364,7 @@ int twrap_producer_proxy_video_prepare(tmedia_producer_t* self, const tmedia_cod
 		if((videoProducer = manager->findVideoProducer(TWRAP_PRODUCER_PROXY_VIDEO(self)->id)) && videoProducer->getCallback()){
 			self->video.chroma = videoProducer->getChroma();
 			self->video.rotation = videoProducer->getRotation();
-			ret = videoProducer->getCallback()->prepare(TMEDIA_CODEC_VIDEO(codec)->out.width, TMEDIA_CODEC_VIDEO(codec)->out.height, TMEDIA_CODEC_VIDEO(codec)->out.fps);
+        	ret = videoProducer->getCallback()->prepare(TMEDIA_CODEC_VIDEO(codec)->out.width, TMEDIA_CODEC_VIDEO(codec)->out.height, TMEDIA_CODEC_VIDEO(codec)->out.fps);
 		}
 	}
 	
@@ -467,7 +451,7 @@ static tsk_object_t* twrap_producer_proxy_video_dtor(tsk_object_t * self)
 { 
 	twrap_producer_proxy_video_t *producer = (twrap_producer_proxy_video_t *)self;
 	if(producer){
-		TSK_DEBUG_INFO("twrap_producer_proxy_video_dtor()");
+
 		/* stop */
 		if(producer->started){
 			twrap_producer_proxy_video_stop(TMEDIA_PRODUCER(producer));
@@ -511,7 +495,7 @@ static const tmedia_producer_plugin_def_t twrap_producer_proxy_video_plugin_def_
 	twrap_producer_proxy_video_stop
 };
 
-TINYWRAP_GEXTERN const tmedia_producer_plugin_def_t *twrap_producer_proxy_video_plugin_def_t = &twrap_producer_proxy_video_plugin_def_s;
+const tmedia_producer_plugin_def_t *twrap_producer_proxy_video_plugin_def_t = &twrap_producer_proxy_video_plugin_def_s;
 
 
 
@@ -528,7 +512,6 @@ ProxyVideoProducer::ProxyVideoProducer(tmedia_chroma_t eChroma, struct twrap_pro
 
 ProxyVideoProducer::~ProxyVideoProducer()
 {
-	TSK_DEBUG_INFO("~ProxyVideoProducer");
 }
 
 int ProxyVideoProducer::getRotation()const
@@ -575,28 +558,13 @@ int ProxyVideoProducer::push(const void* pBuffer, unsigned nSize)
 
 // send() "as is"
 // only used by telepresence system with a H.264 SVC hardaware encoder
-int ProxyVideoProducer::sendRaw(const void* pBuffer, unsigned nSize, unsigned nDuration, bool bMarker)
+int ProxyVideoProducer::send(const void* pBuffer, unsigned nSize, unsigned nDuration, bool bMarker)
 {
 	if(m_pWrappedPlugin && TMEDIA_PRODUCER(m_pWrappedPlugin)->raw_cb.callback){
-		//tmedia_video_encode_result_reset(&TMEDIA_PRODUCER(m_pWrappedPlugin)->raw_cb.chunck_curr);
-
 		TMEDIA_PRODUCER(m_pWrappedPlugin)->raw_cb.chunck_curr.buffer.ptr = pBuffer;
 		TMEDIA_PRODUCER(m_pWrappedPlugin)->raw_cb.chunck_curr.buffer.size = nSize;
 		TMEDIA_PRODUCER(m_pWrappedPlugin)->raw_cb.chunck_curr.duration = nDuration;
 		TMEDIA_PRODUCER(m_pWrappedPlugin)->raw_cb.chunck_curr.last_chunck = (bMarker == true);
-		return TMEDIA_PRODUCER(m_pWrappedPlugin)->raw_cb.callback(&TMEDIA_PRODUCER(m_pWrappedPlugin)->raw_cb.chunck_curr);
-	}
-	return 0;
-}
-
-int ProxyVideoProducer::sendRaw(const void* pBuffer, unsigned nSize, const void* proto_hdr)
-{
-	if(m_pWrappedPlugin && TMEDIA_PRODUCER(m_pWrappedPlugin)->raw_cb.callback){
-		//tmedia_video_encode_result_reset(&TMEDIA_PRODUCER(m_pWrappedPlugin)->raw_cb.chunck_curr);
-
-		TMEDIA_PRODUCER(m_pWrappedPlugin)->raw_cb.chunck_curr.buffer.ptr = pBuffer;
-		TMEDIA_PRODUCER(m_pWrappedPlugin)->raw_cb.chunck_curr.buffer.size = nSize;
-		TMEDIA_PRODUCER(m_pWrappedPlugin)->raw_cb.chunck_curr.proto_hdr = proto_hdr;
 		return TMEDIA_PRODUCER(m_pWrappedPlugin)->raw_cb.callback(&TMEDIA_PRODUCER(m_pWrappedPlugin)->raw_cb.chunck_curr);
 	}
 	return 0;

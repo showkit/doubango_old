@@ -58,7 +58,9 @@ int tmedia_producer_init(tmedia_producer_t* self)
 	self->audio.rate = TMEDIA_PRODUCER_RATE_DEFAULT;
 	self->audio.volume = tmedia_defaults_get_volume();
 
-	return 0;
+
+    
+    return 0;
 }
 
 /**@ingroup tmedia_producer_group

@@ -42,7 +42,8 @@ tcomp_dictionary_t* tcomp_dicts_create_presence_dict()
 	static const char *pres_dict_data = RFC5112_DICTIONARY_PRESENCE_VALUE;
 	static tcomp_dictionary_t * pres_dict = tsk_null;
 
-	if(!pres_dict){
+	if(!pres_dict)
+	{
 		pres_dict = tcomp_state_create(
 			RFC5112_DICTIONARY_PRESENCE_VALUE_LENGTH, 
 			RFC5112_DICTIONARY_PRESENCE_STATE_ADDRESS, 
@@ -53,15 +54,16 @@ tcomp_dictionary_t* tcomp_dicts_create_presence_dict()
 		if(pres_dict){
 			tcomp_buffer_referenceBuff(pres_dict->value, (uint8_t*)pres_dict_data, RFC5112_DICTIONARY_PRESENCE_VALUE_LENGTH);
 			tcomp_state_makeValid(pres_dict);
-			TSK_DEBUG_INFO("SigComp - Presence dict State id=");
-			tcomp_buffer_print(pres_dict->identifier);
 		}
 		else{
 			TSK_DEBUG_ERROR("Failed to create Presence dictionary.");
 		}
 	}
+	else{
+		pres_dict = tsk_object_ref(pres_dict);
+	}
 
-	return tsk_object_ref(pres_dict);
+	return pres_dict;
 }
 
 /**The Session Initiation Protocol (SIP) and Session Description Protocol (SDP) Static Dictionary for Signaling Compression as per RFC 3485.
@@ -83,14 +85,16 @@ tcomp_dictionary_t* tcomp_dicts_create_sip_dict()
 		if(sip_dict){
 			tcomp_buffer_referenceBuff(sip_dict->value, (uint8_t*)sip_dict_data, RFC3485_DICTIONARY_SIP_VALUE_LENGTH);
 			tcomp_state_makeValid(sip_dict);
-			TSK_DEBUG_INFO("SigComp - SIP dict State id=");
-			tcomp_buffer_print(sip_dict->identifier);
 		}
 		else{
 			TSK_DEBUG_ERROR("Failed to create SIP/SDP dictionary.");
 		}
 	}
+	else{
+		/* take ownership */
+		sip_dict = tsk_object_ref(sip_dict);
+	}
 
-	return tsk_object_ref(sip_dict);
+	return sip_dict;
 }
 

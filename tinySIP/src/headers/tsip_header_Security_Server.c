@@ -109,7 +109,7 @@ tsip_header_Security_Servers_L_t *tsip_header_Security_Server_parse(const char *
 	const char *eof = pe;
 	tsip_header_Security_Servers_L_t *hdr_securityservers = tsk_list_create();
 	
-	const char *tag_start = tsk_null;
+	const char *tag_start;
 	tsip_header_Security_Server_t *curr_securityserver = tsk_null;
 
 	
@@ -675,19 +675,15 @@ static const int tsip_machine_parser_header_Security_Server_en_main = 1;
 
 
 /* #line 214 "./ragel/tsip_parser_header_Security_Server.rl" */
-	(void)(eof);
-	(void)(tsip_machine_parser_header_Security_Server_first_final);
-	(void)(tsip_machine_parser_header_Security_Server_error);
-	(void)(tsip_machine_parser_header_Security_Server_en_main);
 	
-/* #line 684 "./src/headers/tsip_header_Security_Server.c" */
+/* #line 680 "./src/headers/tsip_header_Security_Server.c" */
 	{
 	cs = tsip_machine_parser_header_Security_Server_start;
 	}
 
-/* #line 219 "./ragel/tsip_parser_header_Security_Server.rl" */
+/* #line 215 "./ragel/tsip_parser_header_Security_Server.rl" */
 	
-/* #line 691 "./src/headers/tsip_header_Security_Server.c" */
+/* #line 687 "./src/headers/tsip_header_Security_Server.c" */
 	{
 	int _klen;
 	unsigned int _trans;
@@ -868,7 +864,7 @@ _match:
 	{
 	}
 	break;
-/* #line 872 "./src/headers/tsip_header_Security_Server.c" */
+/* #line 868 "./src/headers/tsip_header_Security_Server.c" */
 		}
 	}
 
@@ -881,12 +877,12 @@ _again:
 	_out: {}
 	}
 
-/* #line 220 "./ragel/tsip_parser_header_Security_Server.rl" */
+/* #line 216 "./ragel/tsip_parser_header_Security_Server.rl" */
 	
 	if( cs < 
-/* #line 888 "./src/headers/tsip_header_Security_Server.c" */
+/* #line 884 "./src/headers/tsip_header_Security_Server.c" */
 188
-/* #line 221 "./ragel/tsip_parser_header_Security_Server.rl" */
+/* #line 217 "./ragel/tsip_parser_header_Security_Server.rl" */
  ){
 		TSK_DEBUG_ERROR("Failed to parse 'Security-Server' header.");
 		TSK_OBJECT_SAFE_FREE(curr_securityserver);

@@ -41,7 +41,7 @@
 	machine thttp_machine_parser_header_Content_Type;
 
 	# Includes
-	include thttp_machine_utils "./ragel/thttp_machine_utils.rl";
+	include thttp_machine_utils "./thttp_machine_utils.rl";
 	
 	action tag{
 		tag_start = p;
@@ -108,13 +108,9 @@ thttp_header_Content_Type_t *thttp_header_Content_Type_parse(const char *data, t
 	const char *eof = pe;
 	thttp_header_Content_Type_t *hdr_ctype = thttp_header_content_type_create_null();
 	
-	const char *tag_start = tsk_null;
+	const char *tag_start;
 
 	%%write data;
-	(void)(eof);
-	(void)(thttp_machine_parser_header_Content_Type_first_final);
-	(void)(thttp_machine_parser_header_Content_Type_error);
-	(void)(thttp_machine_parser_header_Content_Type_en_main);
 	%%write init;
 	%%write exec;
 	

@@ -38,7 +38,6 @@ TSIP_BEGIN_DECLS
 
 #define TSIP_PUBLISH_EVENT(self)		((tsip_publish_event_t*)(self))
 
-//@tinyWRAP
 typedef enum tsip_publish_event_type_e
 {
 	tsip_i_publish,

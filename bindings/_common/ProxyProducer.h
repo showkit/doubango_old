@@ -62,7 +62,6 @@ public:
 #endif
 	virtual ~ProxyAudioProducer();
 
-	bool setActualSndCardRecordParams(int nPtime, int nRate, int nChannels);
 	bool setPushBuffer(const void* pPushBufferPtr, unsigned nPushBufferSize, bool bUsePushCallback=false);
 	int push(const void* pBuffer=tsk_null, unsigned nSize=0);
 	bool setGain(unsigned nGain);
@@ -128,10 +127,9 @@ public:
 	bool setRotation(int nRot);
 	bool setActualCameraOutputSize(unsigned nWidth, unsigned nHeight);
 	int push(const void* pBuffer, unsigned nSize);
+	int send(const void* pBuffer, unsigned nSize, unsigned nDuration, bool bMarker);
 	void setCallback(ProxyVideoProducerCallback* pCallback) { m_pCallback = pCallback; }
 #if !defined(SWIG)
-	int sendRaw(const void* pBuffer, unsigned nSize, unsigned nDuration, bool bMarker);
-	int sendRaw(const void* pBuffer, unsigned nSize, const void* proto_hdr);
 	inline ProxyVideoProducerCallback* getCallback()const { return m_pCallback; }
 	virtual inline bool isWrapping(tsk_object_t* wrapped_plugin){
 		return m_pWrappedPlugin == wrapped_plugin;

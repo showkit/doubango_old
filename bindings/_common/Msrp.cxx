@@ -23,6 +23,7 @@
 
 #include "SipSession.h"
 #include "Common.h"
+#include "tinymsrp/headers/tmsrp_header.h"
 
 /* ======================== MsrpMessage ========================*/
 MsrpMessage::MsrpMessage()

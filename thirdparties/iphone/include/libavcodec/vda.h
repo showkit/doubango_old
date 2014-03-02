@@ -3,20 +3,20 @@
  *
  * copyright (c) 2011 Sebastien Zwickert
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -58,7 +58,7 @@
  *
  * @deprecated Use synchronous decoding mode.
  */
-typedef struct {
+typedef struct vda_frame {
     /**
      * The PTS of the frame.
      *
@@ -87,7 +87,7 @@ typedef struct {
 
 /**
  * This structure is used to provide the necessary configurations and data
- * to the VDA FFmpeg HWAccel implementation.
+ * to the VDA Libav HWAccel implementation.
  *
  * The application must make it available as AVCodecContext.hwaccel_context.
  */
@@ -172,25 +172,16 @@ struct vda_context {
 
     /**
      * The current bitstream buffer.
-     *
-     * - encoding: unused
-     * - decoding: Set/Unset by libavcodec.
      */
     uint8_t             *priv_bitstream;
 
     /**
      * The current size of the bitstream.
-     *
-     * - encoding: unused
-     * - decoding: Set/Unset by libavcodec.
      */
     int                 priv_bitstream_size;
 
     /**
      * The reference size used for fast reallocation.
-     *
-     * - encoding: unused
-     * - decoding: Set/Unset by libavcodec.
      */
     int                 priv_allocated_size;
 };

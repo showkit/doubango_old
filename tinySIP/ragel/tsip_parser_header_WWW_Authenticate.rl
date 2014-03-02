@@ -175,7 +175,7 @@
 //	const char *eof = pe;
 //	tsip_header_WWW_Authenticate_t *hdr_WWW_Authenticate = TSIP_HEADER_WWW_AUTHENTICATE_CREATE();
 //	
-//	const char *tag_start = tsk_null;
+//	const char *tag_start;
 //
 //	%%write data;
 //	%%write init;

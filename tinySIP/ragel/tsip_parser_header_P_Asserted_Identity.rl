@@ -129,14 +129,10 @@ tsip_header_P_Asserted_Identities_L_t *tsip_header_P_Asserted_Identity_parse(con
 	const char *eof = pe;
 	tsip_header_P_Asserted_Identities_L_t *hdr_p_asserted_identities = tsk_list_create();
 	
-	const char *tag_start = tsk_null;
+	const char *tag_start;
 	tsip_header_P_Asserted_Identity_t *curr_p_asserted_identity = 0;
 
 	%%write data;
-	(void)(eof);
-	(void)(tsip_machine_parser_header_P_Asserted_Identity_first_final);
-	(void)(tsip_machine_parser_header_P_Asserted_Identity_error);
-	(void)(tsip_machine_parser_header_P_Asserted_Identity_en_main);
 	%%write init;
 	%%write exec;
 	

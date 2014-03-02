@@ -34,10 +34,6 @@
 #if TSK_UNDER_WINDOWS
 #	include <windows.h>
 #endif
-#if TSK_UNDER_WINDOWS_RT
-#	include "../winrt/ThreadEmulation.h"
-	using namespace ThreadEmulation;
-#endif
 
 #include <string.h>
 
@@ -66,10 +62,11 @@ void tsk_thread_sleep(uint64_t ms)
 * @param arg An address for the argument for the thread's start routine 
 * @retval If successful, returns zero. Otherwise, an error number is returned to indicate the error
 */
-int tsk_thread_create(tsk_thread_handle_t** handle, void *(TSK_STDCALL *start) (void *), void *arg)
+int tsk_thread_create(tsk_thread_handle_t** handle, void *(*start) (void *), void *arg)
 {
 #if TSK_UNDER_WINDOWS
-	*((HANDLE*)handle) = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)start, arg, 0, NULL);
+	DWORD ThreadId;
+	*((HANDLE*)handle) = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)start, arg, 0, &ThreadId);
 	return *((HANDLE*)handle) ? 0 : -1;
 #else
 	*handle = tsk_calloc(1, sizeof(pthread_t));
@@ -86,23 +83,13 @@ int tsk_thread_set_priority(tsk_thread_handle_t* handle, int32_t priority)
 		return -1;
 	}
 #if TSK_UNDER_WINDOWS
-	{
-		int ret = SetThreadPriority(handle, priority) ? 0 : -1;
-#if TSK_UNDER_WINDOWS_RT
-		// It's not possible to set priority on WP8 when thread is not in suspended state -> do nothing and don't bother us
-		if(ret){
-			TSK_DEBUG_INFO("SetThreadPriority() failed but nothing to worry about");
-			ret = 0;
-		}
-#endif
-		return ret;
-	}
+	return SetThreadPriority(handle, priority) ? 0 : -1;
 #else
 	struct sched_param sp;
 	int ret;
     memset(&sp, 0, sizeof(struct sched_param));
     sp.sched_priority = priority;
-    if ((ret = pthread_setschedparam(*((pthread_t*)handle), SCHED_OTHER, &sp))) {
+    if ((ret = pthread_setschedparam(*((pthread_t*)handle), SCHED_RR, &sp))) {
         TSK_DEBUG_ERROR("Failed to change priority to %d with error code=%d", priority, ret);
         return ret;
     }
@@ -164,11 +151,7 @@ int tsk_thread_join(tsk_thread_handle_t** handle)
 	}
     
 #if TSK_UNDER_WINDOWS
-#	if TSK_UNDER_WINDOWS_RT
-	ret = (WaitForSingleObjectEx(*((HANDLE*)handle), INFINITE, TRUE) == WAIT_FAILED) ? -1 : 0;
-#	else
 	ret = (WaitForSingleObject(*((HANDLE*)handle), INFINITE) == WAIT_FAILED) ? -1 : 0;
-#endif
 	if(ret == 0){
 		ret = tsk_thread_destroy(handle);
 	}

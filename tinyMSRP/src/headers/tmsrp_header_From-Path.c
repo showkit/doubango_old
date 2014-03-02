@@ -81,7 +81,7 @@ tmsrp_header_From_Path_t *tmsrp_header_From_Path_parse(const char *data, tsk_siz
 	const char *eof = pe;
 	tmsrp_header_From_Path_t *header = tmsrp_header_From_Path_create_null();
 
-	const char *tag_start = tsk_null;
+	const char *tag_start;
 
 	
 /* #line 88 "./src/headers/tmsrp_header_From-Path.c" */
@@ -150,19 +150,15 @@ static const int tmsrp_machine_parser_header_From_Path_en_main = 1;
 
 
 /* #line 117 "./ragel/tmsrp_parser_header_From-Path.rl" */
-	(void)(eof);
-	(void)(tmsrp_machine_parser_header_From_Path_first_final);
-	(void)(tmsrp_machine_parser_header_From_Path_error);
-	(void)(tmsrp_machine_parser_header_From_Path_en_main);
 	
-/* #line 159 "./src/headers/tmsrp_header_From-Path.c" */
+/* #line 155 "./src/headers/tmsrp_header_From-Path.c" */
 	{
 	cs = tmsrp_machine_parser_header_From_Path_start;
 	}
 
-/* #line 122 "./ragel/tmsrp_parser_header_From-Path.rl" */
+/* #line 118 "./ragel/tmsrp_parser_header_From-Path.rl" */
 	
-/* #line 166 "./src/headers/tmsrp_header_From-Path.c" */
+/* #line 162 "./src/headers/tmsrp_header_From-Path.c" */
 	{
 	int _klen;
 	unsigned int _trans;
@@ -260,7 +256,7 @@ _match:
 		}
 	}
 	break;
-/* #line 264 "./src/headers/tmsrp_header_From-Path.c" */
+/* #line 260 "./src/headers/tmsrp_header_From-Path.c" */
 		}
 	}
 
@@ -300,7 +296,7 @@ _again:
 		}
 	}
 	break;
-/* #line 304 "./src/headers/tmsrp_header_From-Path.c" */
+/* #line 300 "./src/headers/tmsrp_header_From-Path.c" */
 		}
 	}
 	}
@@ -308,12 +304,12 @@ _again:
 	_out: {}
 	}
 
-/* #line 123 "./ragel/tmsrp_parser_header_From-Path.rl" */
+/* #line 119 "./ragel/tmsrp_parser_header_From-Path.rl" */
 	
 	if( cs < 
-/* #line 315 "./src/headers/tmsrp_header_From-Path.c" */
+/* #line 311 "./src/headers/tmsrp_header_From-Path.c" */
 13
-/* #line 124 "./ragel/tmsrp_parser_header_From-Path.rl" */
+/* #line 120 "./ragel/tmsrp_parser_header_From-Path.rl" */
  ){
 		TSK_DEBUG_ERROR("Failed to parse 'From-Path' header.");
 		TSK_OBJECT_SAFE_FREE(header);

@@ -48,12 +48,11 @@ typedef struct tdav_speakup_jitterBuffer_s
 	uint64_t ref_timestamp;
 	uint32_t frame_duration;
 	uint32_t rate;
-	uint32_t channels;
 	uint32_t _10ms_size_bytes;
 }
 tdav_speakup_jitterbuffer_t;
 
-TINYDAV_GEXTERN const tmedia_jitterbuffer_plugin_def_t *tdav_speakup_jitterbuffer_plugin_def_t;
+extern const tmedia_jitterbuffer_plugin_def_t *tdav_speakup_jitterbuffer_plugin_def_t;
 
 TDAV_END_DECLS
 

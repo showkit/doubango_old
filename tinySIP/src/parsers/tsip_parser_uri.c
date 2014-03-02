@@ -416,13 +416,8 @@ static const int tsip_machine_parser_uri_en_main = 26;
 
 
 /* #line 166 "./ragel/tsip_parser_uri.rl" */
-	(void)(eof);
-	(void)(void)(tsip_machine_parser_uri_first_final);
-	(void)(void)(tsip_machine_parser_uri_error);
-	(void)(void)(tsip_machine_parser_uri_en_sip_usrinfo);
-	(void)(void)(tsip_machine_parser_uri_en_main);
 	
-/* #line 426 "./src/parsers/tsip_parser_uri.c" */
+/* #line 421 "./src/parsers/tsip_parser_uri.c" */
 	{
 	cs = tsip_machine_parser_uri_start;
 	ts = 0;
@@ -430,9 +425,9 @@ static const int tsip_machine_parser_uri_en_main = 26;
 	act = 0;
 	}
 
-/* #line 172 "./ragel/tsip_parser_uri.rl" */
+/* #line 167 "./ragel/tsip_parser_uri.rl" */
 	
-/* #line 436 "./src/parsers/tsip_parser_uri.c" */
+/* #line 431 "./src/parsers/tsip_parser_uri.c" */
 	{
 	int _klen;
 	unsigned int _trans;
@@ -453,7 +448,7 @@ _resume:
 /* #line 1 "./ragel/tsip_parser_uri.rl" */
 	{ts = p;}
 	break;
-/* #line 457 "./src/parsers/tsip_parser_uri.c" */
+/* #line 452 "./src/parsers/tsip_parser_uri.c" */
 		}
 	}
 
@@ -637,7 +632,7 @@ _eof_trans:
 /* #line 116 "./ragel/tsip_parser_uri.rl" */
 	{{p = ((te))-1;}{  }}
 	break;
-/* #line 641 "./src/parsers/tsip_parser_uri.c" */
+/* #line 636 "./src/parsers/tsip_parser_uri.c" */
 		}
 	}
 
@@ -650,7 +645,7 @@ _again:
 /* #line 1 "./ragel/tsip_parser_uri.rl" */
 	{ts = 0;}
 	break;
-/* #line 654 "./src/parsers/tsip_parser_uri.c" */
+/* #line 649 "./src/parsers/tsip_parser_uri.c" */
 		}
 	}
 
@@ -670,12 +665,12 @@ _again:
 	_out: {}
 	}
 
-/* #line 173 "./ragel/tsip_parser_uri.rl" */
+/* #line 168 "./ragel/tsip_parser_uri.rl" */
 	
 	if( cs < 
-/* #line 677 "./src/parsers/tsip_parser_uri.c" */
+/* #line 672 "./src/parsers/tsip_parser_uri.c" */
 26
-/* #line 174 "./ragel/tsip_parser_uri.rl" */
+/* #line 169 "./ragel/tsip_parser_uri.rl" */
  ){
 		TSK_DEBUG_ERROR("Failed to parse SIP/SIPS/TEL URI.");
 		TSK_OBJECT_SAFE_FREE(uri);

@@ -68,7 +68,7 @@ tsip_header_CSeq_t *tsip_header_CSeq_parse(const char *data, tsk_size_t size)
 	const char *eof = pe;
 	tsip_header_CSeq_t *hdr_cseq = tsip_header_CSeq_create(TSIP_HEADER_CSEQ_NONE, tsk_null);
 	
-	const char *tag_start = tsk_null;
+	const char *tag_start;
 
 	
 /* #line 75 "./src/headers/tsip_header_CSeq.c" */
@@ -148,19 +148,15 @@ static const int tsip_machine_parser_header_CSeq_en_main = 1;
 
 
 /* #line 96 "./ragel/tsip_parser_header_CSeq.rl" */
-	(void)(eof);
-	(void)(tsip_machine_parser_header_CSeq_first_final);
-	(void)(tsip_machine_parser_header_CSeq_error);
-	(void)(tsip_machine_parser_header_CSeq_en_main);
 	
-/* #line 157 "./src/headers/tsip_header_CSeq.c" */
+/* #line 153 "./src/headers/tsip_header_CSeq.c" */
 	{
 	cs = tsip_machine_parser_header_CSeq_start;
 	}
 
-/* #line 101 "./ragel/tsip_parser_header_CSeq.rl" */
+/* #line 97 "./ragel/tsip_parser_header_CSeq.rl" */
 	
-/* #line 164 "./src/headers/tsip_header_CSeq.c" */
+/* #line 160 "./src/headers/tsip_header_CSeq.c" */
 	{
 	int _klen;
 	unsigned int _trans;
@@ -257,7 +253,7 @@ _match:
 	{
 	}
 	break;
-/* #line 261 "./src/headers/tsip_header_CSeq.c" */
+/* #line 257 "./src/headers/tsip_header_CSeq.c" */
 		}
 	}
 
@@ -270,12 +266,12 @@ _again:
 	_out: {}
 	}
 
-/* #line 102 "./ragel/tsip_parser_header_CSeq.rl" */
+/* #line 98 "./ragel/tsip_parser_header_CSeq.rl" */
 	
 	if( cs < 
-/* #line 277 "./src/headers/tsip_header_CSeq.c" */
+/* #line 273 "./src/headers/tsip_header_CSeq.c" */
 17
-/* #line 103 "./ragel/tsip_parser_header_CSeq.rl" */
+/* #line 99 "./ragel/tsip_parser_header_CSeq.rl" */
  ){
 		TSK_DEBUG_ERROR("Failed to parse 'CSeq' header.");
 		TSK_OBJECT_SAFE_FREE(hdr_cseq);

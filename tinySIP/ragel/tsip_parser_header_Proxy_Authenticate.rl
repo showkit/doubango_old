@@ -176,7 +176,7 @@
 //	const char *eof = pe;
 //	tsip_header_Proxy_Authenticate_t *hdr_Proxy_Authenticate = TSIP_HEADER_PROXY_AUTHENTICATE_CREATE();
 //	
-//	const char *tag_start = tsk_null;
+//	const char *tag_start;
 //
 //	%%write data;
 //	%%write init;

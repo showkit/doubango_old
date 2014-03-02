@@ -105,25 +105,18 @@ extern "C" {
 #define DTLS1_AL_HEADER_LENGTH                   2
 #endif
 
-#ifndef OPENSSL_NO_SSL_INTERN
-
-#ifndef OPENSSL_NO_SCTP
-#define DTLS1_SCTP_AUTH_LABEL	"EXPORTER_DTLS_OVER_SCTP"
-#endif
 
 typedef struct dtls1_bitmap_st
 	{
-	unsigned long map;		/* track 32 packets on 32-bit systems
-					   and 64 - on 64-bit systems */
-	unsigned char max_seq_num[8];	/* max record number seen so far,
-					   64-bit value in big-endian
-					   encoding */
+	PQ_64BIT map;
+	unsigned long length;     /* sizeof the bitmap in bits */
+	PQ_64BIT max_seq_num;  /* max record number seen so far */
 	} DTLS1_BITMAP;
 
 struct dtls1_retransmit_state
 	{
 	EVP_CIPHER_CTX *enc_write_ctx;	/* cryptographic state */
-	EVP_MD_CTX *write_hash;			/* used for mac generation */
+	const EVP_MD *write_hash;		/* used for mac generation */
 #ifndef OPENSSL_NO_COMP
 	COMP_CTX *compress;				/* compression */
 #else
@@ -172,7 +165,6 @@ typedef struct hm_fragment_st
 	{
 	struct hm_header_st msg_header;
 	unsigned char *fragment;
-	unsigned char *reassembly;
 	} hm_fragment;
 
 typedef struct dtls1_state_st
@@ -232,7 +224,7 @@ typedef struct dtls1_state_st
 
 	struct dtls1_timeout_st timeout;
 
-	/* Indicates when the last handshake msg or heartbeat sent will timeout */
+	/* Indicates when the last handshake msg sent will timeout */
 	struct timeval next_timeout;
 
 	/* Timeout duration */
@@ -248,13 +240,6 @@ typedef struct dtls1_state_st
 	unsigned int retransmitting;
 	unsigned int change_cipher_spec_ok;
 
-#ifndef OPENSSL_NO_SCTP
-	/* used when SSL_ST_XX_FLUSH is entered */
-	int next_state;
-
-	int shutdown_received;
-#endif
-
 	} DTLS1_STATE;
 
 typedef struct dtls1_record_data_st
@@ -263,12 +248,8 @@ typedef struct dtls1_record_data_st
 	unsigned int   packet_length;
 	SSL3_BUFFER    rbuf;
 	SSL3_RECORD    rrec;
-#ifndef OPENSSL_NO_SCTP
-	struct bio_dgram_sctp_rcvinfo recordinfo;
-#endif
 	} DTLS1_RECORD_DATA;
 
-#endif
 
 /* Timeout multipliers (timeout slice is defined in apps/timeouts.h */
 #define DTLS1_TMO_READ_COUNT                      2

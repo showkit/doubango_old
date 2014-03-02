@@ -1,5 +1,8 @@
-/* Copyright (C) 2010-2013 Mamadou Diop.
-* Copyright (C) 2013 Doubango Telecom <http://doubango.org>
+/*
+* Copyright (C) 2010-2011 Mamadou Diop.
+*
+* Contact: Mamadou Diop <diopmamadou(at)doubango[dot]org>
+*	
 * This file is part of Open Source Doubango Framework.
 *
 * DOUBANGO is free software: you can redistribute it and/or modify
@@ -19,6 +22,10 @@
 
 /**@file tsk_debug.h
  * @brief Useful functions for debugging purpose.
+ *
+ * @author Mamadou Diop <diopmamadou(at)doubango[dot]org>
+ *
+
  */
 #ifndef _TINYSAK_DEBUG_H_
 #define _TINYSAK_DEBUG_H_
@@ -28,17 +35,11 @@
 
 TSK_BEGIN_DECLS
 
-
 #if !defined(DEBUG_LEVEL)
 #	define DEBUG_LEVEL DEBUG_LEVEL_ERROR
 #endif
 
-/**@ingroup tsk_debug_group
-* @def DEBUG_LEVEL
-* Defines the defaul debug level. Sould be: @ref DEBUG_LEVEL_INFO, @ref DEBUG_LEVEL_WARN, @ref DEBUG_LEVEL_ERROR or @ref DEBUG_LEVEL_FATAL. <br />
-* You can set this value at build time using your CFLAGS (e.g. <i>CFLAGS=$CFLAGS -DDEBUG_LEVEL=DEBUG_LEVEL_ERROR</i>). <br />
-* At runtime, this value could be changed using @ref tsk_debug_set_level().
-*/
+
 /**@ingroup tsk_debug_group
 * @def DEBUG_LEVEL_INFO
 * @a INFO level (4). This is the lowest possible level and will turn on all logging.
@@ -49,51 +50,11 @@ TSK_BEGIN_DECLS
 */
 /**@ingroup tsk_debug_group
 * @def DEBUG_LEVEL_ERROR
-* @a ERROR level (2). This level logs error which might change the application behavior.
+* @a ERROR level (2). This level log error which might change the application behavior.
 */
 /**@ingroup tsk_debug_group
 * @def DEBUG_LEVEL_FATAL
-* @a FATAL level (1). This level logs fatal errors which might abort the application.
-*/
-/**@ingroup tsk_debug_group
-* @def TSK_DEBUG_INFO
-* Writes the C string pointed by @a FMT to <b>stderr</b> output if debug level is >= 4 (@ref DEBUG_LEVEL_INFO) and no callack function is defined using @ref tsk_debug_set_info_cb. <br />
-* <i>Example</i>:
-* @code
-* TSK_DEBUG_INFO("Project name = %s, version = %f", "Doubango", 3.0);
-* @endcode
-* @param FMT C string that contains the text to be written to <b>stderr</b>. The string accept same specifiers as <a target=_blank href="http://www.cplusplus.com/reference/cstdio/printf/">printf</a>.
-* @sa @ref TSK_DEBUG_WARN @ref TSK_DEBUG_ERROR @ref TSK_DEBUG_FATAL <br />
-*/
-/**@ingroup tsk_debug_group
-* @def TSK_DEBUG_WARN
-* Writes the C string pointed by @a FMT to <b>stderr</b> output if debug level is >= 4 (@ref DEBUG_LEVEL_WARN) and no callack function is defined using @ref tsk_debug_set_warn_cb. <br />
-* <i>Example</i>:
-* @code
-* TSK_DEBUG_WARN("Warning code = %d, descripting = %s", 404, "Not found");
-* @endcode
-* @param FMT C string that contains the text to be written to <b>stderr</b>. The string accept same specifiers as <a target=_blank href="http://www.cplusplus.com/reference/cstdio/printf/">printf</a>.
-* @sa @ref TSK_DEBUG_INFO @ref TSK_DEBUG_ERROR @ref TSK_DEBUG_FATAL <br />
-*/
-/**@ingroup tsk_debug_group
-* @def TSK_DEBUG_ERROR
-* Writes the C string pointed by @a FMT to <b>stderr</b> output if debug level is >= 4 (@ref DEBUG_LEVEL_ERROR) and no callack function is defined using @ref tsk_debug_set_error_cb. <br />
-* <i>Example</i>:
-* @code
-* TSK_DEBUG_ERROR("Warning code = %d, descripting = %s", 400, "Bad request");
-* @endcode
-* @param FMT C string that contains the text to be written to <b>stderr</b>. The string accept same specifiers as <a target=_blank href="http://www.cplusplus.com/reference/cstdio/printf/">printf</a>.
-* @sa @ref TSK_DEBUG_INFO @ref TSK_DEBUG_WARN @ref TSK_DEBUG_FATAL <br />
-*/
-/**@ingroup tsk_debug_group
-* @def TSK_DEBUG_FATAL
-* Writes the C string pointed by @a FMT to <b>stderr</b> output if debug level is >= 4 (@ref DEBUG_LEVEL_FATAL) and no callack function is defined using @ref tsk_debug_set_fatal_cb. <br />
-* <i>Example</i>:
-* @code
-* TSK_DEBUG_ERROR("Warning code = %d, descripting = %s", 403, "Forbidden");
-* @endcode
-* @param FMT C string that contains the text to be written to <b>stderr</b>. The string accept same specifiers as <a target=_blank href="http://www.cplusplus.com/reference/cstdio/printf/">printf</a>.
-* @sa @ref TSK_DEBUG_INFO @ref TSK_DEBUG_WARN @ref TSK_DEBUG_ERROR <br />
+* @a FATAL level (1). This level log fatal errors which might abort the application.
 */
 #define DEBUG_LEVEL_INFO		4
 #define DEBUG_LEVEL_WARN		3
@@ -105,11 +66,11 @@ TSK_BEGIN_DECLS
 #else
 	typedef int (*tsk_debug_f)(const void* arg, const char* fmt, ...);
 
-	/* INFO */
 #define TSK_LOG(FMT, ...) \
 if(tsk_debug_get_logger_cb()) { \
     tsk_debug_get_logger_cb()(tsk_debug_get_arg_data(), "*LOG: " FMT "\n", ##__VA_ARGS__); }
 
+	/* INFO */
 #define TSK_DEBUG_INFO(FMT, ...)		\
 	if(tsk_debug_get_level() >= DEBUG_LEVEL_INFO){ \
         if(tsk_debug_get_logger_cb()) \
@@ -166,8 +127,10 @@ TINYSAK_API void tsk_debug_set_error_cb(tsk_debug_f );
 TINYSAK_API tsk_debug_f tsk_debug_get_error_cb( );
 TINYSAK_API void tsk_debug_set_fatal_cb(tsk_debug_f );
 TINYSAK_API tsk_debug_f tsk_debug_get_fatal_cb( );
+
 TINYSAK_API void tsk_debug_set_logger_cb(tsk_debug_f);
 TINYSAK_API tsk_debug_f tsk_debug_get_logger_cb ( );
+
 TINYSAK_API int tsk_debug_get_level( );
 TINYSAK_API void tsk_debug_set_level(int );
 

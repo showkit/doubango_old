@@ -31,7 +31,6 @@
 #include "tsk_memory.h"
 #include "tsk_string.h"
 #include "tsk_params.h"
-#include "tsk_debug.h"
 
 #include <string.h>
 
@@ -93,24 +92,27 @@ static const tdav_codec_h264_common_level_size_xt tdav_codec_h264_common_level_s
 	{level_idc_2_0, 352, 288},
 	{level_idc_2_1, 352, 480},
 	{level_idc_2_2, 352, 480},
-	{level_idc_3_0, 720, 480},
+	{level_idc_3_0, 352, 288},
 	{level_idc_3_1, 1280, 720},
 	{level_idc_3_2, 1280, 720},
 	{level_idc_4_0, 2048, 1024},
 	{level_idc_4_1, 2048, 1024},
 	{level_idc_4_2, 2048, 1080},
-	{level_idc_5_0, 2560, 1920},
-	{level_idc_5_1, 3840, 2160},
+	{level_idc_5_0, 20560, 1920},
+	{level_idc_5_1, 4096, 2048},
 	{level_idc_5_2, 4096, 2048}
 };
 
 static int tdav_codec_h264_common_size_from_level(level_idc_t level, unsigned *width, unsigned *height)
 {
 	tsk_size_t i;
+    //printf("h264 level: %d\n", level);
 	for(i = 0; i < sizeof(tdav_codec_h264_common_level_sizes)/sizeof(tdav_codec_h264_common_level_sizes[0]); ++i){
 		if(tdav_codec_h264_common_level_sizes[i].level == level){
+           
 			*width = tdav_codec_h264_common_level_sizes[i].width;
 			*height = tdav_codec_h264_common_level_sizes[i].height;
+           // printf("width: %d, height: %d\n", *width, *height);
 			return 0;
 		}
 	}
@@ -136,13 +138,13 @@ static int tdav_codec_h264_common_init(tdav_codec_h264_common_t * h264)
 		// because at this step 'tmedia_codec_init()' is not called yet and we need default size to compute the H.264 level
 		if(TMEDIA_CODEC_VIDEO(h264)->out.width == 0 || TMEDIA_CODEC_VIDEO(h264)->in.width == 0){
 			unsigned width, height;
-                        unsigned fps = tmedia_defaults_get_video_fps();
 			tmedia_pref_video_size_t pref_size = tmedia_defaults_get_pref_video_size();
+            unsigned fps = tmedia_defaults_get_pref_video_framerate();
 			if(tmedia_video_get_size(pref_size, &width, &height) == 0){
 				TMEDIA_CODEC_VIDEO(h264)->out.width = TMEDIA_CODEC_VIDEO(h264)->in.width = width;
 				TMEDIA_CODEC_VIDEO(h264)->out.height = TMEDIA_CODEC_VIDEO(h264)->in.height = height;
 			}
-                        TMEDIA_CODEC_VIDEO(h264)->out.fps = TMEDIA_CODEC_VIDEO(h264)->in.fps = fps;
+        TMEDIA_CODEC_VIDEO(h264)->out.fps = TMEDIA_CODEC_VIDEO(h264)->in.fps = fps;
 		}
 	}
 	return 0;
@@ -150,7 +152,6 @@ static int tdav_codec_h264_common_init(tdav_codec_h264_common_t * h264)
 
 static int tdav_codec_h264_common_deinit(tdav_codec_h264_common_t * h264)
 {
-	TSK_DEBUG_INFO("tdav_codec_h264_common_deinit");
 	if(h264){
 		tmedia_codec_video_deinit(TMEDIA_CODEC_VIDEO(h264));
 		TSK_FREE(h264->rtp.ptr);
@@ -159,7 +160,7 @@ static int tdav_codec_h264_common_deinit(tdav_codec_h264_common_t * h264)
 	return 0;
 }
 
-static int tdav_codec_h264_common_get_profile_and_level(const char* fmtp, profile_idc_t *profile, level_idc_t *level)
+static int tdav_codec_h264_get_profile_and_level(const char* fmtp, profile_idc_t *profile, level_idc_t *level)
 {
 	tsk_size_t size = tsk_strlen(fmtp);
 	int start, end;
@@ -202,122 +203,6 @@ static int tdav_codec_h264_common_get_profile_and_level(const char* fmtp, profil
 	}
 	return ret;
 }
-
-static tsk_bool_t tdav_codec_h264_common_sdp_att_match(tdav_codec_h264_common_t* h264, const char* att_name, const char* att_value)
-{
-	tsk_bool_t ret = tsk_true;
-
-	if(!h264){
-		TSK_DEBUG_ERROR("Invalid parameter");
-		return tsk_false;
-	}
-
-	TSK_DEBUG_INFO("[H.264] Trying to match [%s:%s]", att_name, att_value);
-
-	if(tsk_striequals(att_name, "fmtp")){
-		int val_int;
-		profile_idc_t profile;
-		level_idc_t level;
-		tsk_params_L_t* params;
-
-		/* Check whether the profile match (If the profile is missing, then we consider that it's ok) */
-		if(tdav_codec_h264_common_get_profile_and_level(att_value, &profile, &level) != 0){
-			TSK_DEBUG_ERROR("Not valid profile-level: %s", att_value);
-			return tsk_false;
-		}
-		if(h264->profile != profile){
-			return tsk_false;
-		}
-		else{
-			if(h264->level != level){
-				unsigned width, height;
-				h264->level = TSK_MIN(h264->level, level);
-				if(tdav_codec_h264_common_size_from_level(h264->level, &width, &height) != 0){
-					return tsk_false;
-				}
-				TMEDIA_CODEC_VIDEO(h264)->in.width = TMEDIA_CODEC_VIDEO(h264)->out.width = width;
-				TMEDIA_CODEC_VIDEO(h264)->in.height = TMEDIA_CODEC_VIDEO(h264)->out.height = height;
-			}
-		}
-
-		/* e.g. profile-level-id=42e00a; packetization-mode=1; max-br=452; max-mbps=11880 */
-		if((params = tsk_params_fromstring(att_value, ";", tsk_true))){
-			
-			/* === max-br ===*/
-			if((val_int = tsk_params_get_param_value_as_int(params, "max-br")) != -1){
-				// should compare "max-br"?
-				TMEDIA_CODEC_VIDEO(h264)->out.max_br = val_int*1000;
-			}
-
-			/* === max-mbps ===*/
-			if((val_int = tsk_params_get_param_value_as_int(params, "max-mbps")) != -1){
-				// should compare "max-mbps"?
-				TMEDIA_CODEC_VIDEO(h264)->out.max_mbps = val_int*1000;
-			}
-
-			/* === packetization-mode ===*/
-			if((val_int = tsk_params_get_param_value_as_int(params, "packetization-mode")) != -1){
-				if((packetization_mode_t)val_int == Single_NAL_Unit_Mode || (packetization_mode_t)val_int == Non_Interleaved_Mode){
-					TDAV_CODEC_H264_COMMON(h264)->pack_mode = (packetization_mode_t)val_int;
-				}
-				else{
-					TSK_DEBUG_INFO("packetization-mode not matching");
-					ret = tsk_false;
-					goto bail;
-				}
-			}
-		}
-bail:
-		TSK_OBJECT_SAFE_FREE(params);
-	}
-	else if(tsk_striequals(att_name, "imageattr")){
-		unsigned in_width, in_height, out_width, out_height;
-		unsigned width, height;
-		tsk_size_t s;
-		if(tmedia_parse_video_imageattr(att_value, TMEDIA_CODEC_VIDEO(h264)->pref_size, &in_width, &in_height, &out_width, &out_height) != 0){
-			return tsk_false;
-		}
-		// check that 'imageattr' is comform to H.264 'profile-level'
-		if(tdav_codec_h264_common_size_from_level(h264->level, &width, &height) != 0){
-			return tsk_false;
-		}
-		if((s = ((width * height * 3) >> 1)) < ((in_width * in_height * 3) >> 1) || s < ((out_width * out_height * 3) >> 1)){
-			return tsk_false;
-		}
-
-		TMEDIA_CODEC_VIDEO(h264)->in.width = in_width;
-		TMEDIA_CODEC_VIDEO(h264)->in.height = in_height;
-		TMEDIA_CODEC_VIDEO(h264)->out.width = out_width;
-		TMEDIA_CODEC_VIDEO(h264)->out.height = out_height;
-	}
-
-	return ret;
-}
-
-static char* tdav_codec_h264_common_sdp_att_get(const tdav_codec_h264_common_t* h264, const char* att_name)
-{	
-	if(!h264 || !att_name){
-		TSK_DEBUG_ERROR("Invalid parameter");
-		return tsk_null;
-	}
-
-	if(tsk_striequals(att_name, "fmtp")){
-		char* fmtp = tsk_null;
-#if 1
-		tsk_sprintf(&fmtp, "profile-level-id=%x; packetization-mode=%d", ((h264->profile << 16) | h264->level), h264->pack_mode);
-#else
-		tsk_strcat_2(&fmtp, "profile-level-id=%s; packetization-mode=%d; max-br=%d; max-mbps=%d",
-			profile_level, h264->pack_mode, TMEDIA_CODEC_VIDEO(h264)->in.max_br/1000, TMEDIA_CODEC_VIDEO(h264)->in.max_mbps/1000);
-#endif
-		return fmtp;
-	}
-	else if(tsk_striequals(att_name, "imageattr")){
-		return tmedia_get_video_imageattr(TMEDIA_CODEC_VIDEO(h264)->pref_size, 
-			TMEDIA_CODEC_VIDEO(h264)->in.width, TMEDIA_CODEC_VIDEO(h264)->in.height, TMEDIA_CODEC_VIDEO(h264)->out.width, TMEDIA_CODEC_VIDEO(h264)->out.height);
-	}
-	return tsk_null;
-}
-
 
 TDAV_END_DECLS
 

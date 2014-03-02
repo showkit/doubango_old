@@ -83,7 +83,7 @@ int tsip_header_Record_Route_serialize(const tsip_header_t* header, tsk_buffer_t
 	tsip_header_Record_Routes_L_t *hdr_record_routes = tsk_list_create();
 	tsip_header_Record_Route_t *curr_route = tsk_null;
 	
-	const char *tag_start = tsk_null;
+	const char *tag_start;
 
 	
 /* #line 90 "./src/headers/tsip_header_Record_Route.c" */
@@ -330,19 +330,15 @@ static const int tsip_machine_parser_header_Record_Route_en_main = 1;
 
 
 /* #line 145 "./ragel/tsip_parser_header_Record_Route.rl" */
-	(void)(eof);
-	(void)(tsip_machine_parser_header_Record_Route_first_final);
-	(void)(tsip_machine_parser_header_Record_Route_error);
-	(void)(tsip_machine_parser_header_Record_Route_en_main);
 	
-/* #line 339 "./src/headers/tsip_header_Record_Route.c" */
+/* #line 335 "./src/headers/tsip_header_Record_Route.c" */
 	{
 	cs = tsip_machine_parser_header_Record_Route_start;
 	}
 
-/* #line 150 "./ragel/tsip_parser_header_Record_Route.rl" */
+/* #line 146 "./ragel/tsip_parser_header_Record_Route.rl" */
 	
-/* #line 346 "./src/headers/tsip_header_Record_Route.c" */
+/* #line 342 "./src/headers/tsip_header_Record_Route.c" */
 	{
 	int _klen;
 	unsigned int _trans;
@@ -473,7 +469,7 @@ _match:
 	{
 	}
 	break;
-/* #line 477 "./src/headers/tsip_header_Record_Route.c" */
+/* #line 473 "./src/headers/tsip_header_Record_Route.c" */
 		}
 	}
 
@@ -486,12 +482,12 @@ _again:
 	_out: {}
 	}
 
-/* #line 151 "./ragel/tsip_parser_header_Record_Route.rl" */
+/* #line 147 "./ragel/tsip_parser_header_Record_Route.rl" */
 	
 	if( cs < 
-/* #line 493 "./src/headers/tsip_header_Record_Route.c" */
+/* #line 489 "./src/headers/tsip_header_Record_Route.c" */
 99
-/* #line 152 "./ragel/tsip_parser_header_Record_Route.rl" */
+/* #line 148 "./ragel/tsip_parser_header_Record_Route.rl" */
  ){
 		TSK_DEBUG_ERROR("Failed to parse 'Record-Route' header.");
 		TSK_OBJECT_SAFE_FREE(curr_route);

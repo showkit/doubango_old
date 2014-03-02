@@ -78,7 +78,7 @@ tsip_header_Server_t *tsip_header_Server_parse(const char *data, tsk_size_t size
 	const char *eof = pe;
 	tsip_header_Server_t *hdr_server = tsip_header_server_create_null();
 	
-	const char *tag_start = tsk_null;
+	const char *tag_start;
 
 	
 /* #line 85 "./src/headers/tsip_header_Server.c" */
@@ -138,19 +138,15 @@ static const int tsip_machine_parser_header_Server_en_main = 1;
 
 
 /* #line 107 "./ragel/tsip_parser_header_Server.rl" */
-	(void)(eof);
-	(void)(tsip_machine_parser_header_Server_first_final);
-	(void)(tsip_machine_parser_header_Server_error);
-	(void)(tsip_machine_parser_header_Server_en_main);
 	
-/* #line 147 "./src/headers/tsip_header_Server.c" */
+/* #line 143 "./src/headers/tsip_header_Server.c" */
 	{
 	cs = tsip_machine_parser_header_Server_start;
 	}
 
-/* #line 112 "./ragel/tsip_parser_header_Server.rl" */
+/* #line 108 "./ragel/tsip_parser_header_Server.rl" */
 	
-/* #line 154 "./src/headers/tsip_header_Server.c" */
+/* #line 150 "./src/headers/tsip_header_Server.c" */
 	{
 	int _klen;
 	unsigned int _trans;
@@ -241,7 +237,7 @@ _match:
 	{
 	}
 	break;
-/* #line 245 "./src/headers/tsip_header_Server.c" */
+/* #line 241 "./src/headers/tsip_header_Server.c" */
 		}
 	}
 
@@ -254,12 +250,12 @@ _again:
 	_out: {}
 	}
 
-/* #line 113 "./ragel/tsip_parser_header_Server.rl" */
+/* #line 109 "./ragel/tsip_parser_header_Server.rl" */
 	
 	if( cs < 
-/* #line 261 "./src/headers/tsip_header_Server.c" */
+/* #line 257 "./src/headers/tsip_header_Server.c" */
 11
-/* #line 114 "./ragel/tsip_parser_header_Server.rl" */
+/* #line 110 "./ragel/tsip_parser_header_Server.rl" */
  ){
 		TSK_DEBUG_ERROR("Failed to parse 'Server' header.");
 		TSK_OBJECT_SAFE_FREE(hdr_server);

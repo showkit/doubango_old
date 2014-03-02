@@ -90,19 +90,18 @@ Must starts at 96 to be conform to RFC 5761 (rtcp-mux)
 #define TMEDIA_CODEC_FORMAT_H264_MP						"105"
 #define TMEDIA_CODEC_FORMAT_H264_HP						"106"
 
+
 #define TMEDIA_CODEC_FORMAT_AMR_WBP_BE					"107"
 #define TMEDIA_CODEC_FORMAT_AMR_WBP_OA					"108"
 #define TMEDIA_CODEC_FORMAT_AAC							"109"
 #define TMEDIA_CODEC_FORMAT_AACPLUS						"110"
 
-#define TMEDIA_CODEC_FORMAT_OPUS						"111"
+#define TMEDIA_CODEC_FORMAT_AMR_NB_BE					"111"
+#define TMEDIA_CODEC_FORMAT_AMR_NB_OA					"112"
+#define TMEDIA_CODEC_FORMAT_AMR_WB_BE					"113"
+#define TMEDIA_CODEC_FORMAT_AMR_WB_OA					"114"
 
-//#define TMEDIA_CODEC_FORMAT_AMR_NB_BE					"112"
-//#define TMEDIA_CODEC_FORMAT_AMR_NB_OA					"113"
-#define TMEDIA_CODEC_FORMAT_AMR_WB_BE					"114"
-#define TMEDIA_CODEC_FORMAT_AMR_WB_OA					"115"
-
-#define TMEDIA_CODEC_FORMAT_BV16						"116"
+#define TMEDIA_CODEC_FORMAT_BV16						"115"
 
 #define TMEDIA_CODEC_FORMAT_MP4V_ES						"121"
 
@@ -111,6 +110,7 @@ Must starts at 96 to be conform to RFC 5761 (rtcp-mux)
 #define TMEDIA_CODEC_FORMAT_T140						"124"
 
 #define TMEDIA_CODEC_FORMAT_THEORA						"125"
+
 #define TMEDIA_CODEC_FORMAT_SHOWKIT_DATA                "126"
 
 #define TMEDIA_CODEC_FORMAT_MSRP						"*"
@@ -121,8 +121,11 @@ Must starts at 96 to be conform to RFC 5761 (rtcp-mux)
 typedef enum tmedia_codec_id_e
 {
 	tmedia_codec_id_none = 0x00000000,
-	tmedia_codec_id_amr_nb_oa = 0x00000001<<0,
-	tmedia_codec_id_amr_nb_be = 0x00000001<<1,
+	
+	//tmedia_codec_id_amr_nb_oa = 0x00000001<<0,
+//	tmedia_codec_id_amr_nb_be = 0x00000001<<1,
+    tmedia_codec_id_pcma_passthrough =0x00000001<<0,
+    tmedia_codec_id_pcmu_passthrough =0x00000001<<1,
 	tmedia_codec_id_amr_wb_oa = 0x00000001<<2,
 	tmedia_codec_id_amr_wb_be = 0x00000001<<3,
 	tmedia_codec_id_gsm = 0x00000001<<4,
@@ -137,8 +140,7 @@ typedef enum tmedia_codec_id_e
 	tmedia_codec_id_opus = 0x00000001<<13,
 	tmedia_codec_id_g729ab = 0x00000001<<14,
 	tmedia_codec_id_g722 = 0x00000001<<15,
-    tmedia_codec_id_pcma_passthrough =0x00000001<<16,
-    tmedia_codec_id_pcmu_passthrough =0x00000001<<17,
+	
 	/* room for new Audio codecs */
 	
 	tmedia_codec_id_h261 = 0x00010000<<0,
@@ -155,11 +157,9 @@ typedef enum tmedia_codec_id_e
 	tmedia_codec_id_theora = 0x00010000<<8,
 	tmedia_codec_id_mp4ves_es = 0x00010000<<9,
 	tmedia_codec_id_vp8 = 0x00010000<<10,
+	tmedia_codec_id_passthrough = 0x00010000<<11,
 
-    // not sure what happens to this?
-    tmedia_codec_id_passthrough = 0x00010000<<11,
-    
-    /* room for new Video codecs */
+	/* room for new Video codecs */
     tmedia_codec_id_showkit_data = 0x00010000<<13,
 	tmedia_codec_id_t140 = 0x00010000<<14,
 	tmedia_codec_id_red = 0x00010000<<15,
@@ -170,6 +170,7 @@ typedef enum tmedia_codec_id_e
 tmedia_codec_id_t;
 
 
+
 /**Max number of plugins (codec types) we can create */
 #define TMED_CODEC_MAX_PLUGINS			0xFF
 
@@ -177,22 +178,8 @@ tmedia_codec_id_t;
 #define TMEDIA_CODEC(self)		((tmedia_codec_t*)(self))
 
 #define TMEDIA_CODEC_PCM_FRAME_SIZE(self) ((TMEDIA_CODEC((self))->plugin->audio.ptime * TMEDIA_CODEC((self))->plugin->rate)/1000)
-#define TMEDIA_CODEC_RATE(self)                        (TMEDIA_CODEC((self))->plugin->rate)
-//#define TMEDIA_CODEC_FRAMES_COUNT(buff_size) (((buff_size))/TMEDIA_CODEC_FRAME_SIZE(self))
-
-#define TMEDIA_CODEC_RATE_DECODING(self)			(TMEDIA_CODEC((self))->in.rate)
-#define TMEDIA_CODEC_RATE_ENCODING(self)			(TMEDIA_CODEC((self))->out.rate)
-
-#define TMEDIA_CODEC_PTIME_AUDIO_DECODING(self)			(TMEDIA_CODEC_AUDIO((self))->in.ptime)
-#define TMEDIA_CODEC_PTIME_AUDIO_ENCODING(self)			(TMEDIA_CODEC_AUDIO((self))->out.ptime)
-
-#define TMEDIA_CODEC_CHANNELS_AUDIO_DECODING(self)			(TMEDIA_CODEC_AUDIO((self))->in.channels)
-#define TMEDIA_CODEC_CHANNELS_AUDIO_ENCODING(self)			(TMEDIA_CODEC_AUDIO((self))->out.channels)
-
-#define TMEDIA_CODEC_PCM_FRAME_SIZE_AUDIO_DECODING(self) ((TMEDIA_CODEC_PTIME_AUDIO_DECODING((self)) * TMEDIA_CODEC_RATE_DECODING((self)))/1000)
-#define TMEDIA_CODEC_PCM_FRAME_SIZE_AUDIO_ENCODING(self) ((TMEDIA_CODEC_PTIME_AUDIO_ENCODING((self)) * TMEDIA_CODEC_RATE_ENCODING((self)))/1000)
-
-#define TMEDIA_CODEC_FRAME_DURATION_AUDIO_ENCODING(self) (int32_t)((float)TMEDIA_CODEC_PCM_FRAME_SIZE_AUDIO_ENCODING(self) * (float)TMEDIA_CODEC_AUDIO((self))->out.timestamp_multiplier)
+#define TMEDIA_CODEC_RATE(self)			(TMEDIA_CODEC((self))->plugin->rate)
+//#define TMEDIA_CODEC_FRAMES_COUNT(buff_size)	(((buff_size))/TMEDIA_CODEC_FRAME_SIZE(self))
 
 /** callbacks for video codecs */
 typedef int (*tmedia_codec_video_enc_cb_f)(const tmedia_video_encode_result_xt* result);
@@ -231,23 +218,8 @@ typedef struct tmedia_codec_s
 	char* format;
 	//! bandwidth level
 	tmedia_bandwidth_level_t bl; // @deprecated
-	//! maximum bandwidth to use for outgoing RTP (INT_MAX or <=0 means undefined)
-	int32_t bandwidth_max_upload;
-	//! maximum bandwidth to use for incoming RTP (INT_MAX or <=0 means undefined)
-	int32_t bandwidth_max_download;
 	//! the negociated format (only useful for codecs with dyn. payload type)
 	char* neg_format;
-	//! whether this is a passthrough codec
-	tsk_bool_t passthrough;
-
-	struct{
-		// !negotiated decoding rate (for codecs with dynamic rate, e.g. opus)
-		uint32_t rate;
-	} in; //decoding direction
-	struct{
-		// !negotiated encoding rate (for codecs with dynamic rate, e.g. opus)
-		uint32_t rate;
-	} out; //encoding direction
 	
 	//! plugin used to create the codec
 	const struct tmedia_codec_plugin_def_s* plugin;
@@ -320,11 +292,7 @@ TINYMEDIA_API int tmedia_codec_cmp(const tsk_object_t* codec1, const tsk_object_
 TINYMEDIA_API int tmedia_codec_plugin_register(const tmedia_codec_plugin_def_t* plugin);
 TINYMEDIA_API int tmedia_codec_plugin_register_2(const tmedia_codec_plugin_def_t* plugin, int prio);
 TINYMEDIA_API tsk_bool_t tmedia_codec_plugin_is_registered(const tmedia_codec_plugin_def_t* plugin);
-TINYMEDIA_API tsk_bool_t tmedia_codec_plugin_is_registered_2(tmedia_codec_id_t codec_id);
-TINYMEDIA_API int tmedia_codec_plugin_registered_get_all(const struct tmedia_codec_plugin_def_s*** plugins, tsk_size_t* count);
-TINYMEDIA_API const struct tmedia_codec_plugin_def_s* tmedia_codec_plugin_registered_get_const(tmedia_codec_id_t codec_id);
 TINYMEDIA_API int tmedia_codec_plugin_unregister(const tmedia_codec_plugin_def_t* plugin);
-TINYMEDIA_API int tmedia_codec_plugin_unregister_all();
 TINYMEDIA_API tmedia_codec_t* tmedia_codec_create(const char* format);
 TINYMEDIA_API char* tmedia_codec_get_rtpmap(const tmedia_codec_t* self);
 TINYMEDIA_API tsk_bool_t tmedia_codec_sdp_att_match(const tmedia_codec_t* self, const char* att_name, const char* att_value);
@@ -339,23 +307,6 @@ TINYMEDIA_API int tmedia_codec_deinit(tmedia_codec_t* self);
 typedef struct tmedia_codec_audio_s
 {
 	TMEDIA_DECLARE_CODEC;
-
-	struct{
-		// !negotiated decoding ptime
-		uint8_t ptime;
-		// !negotiated decoding channels
-		int8_t channels;
-		// ! timestamp multiplier
-		float timestamp_multiplier;
-	} in; //decoding direction
-	struct{
-		// !negotiated decoding ptime
-		uint8_t ptime;
-		// !negotiated encoding channels
-		int8_t channels;
-		// ! timestamp multiplier
-		float timestamp_multiplier;
-	} out; //encoding direction
 }
 tmedia_codec_audio_t;
 
@@ -375,7 +326,6 @@ tmedia_codec_audio_t;
 #define TMEDIA_CODEC_AUDIO(self)		((tmedia_codec_audio_t*)(self))
 #define tmedia_codec_audio_init(self, name, desc, format) tmedia_codec_init(TMEDIA_CODEC(self), tmedia_audio, name, desc, format)
 #define tmedia_codec_audio_deinit(self) tmedia_codec_deinit(TMEDIA_CODEC(self))
-TINYMEDIA_API float tmedia_codec_audio_get_timestamp_multiplier(tmedia_codec_id_t id, uint32_t sample_rate);
 
 /** Video codec */
 typedef struct tmedia_codec_video_s

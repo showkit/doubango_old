@@ -48,12 +48,6 @@ public:
 	virtual int start() { return -1; }
 	virtual int pause() { return -1; }
 	virtual int stop() { return -1; }
-#if !defined(SWIG)
-	// whether the audio buffer have to be stored in the JB then pulled using "ProxyAudioConsumer::pull()" or not
-	virtual bool putInJitterBuffer(){ return true; }
-	// only called if "putInJitterBuffer()" return "true"
-	virtual int consume(const void* buffer_ptr, tsk_size_t buffer_size, const tsk_object_t* proto_hdr){ return -1; }
-#endif
 };
 
 /* ============ ProxyAudioConsumer Class ================= */
@@ -64,7 +58,7 @@ public:
 	ProxyAudioConsumer(struct twrap_consumer_proxy_audio_s* pConsumer);
 #endif
 	virtual ~ProxyAudioConsumer();
-	bool setActualSndCardPlaybackParams(int nPtime, int nRate, int nChannels);
+
 	bool queryForResampler(uint16_t nInFreq, uint16_t nOutFreq, uint16_t nFrameDuration, uint16_t nChannels, uint16_t nResamplerQuality);
 	bool setPullBuffer(const void* pPullBufferPtr, unsigned nPullBufferSize);
 	unsigned pull(void* pOutput=tsk_null, unsigned nSize=0);
@@ -147,6 +141,10 @@ public:
 	virtual inline bool isWrapping(tsk_object_t* wrapped_plugin){
 		return m_pWrappedPlugin == wrapped_plugin;
 	}
+    virtual inline tmedia_consumer_t* getWrappedPlugin()
+    {
+        return (tmedia_consumer_t*)m_pWrappedPlugin;
+    }
 #endif
 	virtual inline uint64_t getMediaSessionId(){
 		return m_pWrappedPlugin ? TMEDIA_CONSUMER(m_pWrappedPlugin)->session_id : 0;
@@ -182,27 +180,23 @@ class ProxyVideoFrame
 {
 public:
 #if !defined(SWIG)
-	ProxyVideoFrame(const void* pBufferPtr, unsigned nBufferSize, unsigned nFrameWidth, unsigned nFrameHeight, const tsk_object_t* pProtoHdr);
+	ProxyVideoFrame(const void* pBuffer, unsigned nSize);
 #endif
 	virtual ~ProxyVideoFrame();
 
 public: /* For Java/C# applications */
 	unsigned getSize();
 	unsigned getContent(void* pOutput, unsigned nMaxsize);
-	inline unsigned getFrameWidth()const{ return m_nFrameWidth; }
-	inline unsigned getFrameHeight()const{ return m_nFrameHeight; }
 
 #if !defined(SWIG) /* For C/C++ applications */
 public:
-	inline unsigned getBufferSize()const{ return m_nBufferSize; }
-	inline const void* getBufferPtr()const{ return m_pBufferPtr; }
-	inline const tsk_object_t* getProtoHdr()const{ return m_pProtoHdr; }
+	inline unsigned fastGetSize()const{ return m_nSize; }
+	inline const void* fastGetContent()const{ return m_pBuffer; }
 #endif
 
 private:
-	const void* m_pBufferPtr;
-	unsigned m_nBufferSize, m_nFrameWidth, m_nFrameHeight;
-	const tsk_object_t* m_pProtoHdr;
+	const void* m_pBuffer;
+	unsigned m_nSize;
 };
 
 

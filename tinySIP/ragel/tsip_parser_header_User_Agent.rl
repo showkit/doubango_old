@@ -94,13 +94,9 @@ tsip_header_User_Agent_t *tsip_header_User_Agent_parse(const char *data, tsk_siz
 	const char *eof = pe;
 	tsip_header_User_Agent_t *hdr_user_agent = tsip_header_User_Agent_create_null();
 	
-	const char *tag_start = tsk_null;
+	const char *tag_start;
 
 	%%write data;
-	(void)(eof);
-	(void)(tsip_machine_parser_header_User_Agent_first_final);
-	(void)(tsip_machine_parser_header_User_Agent_error);
-	(void)(tsip_machine_parser_header_User_Agent_en_main);
 	%%write init;
 	%%write exec;
 	

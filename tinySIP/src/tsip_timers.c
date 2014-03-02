@@ -102,7 +102,7 @@ static uint32_t T1 = TIMER_T1;
 static uint32_t T2 = 4000;
 static uint32_t T4 = TIMER_T4;
 static uint32_t A = TIMER_T1;
-static uint32_t B = 64*TIMER_T1;
+static uint32_t B = 16*TIMER_T1;        // 8 seconds = 1 try + 4 retries.  RFC3261 specifies 64*T1 = 32s 
 static uint32_t C = 5*60000; /* >3min */
 static uint32_t D = 50000; /*> 32s*/
 static uint32_t E = TIMER_T1;

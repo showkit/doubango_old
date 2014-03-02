@@ -2,20 +2,20 @@
  * AVOptions
  * copyright (c) 2005 Michael Niedermayer <michaelni@gmx.at>
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -44,7 +44,7 @@
  * This section describes how to add AVOptions capabilities to a struct.
  *
  * All AVOptions-related information is stored in an AVClass. Therefore
- * the first member of the struct should be a pointer to an AVClass describing it.
+ * the first member of the struct must be a pointer to an AVClass describing it.
  * The option field of the AVClass must be set to a NULL-terminated static array
  * of AVOptions. Each AVOption must have a non-empty name, a type, a default
  * value and for number-type AVOptions also a range of allowed values. It must
@@ -64,7 +64,7 @@
  *
  * static const AVOption options[] = {
  *   { "test_int", "This is a test option of int type.", offsetof(test_struct, int_opt),
- *     AV_OPT_TYPE_INT, { .i64 = -1 }, INT_MIN, INT_MAX },
+ *     AV_OPT_TYPE_INT, { -1 }, INT_MIN, INT_MAX },
  *   { "test_str", "This is a test option of string type.", offsetof(test_struct, str_opt),
  *     AV_OPT_TYPE_STRING },
  *   { "test_bin", "This is a test option of binary type.", offsetof(test_struct, bin_opt),
@@ -81,7 +81,7 @@
  * @endcode
  *
  * Next, when allocating your struct, you must ensure that the AVClass pointer
- * is set to the correct value. Then, av_opt_set_defaults() can be called to
+ * is set to the correct value. Then, av_opt_set_defaults() must be called to
  * initialize defaults. After that the struct is ready to be used with the
  * AVOptions API.
  *
@@ -123,7 +123,7 @@
  *      } child_struct;
  *      static const AVOption child_opts[] = {
  *          { "test_flags", "This is a test option of flags type.",
- *            offsetof(child_struct, flags_opt), AV_OPT_TYPE_FLAGS, { .i64 = 0 }, INT_MIN, INT_MAX },
+ *            offsetof(child_struct, flags_opt), AV_OPT_TYPE_FLAGS, { 0 }, INT_MIN, INT_MAX },
  *          { NULL },
  *      };
  *      static const AVClass child_class = {
@@ -170,13 +170,13 @@
  *      above, put the following into the child_opts array:
  *      @code
  *      { "test_flags", "This is a test option of flags type.",
- *        offsetof(child_struct, flags_opt), AV_OPT_TYPE_FLAGS, { .i64 = 0 }, INT_MIN, INT_MAX, "test_unit" },
- *      { "flag1", "This is a flag with value 16", 0, AV_OPT_TYPE_CONST, { .i64 = 16 }, 0, 0, "test_unit" },
+ *        offsetof(child_struct, flags_opt), AV_OPT_TYPE_FLAGS, { 0 }, INT_MIN, INT_MAX, "test_unit" },
+ *      { "flag1", "This is a flag with value 16", 0, AV_OPT_TYPE_CONST, { 16 }, 0, 0, "test_unit" },
  *      @endcode
  *
  * @section avoptions_use Using AVOptions
  * This section deals with accessing options in an AVOptions-enabled struct.
- * Such structs in FFmpeg are e.g. AVCodecContext in libavcodec or
+ * Such structs in Libav are e.g. AVCodecContext in libavcodec or
  * AVFormatContext in libavformat.
  *
  * @subsection avoptions_use_examine Examining AVOptions
@@ -225,8 +225,6 @@ enum AVOptionType{
     AV_OPT_TYPE_RATIONAL,
     AV_OPT_TYPE_BINARY,  ///< offset must point to a pointer immediately followed by an int for the length
     AV_OPT_TYPE_CONST = 128,
-    AV_OPT_TYPE_IMAGE_SIZE = MKBETAG('S','I','Z','E'), ///< offset must point to two consecutive integers
-    AV_OPT_TYPE_PIXEL_FMT  = MKBETAG('P','F','M','T'),
 #if FF_API_OLD_AVOPTIONS
     FF_OPT_TYPE_FLAGS = 0,
     FF_OPT_TYPE_INT,
@@ -263,10 +261,10 @@ typedef struct AVOption {
      * the default value for scalar options
      */
     union {
-        int64_t i64;
         double dbl;
         const char *str;
         /* TODO those are unused now */
+        int64_t i64;
         AVRational q;
     } default_val;
     double min;                 ///< minimum valid value for the option
@@ -279,7 +277,6 @@ typedef struct AVOption {
 #define AV_OPT_FLAG_AUDIO_PARAM     8
 #define AV_OPT_FLAG_VIDEO_PARAM     16
 #define AV_OPT_FLAG_SUBTITLE_PARAM  32
-#define AV_OPT_FLAG_FILTERING_PARAM (1<<16) ///< a generic parameter which can be set by the user for filtering
 //FIXME think about enc-audio, ... style flags
 
     /**
@@ -343,9 +340,9 @@ attribute_deprecated const AVOption *av_set_double(void *obj, const char *name, 
 attribute_deprecated const AVOption *av_set_q(void *obj, const char *name, AVRational n);
 attribute_deprecated const AVOption *av_set_int(void *obj, const char *name, int64_t n);
 
-double av_get_double(void *obj, const char *name, const AVOption **o_out);
-AVRational av_get_q(void *obj, const char *name, const AVOption **o_out);
-int64_t av_get_int(void *obj, const char *name, const AVOption **o_out);
+attribute_deprecated double av_get_double(void *obj, const char *name, const AVOption **o_out);
+attribute_deprecated AVRational av_get_q(void *obj, const char *name, const AVOption **o_out);
+attribute_deprecated int64_t av_get_int(void *obj, const char *name, const AVOption **o_out);
 attribute_deprecated const char *av_get_string(void *obj, const char *name, const AVOption **o_out, char *buf, int buf_len);
 attribute_deprecated const AVOption *av_next_option(void *obj, const AVOption *last);
 #endif
@@ -379,7 +376,6 @@ void av_opt_set_defaults2(void *s, int mask, int flags);
  * key. ctx must be an AVClass context, storing is done using
  * AVOptions.
  *
- * @param opts options string to parse, may be NULL
  * @param key_val_sep a 0-terminated list of characters used to
  * separate key from value
  * @param pairs_sep a 0-terminated list of characters used to separate
@@ -590,17 +586,6 @@ int av_opt_get_double(void *obj, const char *name, int search_flags, double     
 int av_opt_get_q     (void *obj, const char *name, int search_flags, AVRational *out_val);
 /**
  * @}
- */
-/**
- * Gets a pointer to the requested field in a struct.
- * This function allows accessing a struct even when its fields are moved or
- * renamed since the application making the access has been compiled,
- *
- * @returns a pointer to the field, it can be cast to the correct type and read
- *          or written to.
- */
-void *av_opt_ptr(const AVClass *avclass, void *obj, const char *name);
-/**
  * @}
  */
 

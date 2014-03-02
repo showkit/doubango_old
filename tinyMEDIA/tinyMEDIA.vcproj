@@ -42,14 +42,14 @@
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				AdditionalIncludeDirectories="&quot;..\thirdparties\win32\include&quot;;include;&quot;..\tinySAK\src&quot;;&quot;..\tinySDP\include&quot;;&quot;..\tinyNET\src&quot;"
-				PreprocessorDefinitions="DEBUG_LEVEL=DEBUG_LEVEL_INFO;WIN32;_DEBUG;_WINDOWS;_USRDLL;TINYMEDIA_EXPORTS;FLIP_ENCODED_PICT=1;FLIP_DECODED_PICT=0"
+				PreprocessorDefinitions="DEBUG_LEVEL=DEBUG_LEVEL_INFO;WIN32;_DEBUG;_WINDOWS;_USRDLL;TINYMEDIA_EXPORTS;FLIP_ENCODED_PICT=1;FLIP_DECODED_PICT=1"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
 				WarnAsError="true"
-				DebugInformationFormat="1"
+				DebugInformationFormat="4"
 				CompileAs="1"
 			/>
 			<Tool
@@ -116,10 +116,10 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				Optimization="3"
-				EnableIntrinsicFunctions="true"
+				Optimization="1"
+				EnableIntrinsicFunctions="false"
 				AdditionalIncludeDirectories="&quot;..\thirdparties\win32\include&quot;;include;&quot;..\tinySAK\src&quot;;&quot;..\tinySDP\include&quot;;&quot;..\tinyNET\src&quot;"
-				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;TINYMEDIA_EXPORTS;FLIP_ENCODED_PICT=1;FLIP_DECODED_PICT=0"
+				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;TINYMEDIA_EXPORTS;FLIP_ENCODED_PICT=1;FLIP_DECODED_PICT=1"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="false"
 				UsePrecompiledHeader="0"
@@ -205,10 +205,6 @@
 			</File>
 			<File
 				RelativePath=".\include\tinymedia\tmedia_consumer.h"
-				>
-			</File>
-			<File
-				RelativePath=".\include\tinymedia\tmedia_converter_video.h"
 				>
 			</File>
 			<File
@@ -306,10 +302,6 @@
 				>
 			</File>
 			<File
-				RelativePath=".\src\tmedia_converter_video.c"
-				>
-			</File>
-			<File
 				RelativePath=".\src\tmedia_defaults.c"
 				>
 			</File>
@@ -379,7 +371,7 @@
 			</Filter>
 		</Filter>
 		<Filter
-			Name="ragel(.*rl)"
+			Name="ragel"
 			>
 			<File
 				RelativePath=".\ragel\tmedia_content_cpim.rl"
@@ -391,14 +383,6 @@
 			</File>
 			<File
 				RelativePath=".\ragel\tmedia_machine_utils.rl"
-				>
-			</File>
-		</Filter>
-		<Filter
-			Name="resources(*.rc)"
-			>
-			<File
-				RelativePath=".\version.rc"
 				>
 			</File>
 		</Filter>

@@ -5,10 +5,10 @@ THIRDPARTIES_LIB := ../thirdparties/android/lib
 
 # TLS (Default: enabled)
 ifeq ($(TLS), no)
-	TLS_CFLAGS := -DHAVE_OPENSSL=0
+	TLS_CFLAGS := -DHAVE_OPENSSL_H=0
 	TLS_LDFLAGS :=
 else
-	TLS_CFLAGS := -DHAVE_OPENSSL=1
+	TLS_CFLAGS := -DHAVE_OPENSSL_H=1
 	TLS_LDFLAGS := -lssl_$(MARCH) -lcrypto_$(MARCH)
 endif
 
@@ -75,9 +75,9 @@ OBJS +=	src/stun/tnet_stun.o\
 	src/stun/tnet_stun_attribute.o\
 	src/stun/tnet_stun_message.o
 	###################
-	## TLS / DTLS
+	## TLS
 	###################
-OBJS +=	src/tls/tnet_tls.o\
+OBJS +=	src/tls/tnet_tls.o \
 	src/tls/tnet_dtls.o
 	###################
 	## TURN

@@ -140,14 +140,10 @@ tsip_header_P_Associated_URIs_L_t *tsip_header_P_Associated_URI_parse(const char
 	const char *eof = pe;
 	tsip_header_P_Associated_URIs_L_t *hdr_p_associated_uris = tsk_list_create();
 	
-	const char *tag_start = tsk_null;
+	const char *tag_start;
 	tsip_header_P_Associated_URI_t *curr_p_associated_uri = tsk_null;
 
 	%%write data;
-	(void)(eof);
-	(void)(tsip_machine_parser_header_P_Associated_URI_first_final);
-	(void)(tsip_machine_parser_header_P_Associated_URI_error);
-	(void)(tsip_machine_parser_header_P_Associated_URI_en_main);
 	%%write init;
 	%%write exec;
 	

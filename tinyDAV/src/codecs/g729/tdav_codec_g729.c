@@ -26,6 +26,7 @@
  *
  * @author Mamadou Diop <diopmamadou(at)doubango.org>
  *
+
  */
 #include "tinydav/codecs/g729/tdav_codec_g729.h"
 
@@ -92,7 +93,7 @@ static int tdav_codec_g729ab_close(tmedia_codec_t* self)
 {
 	tdav_codec_g729ab_t* g729a = (tdav_codec_g729ab_t*)self;	
 
-	(void)(g729a);
+	(g729a);
 	
 	/* resources will be freed by the dctor() */
 	
@@ -436,14 +437,14 @@ static const tmedia_codec_plugin_def_t tdav_codec_g729ab_plugin_def_s =
 	tmedia_audio,
 	tmedia_codec_id_g729ab,
 	"g729",
-	"g729ab Codec (libg729)",
+	"g729ab Codec",
 	TMEDIA_CODEC_FORMAT_G729,
 	tsk_false,
 	8000, // rate
 	
 	{ /* audio */
 		1, // channels
-		0 // ptime @deprecated
+		20 // ptime
 	},
 
 	/* video */

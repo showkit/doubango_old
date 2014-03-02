@@ -66,7 +66,7 @@ int tmedia_denoise_set(tmedia_denoise_t* self, const tmedia_param_t* param)
 	return 0;
 }
 
-int tmedia_denoise_open(tmedia_denoise_t* self, uint32_t record_frame_size_samples, uint32_t record_sampling_rate, uint32_t playback_frame_size_samples, uint32_t playback_sampling_rate)
+int tmedia_denoise_open(tmedia_denoise_t* self, uint32_t frame_size, uint32_t sampling_rate)
 {
 	if(!self || !self->plugin){
 		TSK_DEBUG_ERROR("Invalid parameter");
@@ -86,12 +86,12 @@ int tmedia_denoise_open(tmedia_denoise_t* self, uint32_t record_frame_size_sampl
 			return -2;
 		}
 		// resize the buffer
-		if((ret = tsk_buffer_realloc(self->last_frame, (record_frame_size_samples * sizeof(int16_t))))){
+		if((ret = tsk_buffer_realloc(self->last_frame, (frame_size * sizeof(int16_t))))){
 			TSK_DEBUG_ERROR("Failed to realloc the buffer");
 			return ret;
 		}
 
-		if((ret = self->plugin->open(self, record_frame_size_samples, record_sampling_rate, playback_frame_size_samples, playback_sampling_rate))){
+		if((ret = self->plugin->open(self, frame_size, sampling_rate))){
 			TSK_DEBUG_ERROR("Failed to open [%s] denoiser", self->plugin->desc);
 			return ret;
 		}
@@ -106,7 +106,7 @@ int tmedia_denoise_open(tmedia_denoise_t* self, uint32_t record_frame_size_sampl
 	}
 }
 
-int tmedia_denoise_echo_playback(tmedia_denoise_t* self, const void* echo_frame, uint32_t echo_frame_size_bytes)
+int tmedia_denoise_echo_playback(tmedia_denoise_t* self, const void* echo_frame)
 {
 	if(!self || !self->plugin){
 		TSK_DEBUG_ERROR("Invalid parameter");
@@ -119,14 +119,14 @@ int tmedia_denoise_echo_playback(tmedia_denoise_t* self, const void* echo_frame,
 	}
 
 	if(self->plugin->echo_playback){
-		return self->plugin->echo_playback(self, echo_frame, echo_frame_size_bytes);
+		return self->plugin->echo_playback(self, echo_frame);
 	}
 	else{
 		return 0;
 	}
 }
 
-int tmedia_denoise_process_record(tmedia_denoise_t* self, void* audio_frame, uint32_t audio_frame_size_bytes, tsk_bool_t* silence_or_noise)
+int tmedia_denoise_process_record(tmedia_denoise_t* self, void* audio_frame, tsk_bool_t* silence_or_noise)
 {
 	if(!self || !self->plugin || !silence_or_noise){
 		TSK_DEBUG_ERROR("Invalid parameter");
@@ -139,7 +139,7 @@ int tmedia_denoise_process_record(tmedia_denoise_t* self, void* audio_frame, uin
 	}
 
 	if(self->plugin->process_record){
-		return self->plugin->process_record(self, audio_frame, audio_frame_size_bytes, silence_or_noise);
+		return self->plugin->process_record(self, audio_frame, silence_or_noise);
 	}
 	else{
 		*silence_or_noise = tsk_false;
@@ -147,7 +147,7 @@ int tmedia_denoise_process_record(tmedia_denoise_t* self, void* audio_frame, uin
 	}
 }
 
-int tmedia_denoise_process_playback(tmedia_denoise_t* self, void* audio_frame, uint32_t audio_frame_size_bytes)
+int tmedia_denoise_process_playback(tmedia_denoise_t* self, void* audio_frame)
 {
 	if(!self || !self->plugin){
 		TSK_DEBUG_ERROR("Invalid parameter");
@@ -160,7 +160,7 @@ int tmedia_denoise_process_playback(tmedia_denoise_t* self, void* audio_frame, u
 	}
 
 	if(self->plugin->process_playback){
-		return self->plugin->process_playback(self, audio_frame, audio_frame_size_bytes);
+		return self->plugin->process_playback(self, audio_frame);
 	}
 	return 0;
 }
@@ -215,16 +215,12 @@ int tmedia_denoise_plugin_register(const tmedia_denoise_plugin_def_t* plugin)
 		TSK_DEBUG_ERROR("Invalid parameter");
 		return -1;
 	}
-	if(!__tmedia_denoise_plugin) {
-		TSK_DEBUG_INFO("Register denoiser: %d", plugin->desc);
-		__tmedia_denoise_plugin = plugin;
-	}
+	__tmedia_denoise_plugin = plugin;
 	return 0;
 }
 
-int tmedia_denoise_plugin_unregister(const tmedia_denoise_plugin_def_t* plugin)
+int tmedia_denoise_plugin_unregister()
 {
-	(void)(plugin);
 	__tmedia_denoise_plugin = tsk_null;
 	return 0;
 }

@@ -22,26 +22,21 @@
 #ifndef TINYWRAP_MEDIA_SESSIONMGR_H
 #define TINYWRAP_MEDIA_SESSIONMGR_H
 
-#include "tinyWRAP_config.h"
-
 #include "tinymedia.h"
 #include "Common.h"
 
 class ProxyPlugin;
-
-class TINYWRAP_API Codec
+struct tdav_session_av_s;
+typedef struct tdav_session_av_s tdav_session_av_t;
+class Codec
 {
 public:
 #if !defined(SWIG)
-	Codec(const struct tmedia_codec_s* pWrappedCodec);
+	Codec(struct tmedia_codec_s* pWrappedCodec);
 #endif
 	virtual ~Codec();
 
 public:
-#if !defined(SWIG)
-	const struct tmedia_codec_s* getWrappedCodec(){ return m_pWrappedCodec; }
-	inline bool isOpened(){ return (m_pWrappedCodec && (m_pWrappedCodec->opened == tsk_true)); }
-#endif
 	twrap_media_type_t getMediaType();
 	const char* getName();
 	const char* getDescription();
@@ -54,7 +49,7 @@ private:
 	struct tmedia_codec_s* m_pWrappedCodec;
 };
 
-class TINYWRAP_API MediaSessionMgr
+class MediaSessionMgr
 {
 public:
 #if !defined(SWIG)
@@ -76,7 +71,8 @@ public:
 #if !defined(SWIG)
 	const ProxyPlugin* findProxyPlugin(twrap_media_type_t media, bool consumer)const;
 #endif
-
+    tdav_session_av_t* findSession(twrap_media_type_t, bool consumer)const;
+    
 	const ProxyPlugin* findProxyPluginConsumer(twrap_media_type_t media)const{
 		return this->findProxyPlugin(media, true);
 	}
@@ -87,21 +83,13 @@ public:
 	static unsigned int registerAudioPluginFromFile(const char* path);
 
 	uint64_t getSessionId(twrap_media_type_t media)const;
-
-#if !defined(SWIG)
-	inline const tmedia_session_mgr_t* getWrappedMgr()const { return m_pWrappedMgr; }
-#endif
 	
 	// Defaults
 	static bool defaultsSetProfile(tmedia_profile_t profile);
 	static tmedia_profile_t defaultsGetProfile();
 	static bool defaultsSetBandwidthLevel(tmedia_bandwidth_level_t bl); // @deprecated
 	static tmedia_bandwidth_level_t defaultsGetBandwidthLevel(); // @deprecated
-	static bool defaultsSetCongestionCtrlEnabled(bool enabled);
-	static bool defaultsSetVideoMotionRank(int32_t video_motion_rank);
-	static bool defaultsSetVideoFps(int32_t video_fps);
-	static bool defaultsSetBandwidthVideoUploadMax(int32_t bw_video_up_max_kbps);
-	static bool defaultsSetBandwidthVideoDownloadMax(int32_t bw_video_down_max_kbps);
+    static bool defaultsSetPrefVideoFramerate(unsigned framerate);
 	static bool defaultsSetPrefVideoSize(tmedia_pref_video_size_t pref_video_size);
 	static bool defaultsSetJbMargin(uint32_t jb_margin_ms);
 	static bool defaultsSetJbMaxLateRate(uint32_t jb_late_rate_percent);
@@ -124,40 +112,17 @@ public:
 	static bool defaultsGet100relEnabled();
 	static bool defaultsSetScreenSize(int32_t sx, int32_t sy);
 	static bool defaultsSetAudioGain(int32_t producer_gain, int32_t consumer_gain);
-	static bool defaultsSetAudioPtime(int32_t ptime);
-	static bool defaultsSetAudioChannels(int32_t channel_playback, int32_t channel_record);
 	static bool defaultsSetRtpPortRange(uint16_t range_start, uint16_t range_stop);
-	static bool defaultsSetRtpSymetricEnabled(bool enabled);
 	static bool defaultsSetMediaType(twrap_media_type_t media_type);
 	static bool defaultsSetVolume(int32_t volume);
 	static int32_t defaultsGetVolume();
 	static bool defaultsSetInviteSessionTimers(int32_t timeout, const char* refresher);
 	static bool defaultsSetSRtpMode(tmedia_srtp_mode_t mode);
-	static tmedia_srtp_mode_t defaultsGetSRtpMode();
-	static bool defaultsSetSRtpType(tmedia_srtp_type_t srtp_type);
-	static tmedia_srtp_type_t defaultsGetSRtpType();
 	static bool defaultsSetRtcpEnabled(bool enabled);
 	static bool defaultsGetRtcpEnabled();
 	static bool defaultsSetRtcpMuxEnabled(bool enabled);
 	static bool defaultsGetRtcpMuxEnabled();
-	static bool defaultsSetStunEnabled(bool stun_enabled);
-	static bool defaultsSetIceStunEnabled(bool icestun_enabled);
-	static bool defaultsSetStunServer(const char* server_ip, uint16_t server_port, const char* usr_name = tsk_null, const char* usr_pwd = tsk_null);
 	static bool defaultsSetIceEnabled(bool ice_enabled);
-	static bool defaultsSetByPassEncoding(bool enabled);
-	static bool defaultsGetByPassEncoding();
-	static bool defaultsSetByPassDecoding(bool enabled);
-	static bool defaultsGetByPassDecoding();
-	static bool defaultsSetVideoJbEnabled(bool enabled);
-	static bool defaultsGetVideoJbEnabled();
-	static bool defaultsSetVideoZeroArtifactsEnabled(bool enabled);
-	static bool defaultsGetVideoZeroArtifactsEnabled();
-	static bool defaultsSetRtpBuffSize(unsigned buffSize);
-	static unsigned defaultsGetRtpBuffSize();
-	static bool defaultsSetAvpfTail(unsigned tail_min, unsigned tail_max);
-	static bool defaultsSetOpusMaxCaptureRate(uint32_t opus_maxcapturerate);
-	static bool defaultsSetOpusMaxPlaybackRate(uint32_t opus_maxplaybackrate);
-	static bool defaultsSetMaxFds(int32_t max_fds);
 
 private:
 	tmedia_session_mgr_t* m_pWrappedMgr;

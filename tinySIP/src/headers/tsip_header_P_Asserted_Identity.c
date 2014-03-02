@@ -78,7 +78,7 @@ tsip_header_P_Asserted_Identities_L_t *tsip_header_P_Asserted_Identity_parse(con
 	const char *eof = pe;
 	tsip_header_P_Asserted_Identities_L_t *hdr_p_asserted_identities = tsk_list_create();
 	
-	const char *tag_start = tsk_null;
+	const char *tag_start;
 	tsip_header_P_Asserted_Identity_t *curr_p_asserted_identity = 0;
 
 	
@@ -1216,19 +1216,15 @@ static const int tsip_machine_parser_header_P_Asserted_Identity_en_main = 1;
 
 
 /* #line 136 "./ragel/tsip_parser_header_P_Asserted_Identity.rl" */
-	(void)(eof);
-	(void)(tsip_machine_parser_header_P_Asserted_Identity_first_final);
-	(void)(tsip_machine_parser_header_P_Asserted_Identity_error);
-	(void)(tsip_machine_parser_header_P_Asserted_Identity_en_main);
 	
-/* #line 1225 "./src/headers/tsip_header_P_Asserted_Identity.c" */
+/* #line 1221 "./src/headers/tsip_header_P_Asserted_Identity.c" */
 	{
 	cs = tsip_machine_parser_header_P_Asserted_Identity_start;
 	}
 
-/* #line 141 "./ragel/tsip_parser_header_P_Asserted_Identity.rl" */
+/* #line 137 "./ragel/tsip_parser_header_P_Asserted_Identity.rl" */
 	
-/* #line 1232 "./src/headers/tsip_header_P_Asserted_Identity.c" */
+/* #line 1228 "./src/headers/tsip_header_P_Asserted_Identity.c" */
 	{
 	int _klen;
 	unsigned int _trans;
@@ -1350,7 +1346,7 @@ _match:
 	{
 	}
 	break;
-/* #line 1354 "./src/headers/tsip_header_P_Asserted_Identity.c" */
+/* #line 1350 "./src/headers/tsip_header_P_Asserted_Identity.c" */
 		}
 	}
 
@@ -1363,12 +1359,12 @@ _again:
 	_out: {}
 	}
 
-/* #line 142 "./ragel/tsip_parser_header_P_Asserted_Identity.rl" */
+/* #line 138 "./ragel/tsip_parser_header_P_Asserted_Identity.rl" */
 	
 	if( cs < 
-/* #line 1370 "./src/headers/tsip_header_P_Asserted_Identity.c" */
+/* #line 1366 "./src/headers/tsip_header_P_Asserted_Identity.c" */
 230
-/* #line 143 "./ragel/tsip_parser_header_P_Asserted_Identity.rl" */
+/* #line 139 "./ragel/tsip_parser_header_P_Asserted_Identity.rl" */
  ){
 		TSK_DEBUG_ERROR("Failed to parse 'P-Asserted-Identity' header.");
 		TSK_OBJECT_SAFE_FREE(curr_p_asserted_identity);

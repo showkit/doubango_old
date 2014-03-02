@@ -22,13 +22,11 @@
 #ifndef TINYWRAP_MSRP_H
 #define TINYWRAP_MSRP_H
 
-#include "tinyWRAP_config.h"
-
 #include "tinymsrp.h"
 
 class MsrpSession;
 
-class TINYWRAP_API MsrpMessage
+class MsrpMessage
 {
 public:
 	MsrpMessage();
@@ -53,9 +51,6 @@ public:
 	char* getMsrpHeaderParamValue(const char* name, const char* param);
 	unsigned getMsrpContentLength();
 	unsigned getMsrpContent(void* output, unsigned maxsize);
-#if !defined(SWIG)
-	const tmsrp_message_t* getWrappedMsrpMessage() { return m_pMessage; }
-#endif
 
 private:
 	const tmsrp_header_t* getMsrpHeader(const char* name, unsigned index = 0);
@@ -64,7 +59,7 @@ private:
 	tmsrp_message_t *m_pMessage;
 };
 
-class TINYWRAP_API MsrpEvent
+class MsrpEvent
 {
 public:
 #if !defined(SWIG)
@@ -81,7 +76,7 @@ protected:
 	MsrpMessage* m_pMessage;
 };
 
-class TINYWRAP_API MsrpCallback
+class MsrpCallback
 {
 public:
 	MsrpCallback() {  }

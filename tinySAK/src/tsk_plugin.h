@@ -23,8 +23,6 @@
 #include "tinysak_config.h"
 #include "tsk_object.h"
 
-TSK_BEGIN_DECLS
-
 typedef enum tsk_plugin_def_type_e
 {
 	tsk_plugin_def_type_none = 0,
@@ -36,7 +34,7 @@ typedef enum tsk_plugin_def_type_e
 	tsk_plugin_def_type_jb = (1 << 5),
 	tsk_plugin_def_type_denoiser = (1 << 6),
 	tsk_plugin_def_type_converter = (1 << 7),
-	tsk_plugin_def_type_all = (~0)
+	tsk_plugin_def_type_any = (~0)
 }
 tsk_plugin_def_type_t;
 
@@ -45,7 +43,7 @@ typedef enum tsk_plugin_def_media_type_e
 	tsk_plugin_def_media_type_none = 0,
 	tsk_plugin_def_media_type_audio = (1 << 0),
 	tsk_plugin_def_media_type_video = (1 << 1),
-	tsk_plugin_def_media_type_all = (~0)
+	tsk_plugin_def_media_type_any = (~0)
 }
 tsk_plugin_def_media_type_t;
 
@@ -55,10 +53,6 @@ typedef const void* tsk_plugin_def_ptr_const_t;
 
 TINYSAK_API struct tsk_plugin_s* tsk_plugin_create(const char* path);
 TINYSAK_API tsk_plugin_def_ptr_const_t tsk_plugin_get_def(struct tsk_plugin_s* self, tsk_plugin_def_type_t type, tsk_plugin_def_media_type_t media_type);
-TINYSAK_API tsk_plugin_def_ptr_const_t tsk_plugin_get_def_2(struct tsk_plugin_s* self, tsk_plugin_def_type_t type, tsk_plugin_def_media_type_t media_type, tsk_size_t index);
 TINYSAK_API tsk_plugin_symbol_t* tsk_plugin_get_symbol(struct tsk_plugin_s* self, const char* symbol_name);
-TINYSAK_API tsk_bool_t tsk_plugin_file_exist(const char* path);
-
-TSK_END_DECLS
 
 #endif /* _TINYSAK_PLUGIN_H_ */

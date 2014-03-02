@@ -107,7 +107,7 @@ tsip_header_Security_Verifies_L_t *tsip_header_Security_Verify_parse(const char 
 	const char *eof = pe;
 	tsip_header_Security_Verifies_L_t *hdr_securityverifies = tsk_list_create();
 	
-	const char *tag_start = tsk_null;
+	const char *tag_start;
 	tsip_header_Security_Verify_t *curr_securityverify = tsk_null;
 
 	
@@ -673,19 +673,15 @@ static const int tsip_machine_parser_header_Security_Verify_en_main = 1;
 
 
 /* #line 212 "./ragel/tsip_parser_header_Security_Verify.rl" */
-	(void)(eof);
-	(void)(tsip_machine_parser_header_Security_Verify_first_final);
-	(void)(tsip_machine_parser_header_Security_Verify_error);
-	(void)(tsip_machine_parser_header_Security_Verify_en_main);
 	
-/* #line 682 "./src/headers/tsip_header_Security_Verify.c" */
+/* #line 678 "./src/headers/tsip_header_Security_Verify.c" */
 	{
 	cs = tsip_machine_parser_header_Security_Verify_start;
 	}
 
-/* #line 217 "./ragel/tsip_parser_header_Security_Verify.rl" */
+/* #line 213 "./ragel/tsip_parser_header_Security_Verify.rl" */
 	
-/* #line 689 "./src/headers/tsip_header_Security_Verify.c" */
+/* #line 685 "./src/headers/tsip_header_Security_Verify.c" */
 	{
 	int _klen;
 	unsigned int _trans;
@@ -866,7 +862,7 @@ _match:
 	{
 	}
 	break;
-/* #line 870 "./src/headers/tsip_header_Security_Verify.c" */
+/* #line 866 "./src/headers/tsip_header_Security_Verify.c" */
 		}
 	}
 
@@ -879,12 +875,12 @@ _again:
 	_out: {}
 	}
 
-/* #line 218 "./ragel/tsip_parser_header_Security_Verify.rl" */
+/* #line 214 "./ragel/tsip_parser_header_Security_Verify.rl" */
 	
 	if( cs < 
-/* #line 886 "./src/headers/tsip_header_Security_Verify.c" */
+/* #line 882 "./src/headers/tsip_header_Security_Verify.c" */
 188
-/* #line 219 "./ragel/tsip_parser_header_Security_Verify.rl" */
+/* #line 215 "./ragel/tsip_parser_header_Security_Verify.rl" */
  ){
 		TSK_DEBUG_ERROR("Failed to parse 'Security-Verify' header.");
 		TSK_OBJECT_SAFE_FREE(curr_securityverify);

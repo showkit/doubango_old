@@ -29,14 +29,8 @@
  */
 #include "tinymedia/tmedia_common.h"
 
-#include "tinymedia/tmedia_consumer.h"
-#include "tinymedia/tmedia_producer.h"
 #include "tinymedia/tmedia_session.h"
-#include "tinymedia/tmedia_converter_video.h"
-#include "tinymedia/tmedia_resampler.h"
-#include "tinymedia/tmedia_denoise.h"
 #include "tinymedia/tmedia_imageattr.h"
-#include "tinymedia/tmedia_defaults.h"
 
 #include "tsk_params.h"
 #include "tsk_debug.h"
@@ -53,11 +47,10 @@ typedef struct fmtp_size_s{
 static const fmtp_size_t fmtp_sizes[] = 
 {
 	/* must be sorted like this */
-	{"2160P", tmedia_pref_video_size_2160p, tsk_false, 3840, 2160},
 	{"1080P", tmedia_pref_video_size_1080p, tsk_false, 1920, 1080},
 	{"16CIF", tmedia_pref_video_size_16cif, tsk_true, 1408, 1152},
 	{"720P", tmedia_pref_video_size_720p, tsk_false, 1280, 720},
-        {"DVGA", tmedia_pref_video_size_dvga, tsk_false, 960, 640},
+    {"DVGA", tmedia_pref_video_size_dvga, tsk_false, 960, 640},
 	{"480P", tmedia_pref_video_size_480p, tsk_false, 852, 480},
 	{"SVGA", tmedia_pref_video_size_svga, tsk_false, 800, 600},
 	{"4CIF", tmedia_pref_video_size_4cif, tsk_true, 704, 576},
@@ -68,69 +61,6 @@ static const fmtp_size_t fmtp_sizes[] =
 	{"QCIF", tmedia_pref_video_size_qcif, tsk_true, 176, 144},
 	{"SQCIF", tmedia_pref_video_size_sqcif, tsk_true, 128, 96}
 };
-
-typedef int (*plugin_register)(const void* plugin_def);
-typedef int (*plugin_unregister)(const void* plugin_def);
-
-typedef struct plugin_decl_s
-{
-	tsk_plugin_def_type_t type;
-	plugin_register fn_register;
-	plugin_unregister fn_unregister;
-}
-plugin_decl_t;
-
-static const struct plugin_decl_s __plugin_def_types[] = 
-{
-	{tsk_plugin_def_type_consumer, tmedia_consumer_plugin_register, tmedia_consumer_plugin_unregister },
-	{tsk_plugin_def_type_producer, tmedia_producer_plugin_register, tmedia_producer_plugin_unregister },
-	{tsk_plugin_def_type_session, tmedia_session_plugin_register, tmedia_session_plugin_unregister },
-	{tsk_plugin_def_type_codec, tmedia_codec_plugin_register, tmedia_codec_plugin_unregister },
-	{tsk_plugin_def_type_converter, tmedia_converter_video_plugin_register, tmedia_converter_video_plugin_unregister },
-	{tsk_plugin_def_type_resampler, tmedia_resampler_plugin_register, tmedia_resampler_plugin_unregister },
-	{tsk_plugin_def_type_denoiser, tmedia_denoise_plugin_register, tmedia_denoise_plugin_unregister },
-};
-static const tsk_size_t __plugin_def_types_count = sizeof(__plugin_def_types)/sizeof(__plugin_def_types[0]);
-static const tsk_plugin_def_media_type_t __plugin_def_media_types[] = 
-{
-	tsk_plugin_def_media_type_audio,
-	tsk_plugin_def_media_type_video
-};
-static const tsk_size_t __plugin_def_media_types_count = sizeof(__plugin_def_media_types)/sizeof(__plugin_def_media_types[0]);
-
-static tsk_size_t _tmedia_plugin_register_or_unregister(struct tsk_plugin_s* plugin, enum tsk_plugin_def_type_e type, enum tsk_plugin_def_media_type_e media, tsk_bool_t _register)
-{
-	tsk_size_t ret = 0, i, j, index;
-	tsk_plugin_def_ptr_const_t plugin_def_ptr_const;
-	if(!plugin){
-		TSK_DEBUG_ERROR("Invalid parameter");
-		return 0;
-	}
-
-	for(i = 0; i < __plugin_def_types_count; ++i){
-		for(j = 0; j < __plugin_def_media_types_count; ++j){
-			if((_register ? __plugin_def_types[i].fn_register : __plugin_def_types[i].fn_unregister) && (type & __plugin_def_types[i].type) == __plugin_def_types[i].type && (media & __plugin_def_media_types[j]) == __plugin_def_media_types[j]){
-				for(index = 0; (plugin_def_ptr_const = tsk_plugin_get_def_2(plugin, __plugin_def_types[i].type, __plugin_def_media_types[j], index)); ++index){
-					if((_register ? __plugin_def_types[i].fn_register : __plugin_def_types[i].fn_unregister)(plugin_def_ptr_const) == 0){
-						++ret;
-					}
-				}
-			}
-		}
-	}
-
-	return ret;
-}
-
-tsk_size_t tmedia_plugin_register(struct tsk_plugin_s* plugin, enum tsk_plugin_def_type_e type, enum tsk_plugin_def_media_type_e media)
-{
-	return _tmedia_plugin_register_or_unregister(plugin, type, media, tsk_true);
-}
-
-tsk_size_t tmedia_plugin_unregister(struct tsk_plugin_s* plugin, enum tsk_plugin_def_type_e type, enum tsk_plugin_def_media_type_e media)
-{
-	return _tmedia_plugin_register_or_unregister(plugin, type, media, tsk_false);
-}
 
 tmedia_type_t tmedia_type_from_sdp(const tsdp_message_t* sdp)
 {
@@ -230,17 +160,6 @@ int tmedia_video_get_size(tmedia_pref_video_size_t pref_vs, unsigned *width, uns
 		}
 	}
 	return -1;
-}
-
-tmedia_pref_video_size_t tmedia_video_get_size_enum(unsigned width, unsigned height)
-{
-	int i;
-	for(i=0; i<sizeof(fmtp_sizes)/sizeof(fmtp_sizes[0]); i++){
-		if((fmtp_sizes[i].width == width) && (fmtp_sizes[i].height == height)){
-			return fmtp_sizes[i].pref_vs;
-		}
-	}
-	return tmedia_pref_video_size_notfound;
 }
 
 int tmedia_video_get_closest_cif_size(tmedia_pref_video_size_t pref_vs, tmedia_pref_video_size_t *cif_vs)
@@ -395,21 +314,4 @@ int tmedia_get_video_quality(tmedia_bandwidth_level_t bl)
 		case tmedia_bl_hight: return 5;
 		case tmedia_bl_unrestricted: return 1;
 	}
-}
-
-int32_t tmedia_get_video_bandwidth_kbps(unsigned width, unsigned height, unsigned fps, unsigned motion_rank)
-{
-	return (int32_t)((width * height * fps * motion_rank * 0.07) / 1024);
-}
-
-int32_t tmedia_get_video_bandwidth_kbps_2(unsigned width, unsigned height, unsigned fps)
-{
-	return tmedia_get_video_bandwidth_kbps(width, height, fps, tmedia_defaults_get_video_motion_rank());
-}
-int32_t tmedia_get_video_bandwidth_kbps_3()
-{
-	unsigned width = 3840;
-	unsigned height = 2160;
-	tmedia_video_get_size(tmedia_defaults_get_pref_video_size(), &width, &height);
-	return tmedia_get_video_bandwidth_kbps(width, height, tmedia_defaults_get_video_fps(), tmedia_defaults_get_video_motion_rank());
 }

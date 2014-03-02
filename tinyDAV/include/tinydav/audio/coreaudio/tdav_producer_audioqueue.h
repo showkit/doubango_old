@@ -51,6 +51,7 @@ typedef struct tdav_producer_audioqueue_s
     AudioQueueBufferRef buffers[CoreAudioRecordBuffers];
     
     tsk_size_t buffer_size;
+    unsigned muted;
 }
 tdav_producer_audioqueue_t;
 

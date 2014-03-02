@@ -52,8 +52,8 @@ typedef struct trtp_rtp_packet_s
 	/* extension header as per RFC 3550 section 5.3.1 */
 	struct{
         uint16_t profile;
+        uint16_t size;
 		uint32_t* data;
-		tsk_size_t size; /* contains the first two 16-bit fields */
 	} extension;
 }
 trtp_rtp_packet_t;

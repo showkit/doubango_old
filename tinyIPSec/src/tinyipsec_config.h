@@ -27,12 +27,10 @@
 #undef _WIN32 /* Because of WINSCW */
 #endif
 
-// Windows (XP/Vista/7/CE and Windows Mobile) macro definition
+/* Windows (XP/Vista/7/CE and Windows Mobile) macro definition.
+*/
 #if defined(WIN32)|| defined(_WIN32) || defined(_WIN32_WCE)
 #	define TIPSEC_UNDER_WINDOWS	1
-#	if defined(WINAPI_FAMILY) && (WINAPI_FAMILY == WINAPI_FAMILY_PHONE_APP || WINAPI_FAMILY == WINAPI_FAMILY_APP)
-#		define TIPSEC_UNDER_WINDOWS_RT		1
-#	endif
 #endif
 
 /* Used on Windows and Symbian systems to export/import public functions and global variables.
@@ -40,7 +38,7 @@
 #if !defined(__GNUC__) && defined(TINYIPSEC_EXPORTS)
 # 	define TINYIPSEC_API		__declspec(dllexport)
 #	define TINYIPSEC_GEXTERN	__declspec(dllexport)
-#elif !defined(__GNUC__) && !defined(TINYIPSEC_IMPORTS_IGNORE)
+#elif !defined(__GNUC__) && defined(TINYIPSEC_IMPORTS)
 # 	define TINYIPSEC_API		__declspec(dllimport)
 #	define TINYIPSEC_GEXTERN	__declspec(dllimport)
 #else
@@ -65,6 +63,13 @@
 #	pragma warning( disable : 4996 )
 #endif
 
+#if TIPSEC_UNDER_WINDOWS && !defined(_WIN32_WCE)
+//#	include <windows.h>
+//#	include <ws2tcpip.h>
+#	include <winsock2.h>
+#endif
+
+
 //
 // IPSEC
 //
@@ -80,7 +85,7 @@
 
 
 #if HAVE_CONFIG_H
-	#include <config.h>
+	#include "../config.h"
 #endif
 
 #endif /* TINYIPSEC_CONFIG_H */

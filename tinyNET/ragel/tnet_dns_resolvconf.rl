@@ -54,7 +54,6 @@
 			tnet_address_t *address;
 			memset(ip, '\0', sizeof(ip));
 			memcpy(ip, tag_start, len);
-			TSK_DEBUG_INFO("Adding DNS server = %s:%d", ip, TNET_DNS_SERVER_PORT_DEFAULT);
 			
 			address = tnet_address_create(ip);
 			address->family = tnet_get_family(ip, TNET_DNS_SERVER_PORT_DEFAULT);
@@ -72,7 +71,7 @@
 	o_name = any+;
 	o_value = any+;
 	
-	COMMENT = SP*<: ("#" | ";") any*;
+	COMMENT = SP*<: "#" any*;
 	OPTION_ANY = SP*<: o_name :>SP+<: o_value :>SP*;
 	OPTION_DNS = SP*<: "nameserver"i :>SP+<: o_value>tag %add_dns :>SP*;
 	LINE = (OPTION_DNS)@100 | (OPTION_ANY)@0 | (COMMENT)@50;
@@ -92,9 +91,9 @@ tnet_addresses_L_t * tnet_dns_resolvconf_parse(const char* path)
 	tnet_addresses_L_t* servers = tsk_null;
 	tnet_ip_t ip;
 	const char* fullpath = path;
-	const char* tag_start = tsk_null;
+	const char* tag_start;
 	FILE* fd;
-	char* buf = tsk_null;
+	char buf[4092];
 	
 	// Ragel
 	int cs = 0;
@@ -103,10 +102,6 @@ tnet_addresses_L_t * tnet_dns_resolvconf_parse(const char* path)
 	const char *eof;
 
 	%%write data;
-	(void)(eof);
-	(void)(tdns_machine_resolvconf_first_final);
-	(void)(tdns_machine_resolvconf_error);
-	(void)(tdns_machine_resolvconf_en_main);
 
 	if(tsk_strnullORempty(fullpath)){
 		fullpath = TNET_RESOLV_CONF_PATH;
@@ -114,15 +109,7 @@ tnet_addresses_L_t * tnet_dns_resolvconf_parse(const char* path)
 
 	/* Open the file and read all data */
 	if((fd = fopen(fullpath, "r"))){
-		long len;
-		fseek(fd, 0L, SEEK_END);
-		len = ftell(fd);
-		fseek(fd, 0L, SEEK_SET);
-		if(!(buf = (char*)tsk_calloc(len + 1, 1))){
-			TSK_DEBUG_ERROR("Failed to allocate buffer with size = %ld", (len + 1));
-			goto bail;
-		}
-		fread(buf, 1, len, fd);
+		int len = fread(buf, sizeof(uint8_t), sizeof(buf)-2, fd);
 		p = &buf[0];
 		pe = p + len + 1/*hack*/;
 		eof = pe;
@@ -152,7 +139,6 @@ tnet_addresses_L_t * tnet_dns_resolvconf_parse(const char* path)
 	}
 
 bail:
-	TSK_FREE(buf);
 	return servers;
 }
 

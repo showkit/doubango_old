@@ -122,7 +122,7 @@ int tsdp_header_Z_tostring(const tsdp_header_t* header, tsk_buffer_t* output)
 		const tsdp_zone_t* zone;
 		
 		tsk_list_foreach(item, Z->zones){
-			zone = (const tsdp_zone_t*)item->data;
+			zone = item->data;
 			// time  SP ["-"] typed-time
 			tsk_buffer_append_2(output, "%s%llu %s%s",
 				TSK_LIST_IS_FIRST(Z->zones, item) ? "" : " ",
@@ -145,12 +145,9 @@ tsdp_header_Z_t *tsdp_header_Z_parse(const char *data, tsk_size_t size)
 	tsdp_header_Z_t *hdr_Z = tsdp_header_Z_create_null();
 	tsdp_zone_t* zone = tsk_null;
 	
-	const char *tag_start = tsk_null;
+	const char *tag_start;
 
 	%%write data;
-	(void)(tsdp_machine_parser_header_Z_first_final);
-	(void)(tsdp_machine_parser_header_Z_error);
-	(void)(tsdp_machine_parser_header_Z_en_main);
 	%%write init;
 	%%write exec;
 	

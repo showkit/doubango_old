@@ -31,11 +31,9 @@
 
 static int tdav_apple_init()
 {
-#ifdef __SHOWKIT_AUDIO__
-return -1;
-#endif
 	// initialize audio session
 #if TARGET_OS_IPHONE
+
 	OSStatus status;
 	status = AudioSessionInitialize(NULL, NULL, NULL, NULL);
 	if(status){

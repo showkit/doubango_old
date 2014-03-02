@@ -77,7 +77,7 @@ thttp_header_Transfer_Encoding_t *thttp_header_Transfer_Encoding_parse(const cha
 	const char *eof = pe;
 	thttp_header_Transfer_Encoding_t *hdr_tencoding = thttp_header_transfer_encoding_create_null();
 	
-	const char *tag_start = tsk_null;
+	const char *tag_start;
 
 	
 /* #line 84 "./src/headers/thttp_header_Transfer_Encoding.c" */
@@ -191,19 +191,15 @@ static const int thttp_machine_parser_header_Transfer_Encoding_en_main = 1;
 
 
 /* #line 105 "./ragel/thttp_parser_header_Transfer_Encoding.rl" */
-	(void)(eof);
-	(void)(thttp_machine_parser_header_Transfer_Encoding_first_final);
-	(void)(thttp_machine_parser_header_Transfer_Encoding_error);
-	(void)(thttp_machine_parser_header_Transfer_Encoding_en_main);
 	
-/* #line 200 "./src/headers/thttp_header_Transfer_Encoding.c" */
+/* #line 196 "./src/headers/thttp_header_Transfer_Encoding.c" */
 	{
 	cs = thttp_machine_parser_header_Transfer_Encoding_start;
 	}
 
-/* #line 110 "./ragel/thttp_parser_header_Transfer_Encoding.rl" */
+/* #line 106 "./ragel/thttp_parser_header_Transfer_Encoding.rl" */
 	
-/* #line 207 "./src/headers/thttp_header_Transfer_Encoding.c" */
+/* #line 203 "./src/headers/thttp_header_Transfer_Encoding.c" */
 	{
 	int _klen;
 	unsigned int _trans;
@@ -300,7 +296,7 @@ _match:
 	{
 	}
 	break;
-/* #line 304 "./src/headers/thttp_header_Transfer_Encoding.c" */
+/* #line 300 "./src/headers/thttp_header_Transfer_Encoding.c" */
 		}
 	}
 
@@ -313,12 +309,12 @@ _again:
 	_out: {}
 	}
 
-/* #line 111 "./ragel/thttp_parser_header_Transfer_Encoding.rl" */
+/* #line 107 "./ragel/thttp_parser_header_Transfer_Encoding.rl" */
 	
 	if( cs < 
-/* #line 320 "./src/headers/thttp_header_Transfer_Encoding.c" */
+/* #line 316 "./src/headers/thttp_header_Transfer_Encoding.c" */
 33
-/* #line 112 "./ragel/thttp_parser_header_Transfer_Encoding.rl" */
+/* #line 108 "./ragel/thttp_parser_header_Transfer_Encoding.rl" */
  ){
 		TSK_DEBUG_ERROR("Failed to parse Tansfer-Encoding header.");
 		TSK_OBJECT_SAFE_FREE(hdr_tencoding);

@@ -108,13 +108,9 @@ tmsrp_header_Status_t *tmsrp_header_Status_parse(const char *data, tsk_size_t si
 	const char *eof = pe;
 	tmsrp_header_Status_t *hdr_Status = tmsrp_header_Status_create_null();
 
-	const char *tag_start = tsk_null;
+	const char *tag_start;
 
 	%%write data;
-	(void)(eof);
-	(void)(tmsrp_machine_parser_header_Status_first_final);
-	(void)(tmsrp_machine_parser_header_Status_error);
-	(void)(tmsrp_machine_parser_header_Status_en_main);
 	%%write init;
 	%%write exec;
 	

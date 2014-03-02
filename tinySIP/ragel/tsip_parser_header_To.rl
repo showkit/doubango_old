@@ -124,13 +124,9 @@ tsip_header_To_t *tsip_header_To_parse(const char *data, tsk_size_t size)
 	const char *eof = pe;
 	tsip_header_To_t *hdr_to = tsip_header_To_create_null();
 	
-	const char *tag_start = tsk_null;
+	const char *tag_start;
 
 	%%write data;
-	(void)(eof);
-	(void)(tsip_machine_parser_header_To_first_final);
-	(void)(tsip_machine_parser_header_To_error);
-	(void)(tsip_machine_parser_header_To_en_main);
 	%%write init;
 	%%write exec;
 	

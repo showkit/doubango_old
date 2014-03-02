@@ -30,7 +30,7 @@ extern int tsip_dialog_register_send_RESPONSE(tsip_dialog_register_t *self, cons
 static int s0000_Started_2_Terminated_X_iREGISTER(va_list *app);
 static int s0000_Started_2_Incoming_X_iREGISTER(va_list *app);
 static int s0000_Incoming_2_Connected_X_Accept(va_list *app);
-static int s0000_Incoming_2_Terminated_X_Terminates(va_list *app);
+static int s0000_Incoming_2_Terminated_X_Reject(va_list *app);
 static int s0000_Connected_2_Connected_X_iREGISTER(va_list *app);
 static int s0000_Connected_2_Terminated_X_iREGISTER(va_list *app);
 
@@ -38,14 +38,12 @@ static int s0000_Connected_2_Terminated_X_iREGISTER(va_list *app);
 /* ======================== conds ======================== */
 static tsk_bool_t _fsm_cond_not_served_here(tsip_dialog_register_t* dialog, tsip_message_t* message)
 {
-#if 0 // FIXME: Have to disabled only when in proxy mode
 	if(message && TSIP_REQUEST_IS_REGISTER(message)){
 		if(tsk_object_cmp(TSIP_DIALOG_GET_STACK(dialog)->network.realm, message->line.request.uri) != 0){
 			tsip_dialog_register_send_RESPONSE(dialog, TSIP_MESSAGE_AS_REQUEST(message), 404, "Domain not served here");
 			return tsk_true;
 		}
 	}
-#endif
 	return tsk_false;
 }
 static tsk_bool_t _fsm_cond_server_unregistering(tsip_dialog_register_t* dialog, tsip_message_t* message)
@@ -80,14 +78,8 @@ int tsip_dialog_register_server_init(tsip_dialog_register_t *self)
 		*/
 		// Incoming -> (Accept) -> Connected
 		TSK_FSM_ADD_ALWAYS(_fsm_state_Incoming, _fsm_action_accept, _fsm_state_Connected, s0000_Incoming_2_Connected_X_Accept, "s0000_Incoming_2_Connected_X_Accept"),
-		// Incoming -> (iRegister) -> Incoming
-		TSK_FSM_ADD(_fsm_state_Incoming, _fsm_action_iREGISTER, _fsm_cond_server_registering, _fsm_state_Incoming, tsk_null, "s0000_Incoming_2_Incoming_X_iREGISTER"),
-		// Incoming -> (iRegister, expires=0) -> Terminated
-		TSK_FSM_ADD(_fsm_state_Incoming, _fsm_action_iREGISTER, _fsm_cond_server_unregistering, _fsm_state_Terminated, tsk_null, "s0000_Incoming_2_Terminated_X_iREGISTER"),
 		// Incoming -> (Reject) -> Terminated
-		TSK_FSM_ADD_ALWAYS(_fsm_state_Incoming, _fsm_action_reject, _fsm_state_Terminated, s0000_Incoming_2_Terminated_X_Terminates, "s0000_Incoming_2_Terminated_X_Terminates"),
-		// Incoming -> (Hangup) -> Terminated
-		TSK_FSM_ADD_ALWAYS(_fsm_state_Incoming, _fsm_action_hangup, _fsm_state_Terminated, s0000_Incoming_2_Terminated_X_Terminates, "s0000_Incoming_2_Terminated_X_Terminates"),
+		TSK_FSM_ADD_ALWAYS(_fsm_state_Incoming, _fsm_action_reject, _fsm_state_Terminated, s0000_Incoming_2_Terminated_X_Reject, "s0000_Incoming_2_Terminated_X_Reject"),
 
 		/*=======================
 		* === Connected === 
@@ -174,28 +166,9 @@ int s0000_Incoming_2_Connected_X_Accept(va_list *app)
 
 /* Incoming -> (Reject) -> Terminated
 */
-int s0000_Incoming_2_Terminated_X_Terminates(va_list *app)
+int s0000_Incoming_2_Terminated_X_Reject(va_list *app)
 {
-	int ret;
-	short code;
-	const char* phrase;
-	char* reason = tsk_null;
-
-	tsip_dialog_register_t *self;
-	const tsip_action_t* action;
-
-	self = va_arg(*app, tsip_dialog_register_t *);
-	va_arg(*app, const tsip_message_t *);
-	action = va_arg(*app, const tsip_action_t *);
-
-	/* Send Reject */
-	code = action->line_resp.code>=300 ? action->line_resp.code : 600;
-	phrase = action->line_resp.phrase ? action->line_resp.phrase : "Not Supported";
-	tsk_sprintf(&reason, "SIP; cause=%hi; text=\"%s\"", code, phrase);
-	ret = tsip_dialog_register_send_RESPONSE(self, self->last_iRegister, code, phrase);
-	TSK_FREE(reason);
-
-	return ret;
+	return -1;
 }
 
 /* Connected -> (register) -> Connected

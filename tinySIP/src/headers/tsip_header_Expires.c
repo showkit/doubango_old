@@ -55,6 +55,7 @@ int tsip_header_Expires_serialize(const tsip_header_t* header, tsk_buffer_t* out
 	if(header){
 		const tsip_header_Expires_t *Expires = (const tsip_header_Expires_t *)header;
 		if(Expires->delta_seconds >=0){
+            TSK_DEBUG_INFO("header_expries_serialize: %lld", Expires->delta_seconds);
 			return tsk_buffer_append_2(output, "%lld", Expires->delta_seconds);
 		}
 		return 0;
@@ -71,7 +72,7 @@ tsip_header_Expires_t *tsip_header_Expires_parse(const char *data, tsk_size_t si
 	const char *eof = pe;
 	tsip_header_Expires_t *hdr_expires = tsip_header_Expires_create(TSIP_HEADER_EXPIRES_NONE);
 	
-	const char *tag_start = tsk_null;
+	const char *tag_start;
 
 	
 /* #line 78 "./src/headers/tsip_header_Expires.c" */
@@ -134,19 +135,15 @@ static const int tsip_machine_parser_header_Expires_en_main = 1;
 
 
 /* #line 95 "./ragel/tsip_parser_header_Expires.rl" */
-	(void)(eof);
-	(void)(tsip_machine_parser_header_Expires_first_final);
-	(void)(tsip_machine_parser_header_Expires_error);
-	(void)(tsip_machine_parser_header_Expires_en_main);
 	
-/* #line 143 "./src/headers/tsip_header_Expires.c" */
+/* #line 139 "./src/headers/tsip_header_Expires.c" */
 	{
 	cs = tsip_machine_parser_header_Expires_start;
 	}
 
-/* #line 100 "./ragel/tsip_parser_header_Expires.rl" */
+/* #line 96 "./ragel/tsip_parser_header_Expires.rl" */
 	
-/* #line 150 "./src/headers/tsip_header_Expires.c" */
+/* #line 146 "./src/headers/tsip_header_Expires.c" */
 	{
 	int _klen;
 	unsigned int _trans;
@@ -237,7 +234,7 @@ _match:
 	{
 	}
 	break;
-/* #line 241 "./src/headers/tsip_header_Expires.c" */
+/* #line 237 "./src/headers/tsip_header_Expires.c" */
 		}
 	}
 
@@ -250,12 +247,12 @@ _again:
 	_out: {}
 	}
 
-/* #line 101 "./ragel/tsip_parser_header_Expires.rl" */
+/* #line 97 "./ragel/tsip_parser_header_Expires.rl" */
 	
 	if( cs < 
-/* #line 257 "./src/headers/tsip_header_Expires.c" */
+/* #line 253 "./src/headers/tsip_header_Expires.c" */
 15
-/* #line 102 "./ragel/tsip_parser_header_Expires.rl" */
+/* #line 98 "./ragel/tsip_parser_header_Expires.rl" */
  ){
 		TSK_DEBUG_ERROR("Failed to parse 'Expires' header.");
 		TSK_OBJECT_SAFE_FREE(hdr_expires);

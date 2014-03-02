@@ -224,7 +224,6 @@ tsk_bool_t tsip_message_parse(tsk_ragel_state_t *state, tsip_message_t **result,
 /* #line 214 "./ragel/tsip_parser_message.rl" */
  )
 	{
-		TSK_DEBUG_ERROR("Failed to parse SIP message: %s", state->p);
 		TSK_OBJECT_SAFE_FREE(*result);
 		return tsk_false;
 	}
@@ -238,12 +237,12 @@ static void tsip_message_parser_init(tsk_ragel_state_t *state)
 
 	/* Regel machine initialization. */
 	
-/* #line 242 "./src/parsers/tsip_parser_message.c" */
+/* #line 241 "./src/parsers/tsip_parser_message.c" */
 	{
 	cs = tsip_machine_parser_message_start;
 	}
 
-/* #line 230 "./ragel/tsip_parser_message.rl" */
+/* #line 229 "./ragel/tsip_parser_message.rl" */
 	
 	state->cs = cs;
 }
@@ -256,7 +255,7 @@ static void tsip_message_parser_execute(tsk_ragel_state_t *state, tsip_message_t
 	const char *eof = state->eof;
 
 	
-/* #line 260 "./src/parsers/tsip_parser_message.c" */
+/* #line 259 "./src/parsers/tsip_parser_message.c" */
 	{
 	int _klen;
 	unsigned int _trans;
@@ -483,7 +482,7 @@ _match:
 		eof = state->eof;
 	}
 	break;
-/* #line 487 "./src/parsers/tsip_parser_message.c" */
+/* #line 486 "./src/parsers/tsip_parser_message.c" */
 		}
 	}
 
@@ -496,7 +495,7 @@ _again:
 	_out: {}
 	}
 
-/* #line 242 "./ragel/tsip_parser_message.rl" */
+/* #line 241 "./ragel/tsip_parser_message.rl" */
 
 	state->cs = cs;
 	state->p = p;
@@ -510,7 +509,6 @@ static void tsip_message_parser_eoh(tsk_ragel_state_t *state, tsip_message_t *me
 	const char *p = state->p;
 	const char *pe = state->pe;
 	const char *eof = state->eof;
-	const char *eoh = (state->p + 1);	
 
 	if(extract_content && message)
 	{
@@ -529,5 +527,4 @@ static void tsip_message_parser_eoh(tsk_ragel_state_t *state, tsip_message_t *me
 	state->p = p;
 	state->pe = pe;
 	state->eof = eof;
-	state->eoh = eoh;
 }

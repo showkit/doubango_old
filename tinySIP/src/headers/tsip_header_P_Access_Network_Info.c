@@ -87,7 +87,7 @@ tsip_header_P_Access_Network_Info_t *tsip_header_P_Access_Network_Info_parse(con
 	const char *eof = pe;
 	tsip_header_P_Access_Network_Info_t *hdr_ani = tsip_header_P_Access_Network_Info_create_null();
 	
-	const char *tag_start = tsk_null;
+	const char *tag_start;
 
 	
 /* #line 94 "./src/headers/tsip_header_P_Access_Network_Info.c" */
@@ -168,19 +168,15 @@ static const int tsip_machine_parser_header_P_Access_Network_Info_en_main = 1;
 
 
 /* #line 111 "./ragel/tsip_parser_header_P_Access_Network_Info.rl" */
-	(void)(eof);
-	(void)(tsip_machine_parser_header_P_Access_Network_Info_first_final);
-	(void)(tsip_machine_parser_header_P_Access_Network_Info_error);
-	(void)(tsip_machine_parser_header_P_Access_Network_Info_en_main);
 	
-/* #line 177 "./src/headers/tsip_header_P_Access_Network_Info.c" */
+/* #line 173 "./src/headers/tsip_header_P_Access_Network_Info.c" */
 	{
 	cs = tsip_machine_parser_header_P_Access_Network_Info_start;
 	}
 
-/* #line 116 "./ragel/tsip_parser_header_P_Access_Network_Info.rl" */
+/* #line 112 "./ragel/tsip_parser_header_P_Access_Network_Info.rl" */
 	
-/* #line 184 "./src/headers/tsip_header_P_Access_Network_Info.c" */
+/* #line 180 "./src/headers/tsip_header_P_Access_Network_Info.c" */
 	{
 	int _klen;
 	unsigned int _trans;
@@ -271,7 +267,7 @@ _match:
 	{
 	}
 	break;
-/* #line 275 "./src/headers/tsip_header_P_Access_Network_Info.c" */
+/* #line 271 "./src/headers/tsip_header_P_Access_Network_Info.c" */
 		}
 	}
 
@@ -284,12 +280,12 @@ _again:
 	_out: {}
 	}
 
-/* #line 117 "./ragel/tsip_parser_header_P_Access_Network_Info.rl" */
+/* #line 113 "./ragel/tsip_parser_header_P_Access_Network_Info.rl" */
 	
 	if( cs < 
-/* #line 291 "./src/headers/tsip_header_P_Access_Network_Info.c" */
+/* #line 287 "./src/headers/tsip_header_P_Access_Network_Info.c" */
 26
-/* #line 118 "./ragel/tsip_parser_header_P_Access_Network_Info.rl" */
+/* #line 114 "./ragel/tsip_parser_header_P_Access_Network_Info.rl" */
  ){
 		TSK_DEBUG_ERROR("Failed to parse 'P-Access-Network-Info' header.");
 		TSK_OBJECT_SAFE_FREE(hdr_ani);

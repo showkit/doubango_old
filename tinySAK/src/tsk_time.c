@@ -61,9 +61,9 @@
 
 struct timezone 
 {  
-	int  tz_minuteswest; // minutes W of Greenwich  
-	int  tz_dsttime;     // type of dst correction
-};
+	int  tz_minuteswest; /* minutes W of Greenwich */  
+	int  tz_dsttime;     /* type of dst correction */
+}; 
 
 int gettimeofday(struct timeval *tv, struct timezone *tz) 
 {  
@@ -93,10 +93,8 @@ int gettimeofday(struct timeval *tv, struct timezone *tz)
 	}
 
 	if (tz){   
-		if (!tzflag){
-#if !TSK_UNDER_WINDOWS_RT
-			_tzset();
-#endif
+		if (!tzflag){    
+			_tzset();   
 			tzflag++;  
 		}   
 		tz->tz_minuteswest = _timezone / 60;
@@ -125,15 +123,6 @@ int tsk_gettimeofday(struct timeval *tv, struct timezone *tz)
 }
 
 /**@ingroup tsk_time_group
-*/
-uint64_t tsk_gettimeofday_ms()
-{
-	struct timeval tv;
-	tsk_gettimeofday(&tv, tsk_null);
-	return (((uint64_t)tv.tv_sec)*(uint64_t)1000) + (((uint64_t)tv.tv_usec)/(uint64_t)1000);
-}
-
-/**@ingroup tsk_time_group
 * Gets the number of milliseconds in @a tv
 * @retval The number of milliseconds
 */
@@ -153,7 +142,7 @@ uint64_t tsk_time_get_ms(const struct timeval* tv)
 uint64_t tsk_time_epoch()
 {
 	struct timeval tv;
-	gettimeofday(&tv, (struct timezone *)tsk_null);
+	gettimeofday(&tv, tsk_null);
 	return (((uint64_t)tv.tv_sec)*(uint64_t)1000) + (((uint64_t)tv.tv_usec)/(uint64_t)1000);
 }
 
@@ -165,11 +154,7 @@ uint64_t tsk_time_now()
 	static int __cpu_count = 0;
 	if(__cpu_count == 0){
 		SYSTEM_INFO SystemInfo;
-#	if TSK_UNDER_WINDOWS_RT
-		GetNativeSystemInfo(&SystemInfo);
-#	else
 		GetSystemInfo(&SystemInfo);
-#	endif
 		__cpu_count = SystemInfo.dwNumberOfProcessors;
 	}
 	if(__cpu_count == 1){
@@ -182,11 +167,7 @@ uint64_t tsk_time_now()
 		return (uint64_t)(((double)liPerformanceCount.QuadPart/(double)__liFrequency.QuadPart)*1000.0);
 	}
 	else{
-#	if TSK_UNDER_WINDOWS_RT
-		return tsk_time_epoch();
-#	else
 		return timeGetTime();
-#	endif
 	}
 #elif HAVE_CLOCK_GETTIME || _POSIX_TIMERS > 0
 	struct timespec ts;
@@ -209,7 +190,7 @@ uint64_t tsk_time_now()
 uint64_t tsk_time_ntp()
 {
 	struct timeval tv;
-	gettimeofday(&tv, (struct timezone *)tsk_null);
+	gettimeofday(&tv, tsk_null);
 	return tsk_time_get_ntp_ms(&tv);
 }
 

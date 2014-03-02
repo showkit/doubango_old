@@ -94,13 +94,9 @@ tsip_header_Min_SE_t *tsip_header_Min_SE_parse(const char *data, tsk_size_t size
 	const char *eof = pe;
 	tsip_header_Min_SE_t *hdr_minse = tsip_header_Min_SE_create(TSIP_SESSION_EXPIRES_MIN_VALUE);
 	
-	const char *tag_start = tsk_null;
+	const char *tag_start;
 
 	%%write data;
-	(void)(eof);
-	(void)(tsip_machine_parser_header_Min_SE_first_final);
-	(void)(tsip_machine_parser_header_Min_SE_error);
-	(void)(tsip_machine_parser_header_Min_SE_en_main);
 	%%write init;
 	%%write exec;
 	

@@ -28,27 +28,10 @@
  */
 #include "tinydav/tdav.h"
 
-static tsk_bool_t __b_initialized = tsk_false;
-static const struct tmedia_codec_plugin_def_s* __codec_plugins_all[0xFF] = { tsk_null }; // list of all codecs BEFORE filtering
-static const tsk_size_t __codec_plugins_all_count = sizeof(__codec_plugins_all)/sizeof(__codec_plugins_all[0]);
-
 #if TDAV_UNDER_WINDOWS
 #	include "tinydav/tdav_win32.h"
 #elif TDAV_UNDER_APPLE
 #	include "tinydav/tdav_apple.h"
-#endif
-
-// Shared libraries not allowed on WP8 and iOS
-#if !TDAV_UNDER_WINDOWS_PHONE && !TDAV_UNDER_IPHONE
-#include "tsk_plugin.h"
-#	if TDAV_UNDER_WINDOWS
-#		define TDAV_HAVE_PLUGIN_EXT_WIN32	1
-		static struct tsk_plugin_s* __dll_plugin_wasapi = tsk_null; /* Windows Audio Session API (WASAPI): Windows [Vista - 8] */
-		static struct tsk_plugin_s* __dll_plugin_dshow = tsk_null; /* DirectShow: Windows [XP - 8] */
-		static struct tsk_plugin_s* __dll_plugin_mf = tsk_null; /* Media Foundation and WASAPI : Windows [7 - 8] */
-		static struct tsk_plugin_s* __dll_plugin_cuda = tsk_null; /* Media Foundation and WASAPI : Windows [XP - 8] */
-		static struct tsk_plugin_s* __dll_plugin_audio_dsp = tsk_null; /* Audio DSP, Resampler, AEC, NS, AGC...: Windows [Vista - 8] */
-#	endif /* TDAV_UNDER_WINDOWS */
 #endif
 
 // Media Contents, ...
@@ -61,17 +44,18 @@ static const tsk_size_t __codec_plugins_all_count = sizeof(__codec_plugins_all)/
 #include "tinydav/video/tdav_converter_video.h"
 
 // Sessions
+#include "showkit/codec/data/showkit_data_session.h"
+
 #include "tinymedia/tmedia_session_ghost.h"
 #include "tinydav/audio/tdav_session_audio.h"
 #include "tinydav/video/tdav_session_video.h"
-#include "tinydav/msrp/tdav_session_msrp.h"
-#include "tinydav/t140/tdav_session_t140.h"
+//#include "tinydav/msrp/tdav_session_msrp.h"
+
 // Codecs
 #include "tinydav/codecs/dtmf/tdav_codec_dtmf.h"
-#include "tinydav/codecs/t140/tdav_codec_t140.h"
 #include "tinydav/codecs/fec/tdav_codec_ulpfec.h"
 #include "tinydav/codecs/fec/tdav_codec_red.h"
-#include "tinydav/codecs/msrp/tdav_codec_msrp.h"
+//#include "tinydav/codecs/msrp/tdav_codec_msrp.h"
 #include "tinydav/codecs/amr/tdav_codec_amr.h"
 #include "tinydav/codecs/bv/tdav_codec_bv16.h"
 #include "tinydav/codecs/g711/tdav_codec_g711.h"
@@ -80,45 +64,29 @@ static const tsk_size_t __codec_plugins_all_count = sizeof(__codec_plugins_all)/
 #include "tinydav/codecs/g729/tdav_codec_g729.h"
 #include "tinydav/codecs/g722/tdav_codec_g722.h"
 #include "tinydav/codecs/speex/tdav_codec_speex.h"
-#include "tinydav/codecs/opus/tdav_codec_opus.h"
-#include "tinydav/codecs/h261/tdav_codec_h261.h"
-#include "tinydav/codecs/h263/tdav_codec_h263.h"
 #include "tinydav/codecs/h264/tdav_codec_h264.h"
-#include "tinydav/codecs/h264/tdav_codec_h264_cuda.h"
-#include "tinydav/codecs/theora/tdav_codec_theora.h"
-#include "tinydav/codecs/mp4ves/tdav_codec_mp4ves.h"
-#include "tinydav/codecs/vpx/tdav_codec_vp8.h"
 
-#ifdef __SHOWKIT_DATA__
-#include "showkit/codec/data/showkit_data_session.h"
-#include "showkit/codec/data/showkit_codec_data.h"
-#endif
-#ifdef __SHOWKIT_H264__
+// CMStack Passthrough
 #include "showkit/codec/passthrough/cms_codec_passthrough.h"
-#endif
-#ifdef __SHOWKIT_AUDIO__
 #include "showkit/codec/passthrough/cms_codec_audio_passthrough.h"
-#endif
-
+#include "showkit/codec/data/showkit_codec_data.h"
 // Consumers
 #include "tinydav/audio/waveapi/tdav_consumer_waveapi.h"
 #include "tinydav/audio/directsound/tdav_consumer_dsound.h"
 #include "tinydav/audio/coreaudio/tdav_consumer_audioqueue.h"
 #include "tinydav/audio/coreaudio/tdav_consumer_audiounit.h"
-#include "tinydav/audio/wasapi/tdav_consumer_wasapi.h"
-#include "tinydav/video/winm/tdav_consumer_winm.h"
-#include "tinydav/video/mf/tdav_consumer_video_mf.h"
-#include "tinydav/t140/tdav_consumer_t140.h"
+#if HAVE_TINYDSHOW // DirectShow
+#	include "tinydshow/plugin/DSConsumer.h"
+#endif
 
 // Producers
 #include "tinydav/audio/waveapi/tdav_producer_waveapi.h"
 #include "tinydav/audio/directsound/tdav_producer_dsound.h"
 #include "tinydav/audio/coreaudio/tdav_producer_audioqueue.h"
 #include "tinydav/audio/coreaudio/tdav_producer_audiounit.h"
-#include "tinydav/audio/wasapi/tdav_producer_wasapi.h"
-#include "tinydav/video/winm/tdav_producer_winm.h"
-#include "tinydav/video/mf/tdav_producer_video_mf.h"
-#include "tinydav/t140/tdav_producer_t140.h"
+#if HAVE_TINYDSHOW // DirectShow
+#	include "tinydshow/plugin/DSProducer.h"
+#endif
 
 // Audio Denoise (AGC, Noise Suppression, VAD and AEC)
 #if HAVE_SPEEX_DSP && (!defined(HAVE_SPEEX_DENOISE) || HAVE_SPEEX_DENOISE)
@@ -129,7 +97,7 @@ static const tsk_size_t __codec_plugins_all_count = sizeof(__codec_plugins_all)/
 #endif
 
 // Audio resampler
-#if HAVE_SPEEX_DSP && (!defined(HAVE_SPEEX_RESAMPLER) || HAVE_SPEEX_RESAMPLER)
+#if HAVE_SPEEX_RESAMPLER
 #	include "tinydav/audio/tdav_speex_resampler.h"
 #endif
 
@@ -144,18 +112,38 @@ static const tsk_size_t __codec_plugins_all_count = sizeof(__codec_plugins_all)/
 #	include <libavcodec/avcodec.h>
 #endif
 
-static inline int _tdav_codec_plugins_collect();
-static inline int _tdav_codec_plugins_disperse();
 static inline tsk_bool_t _tdav_codec_is_supported(tdav_codec_id_t codec, const tmedia_codec_plugin_def_t* plugin);
 
+#if HAVE_COREAUDIO_AUDIO_UNIT
+int tdav_use_audiounits(int producer, int consumer)
+{
+    if(consumer)
+    {
+ //       tmedia_consumer_plugin_unregister(tdav_consumer_audioqueue_plugin_def_t);
+        tmedia_consumer_plugin_register(tdav_consumer_audiounit_plugin_def_t);
+    } else {
+ //        tmedia_consumer_plugin_register(tdav_consumer_audioqueue_plugin_def_t);
+         tmedia_consumer_plugin_unregister(tdav_consumer_audiounit_plugin_def_t);
+    }
+    if(producer)
+    {
+        
+  //      tmedia_producer_plugin_unregister(tdav_producer_audioqueue_plugin_def_t);
+        tmedia_producer_plugin_register(tdav_producer_audiounit_plugin_def_t);
+        
+
+    } else {
+
+//        tmedia_producer_plugin_register(tdav_producer_audioqueue_plugin_def_t);
+        tmedia_producer_plugin_unregister(tdav_producer_audiounit_plugin_def_t);
+
+    }
+    return 0;
+}
+#endif
 int tdav_init()
 {
 	int ret = 0;
-
-	if(__b_initialized){
-		TSK_DEBUG_INFO("TINYDAV already initialized");
-		return 0;
-	}
 	
 	/* === OS specific === */
 #if TDAV_UNDER_WINDOWS
@@ -170,57 +158,10 @@ int tdav_init()
 	
 	/* === Initialize ffmpeg === */
 #if HAVE_FFMPEG
-#   if LIBAVCODEC_VERSION_MAJOR <= 53
-	avcodec_init();
-#   endif
+	//avcodec_init();
 #endif
 
-		/* === stand-alone plugins === */
-#if TDAV_HAVE_PLUGIN_EXT_WIN32
-	{
-		tsk_size_t plugins_count = 0;
-		char* full_path = tsk_null; // Loading plugins from ActiveX fails when using relative path.
-		/* WASAPI (Audio consumer, Audio producer) */
-#if 0 // disable WASAPI by default (AEC issue because of code#consumer rate mismatch)
-		if(tdav_win32_is_winvista_or_later()){
-			tsk_sprintf(&full_path, "%s/pluginWASAPI.dll", tdav_get_current_directory_const());
-			if(tsk_plugin_file_exist(full_path) && (__dll_plugin_wasapi = tsk_plugin_create(full_path))){
-				plugins_count += tmedia_plugin_register(__dll_plugin_wasapi, tsk_plugin_def_type_all, tsk_plugin_def_media_type_all);
-			}
-		}
-#endif
-		/* CUDA (H.264 codec) */
-#if 1 // Enable CUDA by default
-		tsk_sprintf(&full_path, "%s/pluginCUDA.dll", tdav_get_current_directory_const()); // CUDA works on all Windows versions
-		if(tsk_plugin_file_exist(full_path) && (__dll_plugin_cuda = tsk_plugin_create(full_path))){
-			plugins_count += tmedia_plugin_register(__dll_plugin_cuda, tsk_plugin_def_type_all, tsk_plugin_def_media_type_all);
-		}
-#endif
-		/* Media Foundation (Video converter, Video consumer, Video producer, Microsoft H.264 codec, Intel Quick Sync H.264 codec) */
-		if(tdav_win32_is_win7_or_later()){
-			tsk_sprintf(&full_path, "%s/pluginWinMF.dll", tdav_get_current_directory_const());
-			if(tsk_plugin_file_exist(full_path) && (__dll_plugin_mf = tsk_plugin_create(full_path))){
-				plugins_count += tmedia_plugin_register(__dll_plugin_mf, tsk_plugin_def_type_all, tsk_plugin_def_media_type_all);
-			}
-		}
-		/* DirectShow (Video consumer, Video producer) */
-		if(tdav_win32_is_winxp_or_later()){
-			tsk_sprintf(&full_path, "%s/pluginDirectShow.dll", tdav_get_current_directory_const());
-			if(tsk_plugin_file_exist(full_path) && (__dll_plugin_dshow = tsk_plugin_create(full_path))){
-				plugins_count += tmedia_plugin_register(__dll_plugin_dshow, tsk_plugin_def_type_all, tsk_plugin_def_media_type_all);
-			}
-		}
-		/* Audio DSP (Resampler, AEC, NS, AGC...) */
-		if(tdav_win32_is_winvista_or_later()){
-			tsk_sprintf(&full_path, "%s/pluginWinAudioDSP.dll", tdav_get_current_directory_const());
-			if(tsk_plugin_file_exist(full_path) && (__dll_plugin_audio_dsp = tsk_plugin_create(full_path))){
-				plugins_count += tmedia_plugin_register(__dll_plugin_audio_dsp, tsk_plugin_def_type_all, tsk_plugin_def_media_type_all);
-			}
-		}
-		TSK_FREE(full_path);
-		TSK_DEBUG_INFO("Windows stand-alone plugins loaded = %u", plugins_count);
-	}
-#endif
+	/* === SRTP === */
 
 	/* === Register media contents === */
 	tmedia_content_plugin_register("text/html", tmedia_content_dummy_plugin_def_t);
@@ -242,34 +183,31 @@ int tdav_init()
 	tmedia_session_plugin_register(tmedia_session_ghost_plugin_def_t);
 	tmedia_session_plugin_register(tdav_session_audio_plugin_def_t);
 	tmedia_session_plugin_register(tdav_session_video_plugin_def_t);
-	tmedia_session_plugin_register(tdav_session_msrp_plugin_def_t);
-	tmedia_session_plugin_register(tdav_session_t140_plugin_def_t);
+    tmedia_session_plugin_register(showkit_data_session_plugin_def_t);
 
+	//tmedia_session_plugin_register(tdav_session_msrp_plugin_def_t);
+
+	/* === Register codecs === */
 #if HAVE_FFMPEG
 	avcodec_register_all();
 #endif
-    
-#ifdef __SHOWKIT_H264__
-    /* === Register CMS passthrough codecs === */
-    tmedia_codec_plugin_register(cms_codec_passthrough_plugin_def_t);
-#endif
-#ifdef __SHOWKIT_DATA__
+
     tmedia_codec_plugin_register(showkit_codec_data_plugin_def_t);
-    tmedia_session_plugin_register(showkit_data_session_plugin_def_t);
-#endif
-#ifdef __SHOWKIT_AUDIO__
+    //tmedia_codec_plugin_register(tdav_codec_msrp_plugin_def_t);
+
+#ifndef __SHOWKIT_AUDIO_DISABLE__
     tmedia_codec_plugin_register(cms_codec_audio_passthrough_alaw_plugin_def_t);
     tmedia_codec_plugin_register(cms_codec_audio_passthrough_ulaw_plugin_def_t);
 #else
-	/* === Register codecs === */
-	tmedia_codec_plugin_register(tdav_codec_msrp_plugin_def_t);
-	tmedia_codec_plugin_register(tdav_codec_t140_plugin_def_t);
-	tmedia_codec_plugin_register(tdav_codec_red_plugin_def_t);
-	tmedia_codec_plugin_register(tdav_codec_g711a_plugin_def_t);
-	tmedia_codec_plugin_register(tdav_codec_g711u_plugin_def_t);
-	tmedia_codec_plugin_register(tdav_codec_g722_plugin_def_t);
+    tmedia_codec_plugin_register(tdav_codec_g711a_plugin_def_t);
+    tmedia_codec_plugin_register(tdav_codec_g711u_plugin_def_t);
 #endif
+
+    // Register CMS passthrough
+    tmedia_codec_plugin_register(cms_codec_passthrough_plugin_def_t);
+
     
+	//tmedia_codec_plugin_register(tdav_codec_g722_plugin_def_t);
 #if HAVE_OPENCORE_AMR
 	tmedia_codec_plugin_register(tdav_codec_amrnb_oa_plugin_def_t);
 	tmedia_codec_plugin_register(tdav_codec_amrnb_be_plugin_def_t);
@@ -288,22 +226,17 @@ int tdav_init()
 	tmedia_codec_plugin_register(tdav_codec_speex_wb_plugin_def_t);
 	tmedia_codec_plugin_register(tdav_codec_speex_uwb_plugin_def_t);
 #endif
-#if HAVE_LIBOPUS
-	tmedia_codec_plugin_register(tdav_codec_opus_plugin_def_t);
-#endif
 #if HAVE_G729
 	tmedia_codec_plugin_register(tdav_codec_g729ab_plugin_def_t);
 #endif
 	// last: dtmf, ULPFEC and RED
-	tmedia_codec_plugin_register(tdav_codec_dtmf_plugin_def_t);
+	//tmedia_codec_plugin_register(tdav_codec_dtmf_plugin_def_t);
 	// tmedia_codec_plugin_register(tdav_codec_ulpfec_plugin_def_t);
 	// tmedia_codec_plugin_register(tdav_codec_red_plugin_def_t);
 
 #if HAVE_LIBVPX
-	tmedia_codec_plugin_register(tdav_codec_vp8_plugin_def_t);
 #endif
 #if HAVE_CUDA
-	#error "Support for H.264 Cuda is deprecated"
 	if(tdav_codec_h264_cuda_is_supported()){
 		tmedia_codec_plugin_register(tdav_codec_h264_cuda_bp10_plugin_def_t);
 		tmedia_codec_plugin_register(tdav_codec_h264_cuda_bp20_plugin_def_t);
@@ -311,54 +244,26 @@ int tdav_init()
 	}
 #endif
 #if HAVE_FFMPEG
-	if(tdav_codec_ffmpeg_mp4ves_is_supported()){
-		tmedia_codec_plugin_register(tdav_codec_mp4ves_plugin_def_t);
-	}
-	if(tdav_codec_ffmpeg_h264_is_supported()){
-		if(!tmedia_codec_plugin_is_registered_2(tmedia_codec_id_h264_bp)) { // could be already registered by stand alone plugins (e.g. pluginWinMF.DLL)
-			tmedia_codec_plugin_register(tdav_codec_h264_base_plugin_def_t);
-		}
-		if(!tmedia_codec_plugin_is_registered_2(tmedia_codec_id_h264_mp)) { // could be already registered by stand alone plugins (e.g. pluginWinMF.DLL)
-			tmedia_codec_plugin_register(tdav_codec_h264_main_plugin_def_t);
-		}
-	}
-	tmedia_codec_plugin_register(tdav_codec_h263p_plugin_def_t);
-	tmedia_codec_plugin_register(tdav_codec_h263pp_plugin_def_t);
-	if(tdav_codec_ffmpeg_theora_is_supported()){
-		tmedia_codec_plugin_register(tdav_codec_theora_plugin_def_t);
-	}
-	tmedia_codec_plugin_register(tdav_codec_h263_plugin_def_t);
-	tmedia_codec_plugin_register(tdav_codec_h261_plugin_def_t);
-#elif HAVE_H264_PASSTHROUGH
-	tmedia_codec_plugin_register(tdav_codec_h264_base_plugin_def_t);
-	tmedia_codec_plugin_register(tdav_codec_h264_main_plugin_def_t);
-#endif
+#	if !defined(HAVE_H264) || HAVE_H264
+//  tmedia_codec_plugin_register(tdav_codec_h264_base_plugin_def_t);
+//	tmedia_codec_plugin_register(tdav_codec_h264_main_plugin_def_t);
+#	endif
+#endif	
+
 
     
-	/* === Register converters === */
-	// register several convertors and try them all (e.g. LIBYUV only support to/from I420)
-#if HAVE_LIBYUV
-	tmedia_converter_video_plugin_register(tdav_converter_video_libyuv_plugin_def_t);
-#endif
-#if HAVE_FFMPEG || HAVE_SWSSCALE
-	tmedia_converter_video_plugin_register(tdav_converter_video_ffmpeg_plugin_def_t);
-#endif
-
 	/* === Register consumers === */
-	tmedia_consumer_plugin_register(tdav_consumer_t140_plugin_def_t); /* T140 */
 #if HAVE_DSOUND_H
 	tmedia_consumer_plugin_register(tdav_consumer_dsound_plugin_def_t);
 #elif HAVE_WAVE_API
 	tmedia_consumer_plugin_register(tdav_consumer_waveapi_plugin_def_t);
-#elif HAVE_WASAPI
-	tmedia_consumer_plugin_register(tdav_consumer_wasapi_plugin_def_t);
 #endif
-#if HAVE_WINM // Windows Media (WP8)
-	tmedia_consumer_plugin_register(tdav_consumer_winm_plugin_def_t);
+#if HAVE_TINYDSHOW // DirectShow
+	tmedia_consumer_plugin_register(tdshow_consumer_plugin_def_t);
 #endif
 
 #if HAVE_COREAUDIO_AUDIO_UNIT // CoreAudio based on AudioUnit
-	tmedia_consumer_plugin_register(tdav_consumer_audiounit_plugin_def_t);
+    tmedia_consumer_plugin_register(tdav_consumer_audiounit_plugin_def_t);
 #elif HAVE_COREAUDIO_AUDIO_QUEUE // CoreAudio based on AudioQueue
 	tmedia_consumer_plugin_register(tdav_consumer_audioqueue_plugin_def_t);
 #endif
@@ -368,35 +273,31 @@ int tdav_init()
 #endif
 
 	/* === Register producers === */
-	tmedia_producer_plugin_register(tdav_producer_t140_plugin_def_t); /* T140 */
 #if HAVE_DSOUND_H // DirectSound
 	tmedia_producer_plugin_register(tdav_producer_dsound_plugin_def_t);
 #elif HAVE_WAVE_API // WaveAPI
 	tmedia_producer_plugin_register(tdav_producer_waveapi_plugin_def_t);
-#elif HAVE_WASAPI // WASAPI
-	tmedia_producer_plugin_register(tdav_producer_wasapi_plugin_def_t);
 #endif
-
-#if HAVE_WINM // Windows Media (WP8)
-	tmedia_producer_plugin_register(tdav_producer_winm_plugin_def_t);
+#if HAVE_TINYDSHOW // DirectShow
+	tmedia_producer_plugin_register(tdshow_producer_plugin_def_t);
 #endif
 	
 #if HAVE_COREAUDIO_AUDIO_UNIT // CoreAudio based on AudioUnit
-	tmedia_producer_plugin_register(tdav_producer_audiounit_plugin_def_t);
+    tmedia_producer_plugin_register(tdav_producer_audiounit_plugin_def_t);
 #elif HAVE_COREAUDIO_AUDIO_QUEUE // CoreAudio based on AudioQueue
 	tmedia_producer_plugin_register(tdav_producer_audioqueue_plugin_def_t);
 #endif
 
 	/* === Register Audio Denoise (AGC, VAD, Noise Suppression and AEC) === */
-#if HAVE_WEBRTC && (!defined(HAVE_WEBRTC_DENOISE) || HAVE_WEBRTC_DENOISE)
-	tmedia_denoise_plugin_register(tdav_webrtc_denoise_plugin_def_t);
-#endif
 #if HAVE_SPEEX_DSP && (!defined(HAVE_SPEEX_DENOISE) || HAVE_SPEEX_DENOISE)
 	tmedia_denoise_plugin_register(tdav_speex_denoise_plugin_def_t);
 #endif
+#if HAVE_WEBRTC && (!defined(HAVE_WEBRTC_DENOISE) || HAVE_WEBRTC_DENOISE)
+	tmedia_denoise_plugin_register(tdav_webrtc_denoise_plugin_def_t);
+#endif
 
 	/* === Register Audio Resampler === */
-#if HAVE_SPEEX_DSP && (!defined(HAVE_SPEEX_RESAMPLER) || HAVE_SPEEX_RESAMPLER)
+#if HAVE_SPEEX_RESAMPLER
 	tmedia_resampler_plugin_register(tdav_speex_resampler_plugin_def_t);
 #endif
 
@@ -407,126 +308,249 @@ int tdav_init()
 	tmedia_jitterbuffer_plugin_register(tdav_speakup_jitterbuffer_plugin_def_t);
 #endif
 
-	// collect all codecs before filtering
-	_tdav_codec_plugins_collect();
-
-	__b_initialized = tsk_true;
-
 	return ret;
 }
 
+typedef struct tdav_codec_decl_s{
+	tdav_codec_id_t id;
+	const tmedia_codec_plugin_def_t** plugin;
+} tdav_codec_decl_t;
+
+static tdav_codec_decl_t __codecs[] = {
+#if HAVE_OPENCORE_AMR
+	{ tdav_codec_id_amr_nb_oa, &tdav_codec_amrnb_oa_plugin_def_t },
+	{ tdav_codec_id_amr_nb_be, &tdav_codec_amrnb_be_plugin_def_t },
+#endif
+#if HAVE_BV16
+	{ tdav_codec_id_bv16, &tdav_codec_bv16_plugin_def_t },
+#endif
+#if HAVE_LIBGSM
+	{ tdav_codec_id_gsm, &tdav_codec_gsm_plugin_def_t },
+#endif
+#ifndef __SHOWKIT_AUDIO_DISABLE__
+    { tdav_codec_id_pcmu_passthrough, &cms_codec_audio_passthrough_ulaw_plugin_def_t },
+    { tdav_codec_id_pcma_passthrough, &cms_codec_audio_passthrough_alaw_plugin_def_t },
+#else
+    { tdav_codec_id_pcmu, &tdav_codec_g711u_plugin_def_t },
+    { tdav_codec_id_pcma, &tdav_codec_g711a_plugin_def_t },
+#endif
+
+	//{ tdav_codec_id_g722, &tdav_codec_g722_plugin_def_t },
+#if HAVE_ILBC
+	{ tdav_codec_id_ilbc, &tdav_codec_ilbc_plugin_def_t },
+#endif
+#if HAVE_LIB_SPEEX
+	{ tdav_codec_id_speex_nb, &tdav_codec_speex_nb_plugin_def_t },
+	{ tdav_codec_id_speex_wb, &tdav_codec_speex_wb_plugin_def_t },
+	{ tdav_codec_id_speex_uwb, &tdav_codec_speex_uwb_plugin_def_t },
+#endif
+#if HAVE_G729
+	{ tdav_codec_id_g729ab, &tdav_codec_g729ab_plugin_def_t },
+#endif
+	
+#if HAVE_LIBVPX
+#endif
+
+#if HAVE_CUDA
+	// tdav_codec_h264_cuda_is_supported() will be used to check availability at runtime
+	{ tdav_codec_id_h264_bp30, &tdav_codec_h264_cuda_bp30_plugin_def_t },
+	{ tdav_codec_id_h264_bp20, &tdav_codec_h264_cuda_bp20_plugin_def_t },
+	{ tdav_codec_id_h264_bp10, &tdav_codec_h264_cuda_bp10_plugin_def_t },
+#endif
+
+#if HAVE_FFMPEG
+#	if (!defined(HAVE_H264) || HAVE_H264) || HAVE_CUDA
+//    { tdav_codec_id_h264_bp, &tdav_codec_h264_base_plugin_def_t },
+//	{ tdav_codec_id_h264_mp, &tdav_codec_h264_main_plugin_def_t },
+#	endif
+#	if !defined(HAVE_THEORA) || HAVE_THEORA
+#	endif
+#endif
+    { cms_codec_id_passthrough, &cms_codec_passthrough_plugin_def_t },
+    { cms_codec_id_data, &showkit_codec_data_plugin_def_t },
+};
+
 int tdav_codec_set_priority(tdav_codec_id_t codec_id, int priority)
 {
-	tsk_size_t i;
+	static int count = sizeof(__codecs)/sizeof(tdav_codec_decl_t);
+	int i;
 	
 	if(priority < 0){
 		TSK_DEBUG_ERROR("Invalid parameter");
 		return -1;
 	}
-	for(i = 0; i < __codec_plugins_all_count && __codec_plugins_all[i]; ++i){
-		if(__codec_plugins_all[i]->codec_id == codec_id){
-			const struct tmedia_codec_plugin_def_s *codec_decl_1, *codec_decl_2;
-			priority = TSK_MIN(priority, (int)__codec_plugins_all_count-1);
-			codec_decl_1 = __codec_plugins_all[priority];
-			codec_decl_2 = __codec_plugins_all[i];
+	for(i = 0; i<count; ++i){
+		if(__codecs[i].id == codec_id){
+			tdav_codec_decl_t codec_decl_1, codec_decl_2;
+			priority = TSK_MIN(priority, count-1);
+			codec_decl_1 = __codecs[priority];
+			codec_decl_2 = __codecs[i];
 			
-			__codec_plugins_all[i] = codec_decl_1;
-			__codec_plugins_all[priority] = codec_decl_2;
+			__codecs[i] = codec_decl_1;
+			__codecs[priority] = codec_decl_2;
 
 			// change priority if already registered and supported
-			if(_tdav_codec_is_supported((tdav_codec_id_t)codec_decl_2->codec_id, codec_decl_2) && tmedia_codec_plugin_is_registered(codec_decl_2)){
-				return tmedia_codec_plugin_register_2(codec_decl_2, priority);
+			if(_tdav_codec_is_supported(codec_decl_2.id, *codec_decl_2.plugin) && tmedia_codec_plugin_is_registered(*codec_decl_2.plugin)){
+				return tmedia_codec_plugin_register_2(*codec_decl_2.plugin, priority);
 			}
 			return 0;
 		}
 	}
 	
-	TSK_DEBUG_INFO("Cannot find codec with id=%d for priority setting", codec_id);
-	return 0;
+	TSK_DEBUG_ERROR("cannot find codec with id=%d", codec_id);
+	return -2;
 }
 
-int tdav_set_codecs(tdav_codec_id_t codecs)
+void tdav_set_codecs(tdav_codec_id_t codecs)
 {
-	tsk_size_t i, prio;
 
-	// unregister all codecs
-	tmedia_codec_plugin_unregister_all();
-	// register selected codecs
-	for(i=0,prio=0; i<__codec_plugins_all_count && __codec_plugins_all[i]; ++i){
-		if((codecs & __codec_plugins_all[i]->codec_id)){
-			if(_tdav_codec_is_supported((tdav_codec_id_t)__codec_plugins_all[i]->codec_id, __codec_plugins_all[i])){
-				tmedia_codec_plugin_register_2(__codec_plugins_all[i], prio++);
-			}
-		}
-	}
-	return 0;
-}
+	int i;
+	int prio;
+   /* for(i=0; i<sizeof(__codecs)/sizeof(tdav_codec_decl_t); ++i){
 
-static inline int _tdav_codec_plugins_collect()
-{
-	const struct tmedia_codec_plugin_def_s** plugins = tsk_null;
-	tsk_size_t i, count;
-	int ret;
-	static const tsk_size_t __codec_plugins_all_count = sizeof(__codec_plugins_all)/sizeof(__codec_plugins_all[0]);
-
-	ret = _tdav_codec_plugins_disperse();
-	if((ret = tmedia_codec_plugin_registered_get_all(&plugins, &count)) == 0) {
-		for(i = 0; i < count && i < __codec_plugins_all_count; ++i) {
-			__codec_plugins_all[i] = plugins[i];
-		}
-	}
-	return 0;
-}
-
-static inline int _tdav_codec_plugins_disperse()
-{
-	memset((void*)__codec_plugins_all, 0, sizeof(__codec_plugins_all));
-	return 0;
-}
-
-
-/*
- Must be called after tdav_init()
+            tmedia_codec_plugin_unregister(*(__codecs[i].plugin));
+        }
 */
-static inline tsk_bool_t _tdav_codec_is_supported(tdav_codec_id_t codec, const tmedia_codec_plugin_def_t* plugin)
+	for(i=0,prio=0; i<sizeof(__codecs)/sizeof(tdav_codec_decl_t); ++i){
+
+        //printf("codecs (%x) -> codec (%x) (%s)\n", codecs, __codecs[i].id, (*(__codecs[i].plugin))->desc);
+		if((codecs & __codecs[i].id)){
+			if(_tdav_codec_is_supported(__codecs[i].id, *(__codecs[i].plugin))){
+				tmedia_codec_plugin_register_2(*(__codecs[i].plugin), prio++);
+			} else {
+                printf("Codec not supported");
+            }
+		}
+		else{
+           
+			tmedia_codec_plugin_unregister(*(__codecs[i].plugin));
+		}
+	}
+}
+
+tsk_bool_t _tdav_codec_is_supported(tdav_codec_id_t codec, const tmedia_codec_plugin_def_t* plugin)
 {
-	tsk_size_t i;
-	for(i = 0; i < __codec_plugins_all_count && __codec_plugins_all[i]; ++i) {
-		if((plugin && __codec_plugins_all[i] == plugin) || __codec_plugins_all[i]->codec_id == codec) {
+	switch(codec){
+
+            /*
+		case tdav_codec_id_amr_nb_oa:
+		case tdav_codec_id_amr_nb_be:
+#if HAVE_OPENCORE_AMR
 			return tsk_true;
-		}
+#else
+			return tsk_false;
+#endif
+		*/
+		case tdav_codec_id_gsm:
+#if HAVE_LIBGSM
+			return tsk_true;
+#else
+			return tsk_false;
+#endif
+
+        case tdav_codec_id_pcmu_passthrough:
+        case tdav_codec_id_pcma_passthrough:
+		case tdav_codec_id_pcma:
+		case tdav_codec_id_pcmu:
+		case tdav_codec_id_g722:
+			return tsk_true;
+
+		case tdav_codec_id_ilbc:
+#if HAVE_ILBC
+			return tsk_true;
+#else
+			return tsk_false;
+#endif
+
+		case tdav_codec_id_speex_nb:
+		case tdav_codec_id_speex_wb:
+		case tdav_codec_id_speex_uwb:
+#if HAVE_LIB_SPEEX
+			return tsk_true;
+#else
+			return tsk_false;
+#endif
+		
+		case tdav_codec_id_bv16:
+#if HAVE_BV16
+			return tsk_true;
+#else
+			return tsk_false;
+#endif
+		
+		case tdav_codec_id_g729ab:
+#if HAVE_G729
+			return tsk_true;
+#else
+			return tsk_false;
+#endif
+		
+		case tdav_codec_id_vp8:
+#if HAVE_LIBVPX
+			return tsk_true;
+#else
+			return tsk_false;
+#endif
+
+		case tdav_codec_id_h261:
+		case tdav_codec_id_h263:
+		case tdav_codec_id_h263p:
+		case tdav_codec_id_h263pp:
+		case tdav_codec_id_mp4ves_es:
+#if HAVE_FFMPEG
+			return tsk_true;
+#else
+			return tsk_false;
+#endif
+		
+		case tdav_codec_id_theora:
+#if HAVE_FFMPEG && (!defined(HAVE_THEORA) || HAVE_THEORA)
+			return tsk_true;
+#else
+			return tsk_false;
+#endif
+
+		case tdav_codec_id_h264_bp:
+		case tdav_codec_id_h264_mp:
+			{
+				if(plugin){
+#if HAVE_CUDA
+					if(tdav_codec_h264_is_cuda_plugin(plugin) && tdav_codec_h264_cuda_is_supported()) return tsk_true;
+#endif
+#if HAVE_FFMPEG && (!defined(HAVE_H264) || HAVE_H264)
+                    return tsk_true;
+#endif
+				}
+				else{
+#if HAVE_CUDA
+				if(tdav_codec_h264_cuda_is_supported()) return tsk_true;
+#endif
+#if HAVE_FFMPEG && (!defined(HAVE_H264) || HAVE_H264)
+					return tsk_true;
+#endif
+				}
+				return tsk_false;
+			}
+        case cms_codec_id_data:
+        case cms_codec_id_passthrough:
+            return tsk_true;
+		case tdav_codec_id_amr_wb_oa:
+		case tdav_codec_id_amr_wb_be:
+		case tdav_codec_id_bv32:
+	//	case tdav_codec_id_evrc:
+		default:
+			return tsk_false;
 	}
-	return tsk_false;
 }
 
-/**
-* Checks whether a codec is supported. Being supported doesn't mean it's enabled and ready for use.
-* @return @ref tsk_true if supported and @tsk_false otherwise.
-* @sa @ref tdav_codec_is_enabled()
-*/
 tsk_bool_t tdav_codec_is_supported(tdav_codec_id_t codec)
 {
 	return _tdav_codec_is_supported(codec, tsk_null);
 }
 
-/**
-* Checks whether a codec is enabled.
-* @return @ref tsk_true if enabled and @tsk_false otherwise.
-* @sa @ref tdav_codec_is_supported()
-*/
-tsk_bool_t tdav_codec_is_enabled(tdav_codec_id_t codec)
-{
-	return tmedia_codec_plugin_is_registered_2((tmedia_codec_id_t)codec);
-}
-
 int tdav_deinit()
 {
 	int ret = 0;
-
-	if(!__b_initialized){
-		TSK_DEBUG_INFO("TINYDAV not initialized");
-		return 0;
-	}
 	
 	/* === OS specific === */
 #if TDAV_UNDER_WINDOWS
@@ -546,68 +570,88 @@ int tdav_deinit()
 	tmedia_session_plugin_unregister(tmedia_session_ghost_plugin_def_t);
 	tmedia_session_plugin_unregister(tdav_session_audio_plugin_def_t);
 	tmedia_session_plugin_unregister(tdav_session_video_plugin_def_t);
-	tmedia_session_plugin_unregister(tdav_session_msrp_plugin_def_t);
-	tmedia_session_plugin_unregister(tdav_session_t140_plugin_def_t);
-
-#ifdef __SHOWKIT_DATA__
-    tmedia_codec_plugin_unregister(showkit_codec_data_plugin_def_t);
     tmedia_session_plugin_unregister(showkit_data_session_plugin_def_t);
-#endif
-#ifdef __SHOWKIT_AUDIO__
-    tmedia_codec_plugin_unregister(cms_codec_audio_passthrough_ulaw_plugin_def_t);
-    tmedia_codec_plugin_unregister(cms_codec_audio_passthrough_alaw_plugin_def_t);
-#endif
-#ifdef __SHOWKIT_H264__
-    /* === Register CMS passthrough codecs === */
-    tmedia_codec_plugin_unregister(cms_codec_passthrough_plugin_def_t);
-#endif
-    
+
+	//tmedia_session_plugin_unregister(tdav_session_msrp_plugin_def_t);
+
 	/* === UnRegister codecs === */
-	tmedia_codec_plugin_unregister_all();
-
-
-	/* === unRegister converters === */
-#if HAVE_LIBYUV
-	tmedia_converter_video_plugin_unregister(tdav_converter_video_libyuv_plugin_def_t);
+	//tmedia_codec_plugin_unregister(tdav_codec_dtmf_plugin_def_t);
+	//tmedia_codec_plugin_unregister(tdav_codec_ulpfec_plugin_def_t);
+	//tmedia_codec_plugin_unregister(tdav_codec_red_plugin_def_t);
+	//tmedia_codec_plugin_unregister(tdav_codec_msrp_plugin_def_t);
+#ifndef __SHOWKIT_AUDIO_DISABLE__
+        tmedia_codec_plugin_unregister(cms_codec_audio_passthrough_alaw_plugin_def_t);
+        tmedia_codec_plugin_unregister(cms_codec_audio_passthrough_ulaw_plugin_def_t);
+#else
+	tmedia_codec_plugin_unregister(tdav_codec_g711a_plugin_def_t);
+	tmedia_codec_plugin_unregister(tdav_codec_g711u_plugin_def_t);
 #endif
-#if HAVE_FFMPEG || HAVE_SWSSCALE
-	tmedia_converter_video_plugin_unregister(tdav_converter_video_ffmpeg_plugin_def_t);
+        tmedia_codec_plugin_unregister(showkit_codec_data_plugin_def_t);
+	//tmedia_codec_plugin_unregister(tdav_codec_g722_plugin_def_t);
+#if HAVE_OPENCORE_AMR
+	tmedia_codec_plugin_unregister(tdav_codec_amrnb_oa_plugin_def_t);
+	tmedia_codec_plugin_unregister(tdav_codec_amrnb_be_plugin_def_t);
+#endif
+#if HAVE_BV16
+	tmedia_codec_plugin_unregister(tdav_codec_bv16_plugin_def_t);
+#endif
+#if HAVE_LIBGSM
+	tmedia_codec_plugin_unregister(tdav_codec_gsm_plugin_def_t);
+#endif
+#if HAVE_ILBC
+	tmedia_codec_plugin_unregister(tdav_codec_ilbc_plugin_def_t);
+#endif
+#if HAVE_LIB_SPEEX
+	tmedia_codec_plugin_unregister(tdav_codec_speex_nb_plugin_def_t);
+	tmedia_codec_plugin_unregister(tdav_codec_speex_wb_plugin_def_t);
+	tmedia_codec_plugin_unregister(tdav_codec_speex_uwb_plugin_def_t);
+#endif
+#if HAVE_G729
+	tmedia_codec_plugin_unregister(tdav_codec_g729ab_plugin_def_t);
 #endif
 
+#if HAVE_LIBVPX
+#endif
+#if HAVE_CUDA
+	if(tdav_codec_h264_cuda_is_supported()){
+		tmedia_codec_plugin_unregister(tdav_codec_h264_cuda_bp10_plugin_def_t);
+		tmedia_codec_plugin_unregister(tdav_codec_h264_cuda_bp20_plugin_def_t);
+		tmedia_codec_plugin_unregister(tdav_codec_h264_cuda_bp30_plugin_def_t);
+	}
+#endif
+#if HAVE_FFMPEG
+#	if  !defined(HAVE_H264) || HAVE_H264
+//    tmedia_codec_plugin_unregister(tdav_codec_h264_base_plugin_def_t);
+//	tmedia_codec_plugin_unregister(tdav_codec_h264_main_plugin_def_t);
+#	endif
+#	if !defined(HAVE_THEORA) || HAVE_THEORA
+#	endif
+
+#endif
+    tmedia_codec_plugin_unregister(cms_codec_passthrough_plugin_def_t);
 	/* === unRegister consumers === */
-	tmedia_consumer_plugin_unregister(tdav_consumer_t140_plugin_def_t); /* T140 */
 #if HAVE_DSOUND_H
 	tmedia_consumer_plugin_unregister(tdav_consumer_dsound_plugin_def_t);
-#endif
-#if HAVE_WAVE_API
+#elif HAVE_WAVE_API
 	tmedia_consumer_plugin_unregister(tdav_consumer_waveapi_plugin_def_t);
 #endif
-#if HAVE_WASAPI
-	tmedia_consumer_plugin_unregister(tdav_consumer_wasapi_plugin_def_t);
-#endif
-#if HAVE_WINM // Windows Media (WP8)
-	tmedia_consumer_plugin_unregister(tdav_consumer_winm_plugin_def_t);
+#if HAVE_TINYDSHOW // DirectShow
+	tmedia_consumer_plugin_unregister(tdshow_consumer_plugin_def_t);
 #endif
 #if HAVE_COREAUDIO_AUDIO_UNIT // CoreAudio based on AudioUnit
 	tmedia_consumer_plugin_unregister(tdav_consumer_audiounit_plugin_def_t);
-#endif
-#if HAVE_COREAUDIO_AUDIO_QUEUE // CoreAudio based on AudioQueue
+#elif HAVE_COREAUDIO_AUDIO_QUEUE // CoreAudio based on AudioQueue
 	tmedia_consumer_plugin_unregister(tdav_consumer_audioqueue_plugin_def_t);
 #endif
 
 	/* === UnRegister producers === */
-	tmedia_producer_plugin_unregister(tdav_producer_t140_plugin_def_t); /* T140 */
 #if HAVE_DSOUND_H // DirectSound
 	tmedia_producer_plugin_unregister(tdav_producer_dsound_plugin_def_t);
-#endif
-#if HAVE_WAVE_API // WaveAPI
+#elif HAVE_WAVE_API // WaveAPI
 	tmedia_producer_plugin_unregister(tdav_producer_waveapi_plugin_def_t);
 #endif
-#if HAVE_WASAPI // WASAPI
-	tmedia_producer_plugin_unregister(tdav_producer_wasapi_plugin_def_t);
-#endif
-#if HAVE_WINM // Windows Media (WP8)
-	tmedia_producer_plugin_unregister(tdav_producer_winm_plugin_def_t);
+#if HAVE_TINYDSHOW // DirectShow
+	tmedia_producer_plugin_unregister(tdshow_producer_plugin_def_t);
 #endif
 
 #if HAVE_COREAUDIO_AUDIO_UNIT // CoreAudio based on AudioUnit
@@ -629,7 +673,7 @@ int tdav_deinit()
 #endif
 
 	/* === UnRegister Audio Resampler === */
-#if HAVE_SPEEX_DSP && (!defined(HAVE_SPEEX_RESAMPLER) || HAVE_SPEEX_RESAMPLER)
+#if HAVE_SPEEX_RESAMPLER
 	tmedia_resampler_plugin_unregister(tdav_speex_resampler_plugin_def_t);
 #endif
 
@@ -639,22 +683,6 @@ int tdav_deinit()
 #else
 	tmedia_jitterbuffer_plugin_unregister(tdav_speakup_jitterbuffer_plugin_def_t);
 #endif
-
-	/* === stand-alone plugins === */
-#if TDAV_HAVE_PLUGIN_EXT_WIN32
-	{
-		TSK_OBJECT_SAFE_FREE(__dll_plugin_cuda);
-		TSK_OBJECT_SAFE_FREE(__dll_plugin_wasapi);
-		TSK_OBJECT_SAFE_FREE(__dll_plugin_mf);
-		TSK_OBJECT_SAFE_FREE(__dll_plugin_dshow);
-		TSK_OBJECT_SAFE_FREE(__dll_plugin_audio_dsp);
-	}
-#endif
-
-	// disperse all collected codecs
-	_tdav_codec_plugins_disperse();
-
-	__b_initialized = tsk_false;
 
 	return ret;
 }

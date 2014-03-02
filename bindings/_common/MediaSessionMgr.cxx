@@ -21,12 +21,22 @@
 */
 #include "MediaSessionMgr.h"
 
+extern tmedia_type_t _get_media_type(twrap_media_type_t type);
+
+#if ANDROID
+static void *__droid_destroy_mgr(void *mgr){	
+	TSK_OBJECT_SAFE_FREE(mgr);
+	return tsk_null;
+}
+#endif
+
+
 //
 //	Codec
 //
-Codec::Codec(const struct tmedia_codec_s* pWrappedCodec)
+Codec::Codec(struct tmedia_codec_s* pWrappedCodec)
 {
-	m_pWrappedCodec = (struct tmedia_codec_s*)tsk_object_ref(TSK_OBJECT(pWrappedCodec));
+	m_pWrappedCodec = (struct tmedia_codec_s*)tsk_object_ref(pWrappedCodec);
 }
 
 Codec::~Codec()
@@ -40,9 +50,8 @@ twrap_media_type_t Codec::getMediaType()
 		switch(m_pWrappedCodec->type){
 			case tmedia_audio: return twrap_media_audio;
 			case tmedia_video: return twrap_media_video;
+            case tmedia_data: return twrap_media_data;
 			case tmedia_msrp: return twrap_media_msrp;
-			case tmedia_data: return twrap_media_data;
-            default: break;
 		}
 	}
 	return twrap_media_none;
@@ -106,12 +115,24 @@ MediaSessionMgr::MediaSessionMgr(tmedia_session_mgr_t* pWrappedMgr)
 
 MediaSessionMgr::~MediaSessionMgr()
 {
+#if ANDROID
+	// On Android, deleting the manager from the managed code will trigger OnPluginDestroyed() event
+	// for each plugin associated to this manager (audio,video,...consumers/producers)
+	void* tid[1] = { tsk_null };
+	if(tsk_thread_create(tid, __droid_destroy_mgr, m_pWrappedMgr) == 0){
+		tsk_thread_join(tid);
+	}
+	else{
+		TSK_DEBUG_ERROR("Failed to start the thread");
+	}
+#else
 	TSK_OBJECT_SAFE_FREE(m_pWrappedMgr);
+#endif
 }
 
 bool MediaSessionMgr::sessionSetInt32(twrap_media_type_t media, const char* key, int32_t value)
 {
-	tmedia_type_t _media = twrap_get_media_type(media);
+	tmedia_type_t _media = _get_media_type(media);
 	return (tmedia_session_mgr_set(m_pWrappedMgr,
 		TMEDIA_SESSION_SET_INT32(_media, key, value),
 		TMEDIA_SESSION_SET_NULL()) == 0);
@@ -120,7 +141,7 @@ bool MediaSessionMgr::sessionSetInt32(twrap_media_type_t media, const char* key,
 int32_t MediaSessionMgr::sessionGetInt32(twrap_media_type_t media, const char* key)
 {
 	int32_t value = 0;
-	tmedia_type_t _media = twrap_get_media_type(media);
+	tmedia_type_t _media = _get_media_type(media);
 	(tmedia_session_mgr_get(m_pWrappedMgr,
 		TMEDIA_SESSION_GET_INT32(_media, key, &value),
 		TMEDIA_SESSION_GET_NULL()));
@@ -129,7 +150,7 @@ int32_t MediaSessionMgr::sessionGetInt32(twrap_media_type_t media, const char* k
 
 bool MediaSessionMgr::consumerSetInt32(twrap_media_type_t media, const char* key, int32_t value)
 {
-	tmedia_type_t _media = twrap_get_media_type(media);
+	tmedia_type_t _media = _get_media_type(media);
 	return (tmedia_session_mgr_set(m_pWrappedMgr,
 		TMEDIA_SESSION_CONSUMER_SET_INT32(_media, key, value),
 		TMEDIA_SESSION_SET_NULL()) == 0);
@@ -137,7 +158,7 @@ bool MediaSessionMgr::consumerSetInt32(twrap_media_type_t media, const char* key
 
 bool MediaSessionMgr::consumerSetInt64(twrap_media_type_t media, const char* key, int64_t value)
 {
-	tmedia_type_t _media = twrap_get_media_type(media);
+	tmedia_type_t _media = _get_media_type(media);
 	return (tmedia_session_mgr_set(m_pWrappedMgr,
 		TMEDIA_SESSION_CONSUMER_SET_INT64(_media, key, value),
 		TMEDIA_SESSION_SET_NULL()) == 0);
@@ -145,7 +166,7 @@ bool MediaSessionMgr::consumerSetInt64(twrap_media_type_t media, const char* key
 
 bool MediaSessionMgr::producerSetInt32(twrap_media_type_t media, const char* key, int32_t value)
 {
-	tmedia_type_t _media = twrap_get_media_type(media);
+	tmedia_type_t _media = _get_media_type(media);
 	return (tmedia_session_mgr_set(m_pWrappedMgr,
 		TMEDIA_SESSION_PRODUCER_SET_INT32(_media, key, value),
 		TMEDIA_SESSION_SET_NULL()) == 0);
@@ -153,7 +174,7 @@ bool MediaSessionMgr::producerSetInt32(twrap_media_type_t media, const char* key
 
 bool MediaSessionMgr::producerSetInt64(twrap_media_type_t media, const char* key, int64_t value)
 {
-	tmedia_type_t _media = twrap_get_media_type(media);
+	tmedia_type_t _media = _get_media_type(media);
 	return (tmedia_session_mgr_set(m_pWrappedMgr,
 		TMEDIA_SESSION_PRODUCER_SET_INT64(_media, key, value),
 		TMEDIA_SESSION_SET_NULL()) == 0);
@@ -162,7 +183,7 @@ bool MediaSessionMgr::producerSetInt64(twrap_media_type_t media, const char* key
 Codec* MediaSessionMgr::producerGetCodec(twrap_media_type_t media)
 {
 	tmedia_codec_t* _codec = tsk_null;
-	tmedia_type_t _media = twrap_get_media_type(media);
+	tmedia_type_t _media = _get_media_type(media);
 	(tmedia_session_mgr_get(m_pWrappedMgr,
 		TMEDIA_SESSION_PRODUCER_GET_POBJECT(_media, "codec", &_codec),
 		TMEDIA_SESSION_GET_NULL()));
@@ -191,7 +212,7 @@ const ProxyPlugin* MediaSessionMgr::findProxyPlugin(twrap_media_type_t media, bo
 	}
 
 	if(manager && m_pWrappedMgr){
-		tmedia_type_t _media = twrap_get_media_type(media);
+		tmedia_type_t _media = _get_media_type(media);
 		tmedia_session_t* session = tmedia_session_mgr_find(m_pWrappedMgr, _media);
 		if(session){
 			if(session->plugin == tdav_session_audio_plugin_def_t){
@@ -222,7 +243,12 @@ const ProxyPlugin* MediaSessionMgr::findProxyPlugin(twrap_media_type_t media, bo
 
 	return plugin;
 }
-
+tdav_session_av_t* MediaSessionMgr::findSession(twrap_media_type_t media, bool consumer) const
+{
+    tmedia_type_t _media = _get_media_type(media);
+    tmedia_session_t* session = tmedia_session_mgr_find(m_pWrappedMgr, _media);
+    return TDAV_SESSION_AV(session);
+}
 // FIXME: create generic function to register any kind and number of plugin from a file
 unsigned int MediaSessionMgr::registerAudioPluginFromFile(const char* path)
 {
@@ -262,7 +288,7 @@ uint64_t MediaSessionMgr::getSessionId(twrap_media_type_t media)const
 	}
 
 	if(manager && m_pWrappedMgr){
-		tmedia_type_t _media = twrap_get_media_type(media);
+		tmedia_type_t _media = _get_media_type(media);
 		tmedia_session_t* session = tmedia_session_mgr_find(m_pWrappedMgr, _media);
 		if(session){
 			id = session->id;
@@ -286,35 +312,19 @@ tmedia_profile_t MediaSessionMgr::defaultsGetProfile()
 	return tmedia_defaults_get_profile();
 }
 
-bool MediaSessionMgr::defaultsSetBandwidthLevel(tmedia_bandwidth_level_t bl) // @deprecated
+bool MediaSessionMgr::defaultsSetBandwidthLevel(tmedia_bandwidth_level_t bl)
 {
 	return tmedia_defaults_set_bl(bl) == 0;
 }
-tmedia_bandwidth_level_t MediaSessionMgr::defaultsGetBandwidthLevel() // @deprecated
+
+tmedia_bandwidth_level_t MediaSessionMgr::defaultsGetBandwidthLevel()
 {
 	return tmedia_defaults_get_bl();
 }
-bool MediaSessionMgr::defaultsSetCongestionCtrlEnabled(bool enabled)
+bool MediaSessionMgr::defaultsSetPrefVideoFramerate(unsigned int framerate)
 {
-	return tmedia_defaults_set_congestion_ctrl_enabled(enabled ? tsk_true : tsk_false) == 0;
+    return tmedia_defaults_set_pref_video_framerate(framerate) == 0;
 }
-bool MediaSessionMgr::defaultsSetVideoMotionRank(int32_t video_motion_rank)
-{
-	return (tmedia_defaults_set_video_motion_rank(video_motion_rank) == 0);
-}
-bool MediaSessionMgr::defaultsSetVideoFps(int32_t video_fps)
-{
-	return (tmedia_defaults_set_video_fps(video_fps) == 0);
-}
-bool MediaSessionMgr::defaultsSetBandwidthVideoUploadMax(int32_t bw_video_up_max_kbps)
-{
-	return (tmedia_defaults_set_bandwidth_video_upload_max(bw_video_up_max_kbps) == 0);
-}
-bool MediaSessionMgr::defaultsSetBandwidthVideoDownloadMax(int32_t bw_video_down_max_kbps)
-{
-	return (tmedia_defaults_set_bandwidth_video_download_max(bw_video_down_max_kbps) == 0);
-}
-
 bool MediaSessionMgr::defaultsSetPrefVideoSize(tmedia_pref_video_size_t pref_video_size)
 {
 	return tmedia_defaults_set_pref_video_size(pref_video_size) == 0;
@@ -421,24 +431,13 @@ bool MediaSessionMgr::defaultsSetAudioGain(int32_t producer_gain, int32_t consum
 	return tmedia_defaults_set_audio_gain(producer_gain, consumer_gain) == 0;
 }
 
-bool MediaSessionMgr::defaultsSetAudioPtime(int32_t ptime){
-	return tmedia_defaults_set_audio_ptime(ptime) == 0;
-}
-bool MediaSessionMgr::defaultsSetAudioChannels(int32_t channel_playback, int32_t channel_record){
-	return tmedia_defaults_set_audio_channels(channel_playback, channel_record) == 0;
-}
-
 bool MediaSessionMgr::defaultsSetRtpPortRange(uint16_t range_start, uint16_t range_stop){
 	return tmedia_defaults_set_rtp_port_range(range_start, range_stop) == 0;
 }
 
-bool MediaSessionMgr::defaultsSetRtpSymetricEnabled(bool enabled){
-	return tmedia_defaults_set_rtp_symetric_enabled(enabled ? tsk_true : tsk_false) == 0;
-}
-
 bool MediaSessionMgr::defaultsSetMediaType(twrap_media_type_t media_type)
 {
-	return (tmedia_defaults_set_media_type(twrap_get_media_type(media_type)) == 0);
+	return (tmedia_defaults_set_media_type(_get_media_type(media_type)) == 0);
 }
 
 bool MediaSessionMgr::defaultsSetVolume(int32_t volume)
@@ -461,16 +460,6 @@ bool MediaSessionMgr::defaultsSetInviteSessionTimers(int32_t timeout, const char
 bool MediaSessionMgr::defaultsSetSRtpMode(tmedia_srtp_mode_t mode){
 	return (tmedia_defaults_set_srtp_mode(mode) == 0);
 }
-tmedia_srtp_mode_t MediaSessionMgr::defaultsGetSRtpMode(){
-	return tmedia_defaults_get_srtp_mode();
-}
-
-bool MediaSessionMgr::defaultsSetSRtpType(tmedia_srtp_type_t srtp_type){
-	return (tmedia_defaults_set_srtp_type(srtp_type) == 0);
-}
-tmedia_srtp_type_t MediaSessionMgr::defaultsGetSRtpType(){
-	return tmedia_defaults_get_srtp_type();
-}
 
 bool MediaSessionMgr::defaultsSetRtcpEnabled(bool enabled){
 	return (tmedia_defaults_set_rtcp_enabled(enabled ? tsk_true : tsk_false) == 0);
@@ -486,65 +475,6 @@ bool MediaSessionMgr::defaultsGetRtcpMuxEnabled(){
 	return (tmedia_defaults_get_rtcpmux_enabled() == tsk_true);
 }
 
-
-bool MediaSessionMgr::defaultsSetStunEnabled(bool stun_enabled){
-	return (tmedia_defaults_set_stun_enabled(stun_enabled ? tsk_true : tsk_false) == 0);
-}
-bool MediaSessionMgr::defaultsSetIceStunEnabled(bool icestun_enabled){
-	return (tmedia_defaults_set_icestun_enabled(icestun_enabled ? tsk_true : tsk_false) == 0);
-}
-bool MediaSessionMgr::defaultsSetStunServer(const char* server_ip, uint16_t server_port, const char* usr_name /*= tsk_null*/, const char* usr_pwd /*= tsk_null*/){
-	return (tmedia_defaults_set_stun_server(server_ip, server_port, usr_name, usr_pwd) == 0);
-}
 bool MediaSessionMgr::defaultsSetIceEnabled(bool ice_enabled){
 	return (tmedia_defaults_set_ice_enabled(ice_enabled ? tsk_true : tsk_false) == 0);
-}
-
-bool MediaSessionMgr::defaultsSetByPassEncoding(bool enabled){
-	return (tmedia_defaults_set_bypass_encoding(enabled ? tsk_true : tsk_false) == 0);
-}
-bool MediaSessionMgr::defaultsGetByPassEncoding(){
-	return (tmedia_defaults_get_bypass_encoding() == tsk_true);
-}
-bool MediaSessionMgr::defaultsSetByPassDecoding(bool enabled){
-	return (tmedia_defaults_set_bypass_decoding(enabled ? tsk_true : tsk_false) == 0);
-}
-bool MediaSessionMgr::defaultsGetByPassDecoding(){
-	return (tmedia_defaults_get_bypass_decoding() == tsk_true);
-}
-
-bool MediaSessionMgr::defaultsSetVideoJbEnabled(bool enabled){
-	return (tmedia_defaults_set_videojb_enabled(enabled ? tsk_true : tsk_false) == 0);
-}
-bool MediaSessionMgr::defaultsGetVideoJbEnabled(){
-	return (tmedia_defaults_get_videojb_enabled() == tsk_true);
-}
-
-bool MediaSessionMgr::defaultsSetVideoZeroArtifactsEnabled(bool enabled){
-	return (tmedia_defaults_set_video_zeroartifacts_enabled(enabled ? tsk_true : tsk_false) == 0);
-}
-bool MediaSessionMgr::defaultsGetVideoZeroArtifactsEnabled(){
-	return (tmedia_defaults_get_video_zeroartifacts_enabled() == tsk_true);
-}
-
-bool MediaSessionMgr::defaultsSetRtpBuffSize(unsigned buffSize){
-	return (tmedia_defaults_set_rtpbuff_size(buffSize) == 0);
-}
-unsigned MediaSessionMgr::defaultsGetRtpBuffSize(){
-	return tmedia_defaults_get_rtpbuff_size();
-}
-
-bool MediaSessionMgr::defaultsSetAvpfTail(unsigned tail_min, unsigned tail_max){
-	return (tmedia_defaults_set_avpf_tail(tail_min, tail_max) == 0);
-}
-
-bool MediaSessionMgr::defaultsSetOpusMaxCaptureRate(uint32_t opus_maxcapturerate){
-	return (tmedia_defaults_set_opus_maxcapturerate(opus_maxcapturerate) == 0);
-}
-bool MediaSessionMgr::defaultsSetOpusMaxPlaybackRate(uint32_t opus_maxplaybackrate){
-	return (tmedia_defaults_set_opus_maxplaybackrate(opus_maxplaybackrate) == 0);
-}
-
-bool MediaSessionMgr::defaultsSetMaxFds(int32_t max_fds) {
-	return (tmedia_defaults_set_max_fds(max_fds) == 0);
 }

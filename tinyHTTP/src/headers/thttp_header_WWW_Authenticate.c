@@ -103,7 +103,7 @@ thttp_header_WWW_Authenticate_t *thttp_header_WWW_Authenticate_parse(const char 
 	const char *eof = pe;
 	thttp_header_WWW_Authenticate_t *hdr_WWW_Authenticate = thttp_header_www_authenticate_create();
 	
-	const char *tag_start = tsk_null;
+	const char *tag_start;
 
 	
 /* #line 110 "./src/headers/thttp_header_WWW_Authenticate.c" */
@@ -8064,19 +8064,15 @@ static const int thttp_machine_parser_header_WWW_Authenticate_en_main = 1;
 
 
 /* #line 194 "./ragel/thttp_parser_header_WWW_Authenticate.rl" */
-	(void)(eof);
-	(void)(thttp_machine_parser_header_WWW_Authenticate_first_final);
-	(void)(thttp_machine_parser_header_WWW_Authenticate_error);
-	(void)(thttp_machine_parser_header_WWW_Authenticate_en_main);
 	
-/* #line 8073 "./src/headers/thttp_header_WWW_Authenticate.c" */
+/* #line 8069 "./src/headers/thttp_header_WWW_Authenticate.c" */
 	{
 	cs = thttp_machine_parser_header_WWW_Authenticate_start;
 	}
 
-/* #line 199 "./ragel/thttp_parser_header_WWW_Authenticate.rl" */
+/* #line 195 "./ragel/thttp_parser_header_WWW_Authenticate.rl" */
 	
-/* #line 8080 "./src/headers/thttp_header_WWW_Authenticate.c" */
+/* #line 8076 "./src/headers/thttp_header_WWW_Authenticate.c" */
 	{
 	int _klen;
 	unsigned int _trans;
@@ -8238,7 +8234,7 @@ _match:
 	{
 	}
 	break;
-/* #line 8242 "./src/headers/thttp_header_WWW_Authenticate.c" */
+/* #line 8238 "./src/headers/thttp_header_WWW_Authenticate.c" */
 		}
 	}
 
@@ -8251,12 +8247,12 @@ _again:
 	_out: {}
 	}
 
-/* #line 200 "./ragel/thttp_parser_header_WWW_Authenticate.rl" */
+/* #line 196 "./ragel/thttp_parser_header_WWW_Authenticate.rl" */
 	
 	if( cs < 
-/* #line 8258 "./src/headers/thttp_header_WWW_Authenticate.c" */
+/* #line 8254 "./src/headers/thttp_header_WWW_Authenticate.c" */
 1738
-/* #line 201 "./ragel/thttp_parser_header_WWW_Authenticate.rl" */
+/* #line 197 "./ragel/thttp_parser_header_WWW_Authenticate.rl" */
  ){
 		TSK_DEBUG_ERROR("Failed to parse WWW-Authenticate header.");
 		TSK_OBJECT_SAFE_FREE(hdr_WWW_Authenticate);

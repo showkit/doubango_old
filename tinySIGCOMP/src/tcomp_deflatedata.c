@@ -33,26 +33,12 @@
 
 tcomp_deflatedata_t* tcomp_deflatedata_create_2(tsk_bool_t isStream, int z_level, int z_windowBits)
 {
-	tcomp_deflatedata_t *deflatedata;
-	if((deflatedata = tsk_object_new(tcomp_deflatedata_def_t))){		
-		deflatedata->isStream = isStream;
-		deflatedata->zLevel = z_level;
-		deflatedata->zWindowBits = z_windowBits;
-	}
-	else{
-		TSK_DEBUG_ERROR("Null SigComp defalte data.");
-	}
-
-	return deflatedata;
+	return tsk_object_new(tcomp_deflatedata_def_t, isStream, z_level, z_windowBits);
 }
 
-tcomp_deflatedata_t* tcomp_deflatedata_create(tsk_bool_t isStream, tsk_bool_t useOnlyACKedStates)
+tcomp_deflatedata_t* tcomp_deflatedata_create(tsk_bool_t isStream)
 {
-	tcomp_deflatedata_t* deflatedata;
-	if((deflatedata = tcomp_deflatedata_create_2(isStream, Z_BEST_COMPRESSION, Z_DEFAULT_WINDOW_BITS))){
-		deflatedata->useOnlyACKedStates = useOnlyACKedStates;
-	}
-	return deflatedata;
+	return tcomp_deflatedata_create_2(isStream, Z_BEST_COMPRESSION, Z_DEFAULT_WINDOW_BITS);
 }
 
 tsk_bool_t tcomp_deflatedata_isStateful(tcomp_deflatedata_t *deflatedata)
@@ -82,6 +68,13 @@ static void* tcomp_deflatedata_ctor(void * self, va_list * app)
 	if(deflatedata){
 		/* Initialize safeobject */
 		tsk_safeobj_init(deflatedata);
+		
+		deflatedata->stream = va_arg(*app, int);
+		deflatedata->zLevel = va_arg(*app, int);
+		deflatedata->zWindowBits = va_arg(*app, int);;
+	}
+	else{
+		TSK_DEBUG_ERROR("Null SigComp defalte data.");
 	}
 
 	return self;

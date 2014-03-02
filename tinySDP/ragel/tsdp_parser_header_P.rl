@@ -101,12 +101,9 @@ tsdp_header_P_t *tsdp_header_P_parse(const char *data, tsk_size_t size)
 	const char *eof = pe;
 	tsdp_header_P_t *hdr_P = tsdp_header_P_create_null();
 	
-	const char *tag_start = tsk_null;
+	const char *tag_start;
 
 	%%write data;
-	(void)(tsdp_machine_parser_header_P_first_final);
-	(void)(tsdp_machine_parser_header_P_error);
-	(void)(tsdp_machine_parser_header_P_en_main);
 	%%write init;
 	%%write exec;
 	

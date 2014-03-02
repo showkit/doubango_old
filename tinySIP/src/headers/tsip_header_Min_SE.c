@@ -72,7 +72,7 @@ tsip_header_Min_SE_t *tsip_header_Min_SE_parse(const char *data, tsk_size_t size
 	const char *eof = pe;
 	tsip_header_Min_SE_t *hdr_minse = tsip_header_Min_SE_create(TSIP_SESSION_EXPIRES_MIN_VALUE);
 	
-	const char *tag_start = tsk_null;
+	const char *tag_start;
 
 	
 /* #line 79 "./src/headers/tsip_header_Min_SE.c" */
@@ -265,19 +265,15 @@ static const int tsip_machine_parser_header_Min_SE_en_main = 1;
 
 
 /* #line 100 "./ragel/tsip_parser_header_Min_SE.rl" */
-	(void)(eof);
-	(void)(tsip_machine_parser_header_Min_SE_first_final);
-	(void)(tsip_machine_parser_header_Min_SE_error);
-	(void)(tsip_machine_parser_header_Min_SE_en_main);
 	
-/* #line 274 "./src/headers/tsip_header_Min_SE.c" */
+/* #line 270 "./src/headers/tsip_header_Min_SE.c" */
 	{
 	cs = tsip_machine_parser_header_Min_SE_start;
 	}
 
-/* #line 105 "./ragel/tsip_parser_header_Min_SE.rl" */
+/* #line 101 "./ragel/tsip_parser_header_Min_SE.rl" */
 	
-/* #line 281 "./src/headers/tsip_header_Min_SE.c" */
+/* #line 277 "./src/headers/tsip_header_Min_SE.c" */
 	{
 	int _klen;
 	unsigned int _trans;
@@ -374,7 +370,7 @@ _match:
 	{
 	}
 	break;
-/* #line 378 "./src/headers/tsip_header_Min_SE.c" */
+/* #line 374 "./src/headers/tsip_header_Min_SE.c" */
 		}
 	}
 
@@ -387,12 +383,12 @@ _again:
 	_out: {}
 	}
 
-/* #line 106 "./ragel/tsip_parser_header_Min_SE.rl" */
+/* #line 102 "./ragel/tsip_parser_header_Min_SE.rl" */
 	
 	if( cs < 
-/* #line 394 "./src/headers/tsip_header_Min_SE.c" */
+/* #line 390 "./src/headers/tsip_header_Min_SE.c" */
 75
-/* #line 107 "./ragel/tsip_parser_header_Min_SE.rl" */
+/* #line 103 "./ragel/tsip_parser_header_Min_SE.rl" */
  ){
 		TSK_DEBUG_ERROR("Failed to parse 'Min-SE' header.");
 		TSK_OBJECT_SAFE_FREE(hdr_minse);

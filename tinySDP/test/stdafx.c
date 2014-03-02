@@ -1,6 +1,7 @@
 /*
 * Copyright (C) 2009 Mamadou Diop.
-* Copyright (C) 2012 Doubango Telecom <http://www.doubango.org>
+*
+* Contact: Mamadou Diop <diopmamadou(at)doubango.org>
 *	
 * This file is part of Open Source Doubango Framework.
 *

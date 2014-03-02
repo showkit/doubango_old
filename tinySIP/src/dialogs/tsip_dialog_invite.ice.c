@@ -26,7 +26,6 @@
 #include "tinysdp/parsers/tsdp_parser_message.h"
 #include "tinysdp/tsdp_message.h"
 #include "tinysdp/headers/tsdp_header_S.h"
-#include "tinysdp/headers/tsdp_header_O.h"
 
 #include "ice/tnet_ice_ctx.h"
 
@@ -36,18 +35,10 @@ extern int tsip_dialog_invite_msession_start(tsip_dialog_invite_t *self);
 
 static int tsip_dialog_invite_ice_create_ctx(tsip_dialog_invite_t * self, tmedia_type_t media_type);
 static int tsip_dialog_invite_ice_audio_callback(const tnet_ice_event_t *e);
-static int tsip_dialog_invite_ice_video_callback(const tnet_ice_event_t *e);
 static int tsip_dialog_invite_ice_data_callback(const tnet_ice_event_t *e);
-int tsip_dialog_invite_ice_set_media_type(tsip_dialog_invite_t * self, tmedia_type_t media_type);
+static int tsip_dialog_invite_ice_video_callback(const tnet_ice_event_t *e);
 tsk_bool_t tsip_dialog_invite_ice_got_local_candidates(const tsip_dialog_invite_t * self);
 int tsip_dialog_invite_ice_process_ro(tsip_dialog_invite_t * self, const tsdp_message_t* sdp_ro, tsk_bool_t is_remote_offer);
-
-#define tsip_dialog_invite_ice_cancel_silent_and_sync_ctx(_self) \
-	tsip_dialog_invite_ice_set_sync_mode_ctx((_self), tsk_true); \
-	tsip_dialog_invite_ice_set_silent_mode_ctx((_self), tsk_true); \
-	tsip_dialog_invite_ice_cancel_ctx((_self));  /* "cancelled" event will not be sent and we're sure that cancel operation will be done when the function exit */ \
-	tsip_dialog_invite_ice_set_sync_mode_ctx((_self), tsk_false); \
-	tsip_dialog_invite_ice_set_silent_mode_ctx((_self), tsk_false); \
 
 /* ======================== transitions ======================== */
 // Use "Current" instead of "Any" to avoid priority reordering
@@ -67,32 +58,24 @@ static tsk_bool_t _fsm_cond_get_local_candidates(tsip_dialog_invite_t* self, tsi
 			// only gets the candidates if ICE is enabled and the remote peer supports ICE
 			tsdp_message_t* sdp_ro;
 			const tsdp_header_M_t* M;
-			int index;
 			if(!(sdp_ro = tsdp_message_parse(TSIP_MESSAGE_CONTENT_DATA(message), TSIP_MESSAGE_CONTENT_DATA_LENGTH(message)))){
 				TSK_DEBUG_ERROR("Failed to parse remote sdp message");
 				return tsk_false;
 			}
-			
-			index = 0;
-			while((M = (const tsdp_header_M_t*)tsdp_message_get_headerAt(sdp_ro, tsdp_htype_M, index++))){
-				if(!tsdp_header_M_findA(M, "candidate")){
-					use_ice = tsk_false; // do not use ICE if at least on media is ICE-less (e.g. MSRP)
-					break;
-				}
-				use_ice = tsk_true; // only use ICE if there is a least one media line
-			}
-			
+			// For now do not use ICE one of the media is ICE-less
+			use_ice = !(((M = tsdp_message_find_media(sdp_ro, "audio")) && !tsdp_header_M_findA(M, "candidate"))
+				|| ((M = tsdp_message_find_media(sdp_ro, "video")) && !tsdp_header_M_findA(M, "candidate")));
 			new_media = tmedia_type_from_sdp(sdp_ro);
 
 			TSK_OBJECT_SAFE_FREE(sdp_ro);
 		}
 		else if(!message){
-			// we are the "offerer" -> use ICE only for audio or video medias (ignore ice for MSRP)
-			use_ice = (new_media & tmedia_audio) || (new_media & tmedia_video) || (new_media & tmedia_data);
+			// we are the "offerer"
+			use_ice = tsk_true;
 		}
 
 		if(use_ice){
-			if(!self->ice.ctx_audio && !self->ice.ctx_video  && !self->ice.ctx_data){ // First time
+			if(!self->ice.ctx_audio && !self->ice.ctx_video && !self->ice.ctx_data){ // First time
 				return tsk_true;
 			}
 			else{
@@ -120,13 +103,13 @@ int tsip_dialog_invite_ice_init(tsip_dialog_invite_t *self)
 
 int tsip_dialog_invite_ice_timers_set(tsip_dialog_invite_t *self, int64_t timeout)
 {
-	if(/*tnet_ice_ctx_is_active*/(self->ice.ctx_audio)){
+	if(tnet_ice_ctx_is_active(self->ice.ctx_audio)){
 		tnet_ice_ctx_set_concheck_timeout(self->ice.ctx_audio, timeout);
 	}
-	if(/*tnet_ice_ctx_is_active*/(self->ice.ctx_video)){
+	if(tnet_ice_ctx_is_active(self->ice.ctx_video)){
 		tnet_ice_ctx_set_concheck_timeout(self->ice.ctx_video, timeout);
 	}
-	if(/*tnet_ice_ctx_is_active*/(self->ice.ctx_data)){
+    if(tnet_ice_ctx_is_active(self->ice.ctx_data)){
 		tnet_ice_ctx_set_concheck_timeout(self->ice.ctx_data, timeout);
 	}
 	return 0;
@@ -134,81 +117,75 @@ int tsip_dialog_invite_ice_timers_set(tsip_dialog_invite_t *self, int64_t timeou
 
 static int tsip_dialog_invite_ice_create_ctx(tsip_dialog_invite_t * self, tmedia_type_t media_type)
 {
-	int32_t transport_idx;
 	if(!self){
 		TSK_DEBUG_ERROR("Invalid parameter");
 		return -1;
 	}
-	transport_idx = TSIP_DIALOG_GET_STACK(self)->network.transport_idx_default;
+
 	if(!self->ice.ctx_audio && (media_type & tmedia_audio)){
-		self->ice.ctx_audio = tnet_ice_ctx_create(self->ice.is_jingle, TNET_SOCKET_TYPE_IS_IPV6(TSIP_DIALOG_GET_STACK(self)->network.proxy_cscf_type[transport_idx]), self->use_rtcp, tsk_false, tsip_dialog_invite_ice_audio_callback, self);
+		self->ice.ctx_audio = tnet_ice_ctx_create(self->ice.is_jingle, TNET_SOCKET_TYPE_IS_IPV6(TSIP_DIALOG_GET_STACK(self)->network.proxy_cscf_type), 
+					self->use_rtcp, tsk_false, tsip_dialog_invite_ice_audio_callback, self);
 		if(!self->ice.ctx_audio){
 			TSK_DEBUG_ERROR("Failed to create ICE audio context");
 			return -2;
 		}
-        
-		if(TSIP_DIALOG_GET_STACK(self)->natt.ice.stun_enabled){
-			tnet_ice_ctx_set_stun(self->ice.ctx_audio, TSIP_DIALOG_GET_STACK(self)->natt.stun.ip, TSIP_DIALOG_GET_STACK(self)->natt.stun.port, "ShowKit", TSIP_DIALOG_GET_STACK(self)->natt.stun.login, TSIP_DIALOG_GET_STACK(self)->natt.stun.pwd);
-		}
+		tnet_ice_ctx_set_stun(self->ice.ctx_audio, "stun.l.google.com", 19302, "ShowKit", "stun-user@showk.it", "stun-password"); //FIXME
 		tnet_ice_ctx_set_rtcpmux(self->ice.ctx_audio, self->use_rtcpmux);
 	}
 	if(!self->ice.ctx_video && (media_type & tmedia_video)){
-		self->ice.ctx_video = tnet_ice_ctx_create(self->ice.is_jingle, TNET_SOCKET_TYPE_IS_IPV6(TSIP_DIALOG_GET_STACK(self)->network.proxy_cscf_type[transport_idx]), self->use_rtcp, tsk_true, tsip_dialog_invite_ice_video_callback, self);
+		self->ice.ctx_video = tnet_ice_ctx_create(self->ice.is_jingle, TNET_SOCKET_TYPE_IS_IPV6(TSIP_DIALOG_GET_STACK(self)->network.proxy_cscf_type), 
+					self->use_rtcp, tsk_true, tsip_dialog_invite_ice_video_callback, self);
 		if(!self->ice.ctx_video){
 			TSK_DEBUG_ERROR("Failed to create ICE video context");
 			return -2;
 		}
-        
-		if(TSIP_DIALOG_GET_STACK(self)->natt.ice.stun_enabled){
-			tnet_ice_ctx_set_stun(self->ice.ctx_video, TSIP_DIALOG_GET_STACK(self)->natt.stun.ip, TSIP_DIALOG_GET_STACK(self)->natt.stun.port, "ShowKit", TSIP_DIALOG_GET_STACK(self)->natt.stun.login, TSIP_DIALOG_GET_STACK(self)->natt.stun.pwd);
-		}
+		tnet_ice_ctx_set_stun(self->ice.ctx_video, "stun.l.google.com", 19302, "ShowKit", "stun-user@showk.it", "stun-password"); // FIXME
 		tnet_ice_ctx_set_rtcpmux(self->ice.ctx_video, self->use_rtcpmux);
 	}
-	if(!self->ice.ctx_data && (media_type & tmedia_data)){
-		self->ice.ctx_data = tnet_ice_ctx_create(self->ice.is_jingle, TNET_SOCKET_TYPE_IS_IPV6(TSIP_DIALOG_GET_STACK(self)->network.proxy_cscf_type[transport_idx]), self->use_rtcp, tsk_true, tsip_dialog_invite_ice_video_callback, self);
+    if(!self->ice.ctx_data && (media_type & tmedia_data)){
+		self->ice.ctx_data = tnet_ice_ctx_create(self->ice.is_jingle, TNET_SOCKET_TYPE_IS_IPV6(TSIP_DIALOG_GET_STACK(self)->network.proxy_cscf_type),
+                                                  self->use_rtcp, tsk_true, tsip_dialog_invite_ice_data_callback, self);
 		if(!self->ice.ctx_data){
 			TSK_DEBUG_ERROR("Failed to create ICE data context");
 			return -2;
 		}
-        
-		if(TSIP_DIALOG_GET_STACK(self)->natt.ice.stun_enabled){
-			tnet_ice_ctx_set_stun(self->ice.ctx_data, TSIP_DIALOG_GET_STACK(self)->natt.stun.ip, TSIP_DIALOG_GET_STACK(self)->natt.stun.port, "ShowKit", TSIP_DIALOG_GET_STACK(self)->natt.stun.login, TSIP_DIALOG_GET_STACK(self)->natt.stun.pwd);
-		}
+		tnet_ice_ctx_set_stun(self->ice.ctx_data, "stun.l.google.com", 19302, "ShowKit", "stun-user@showk.it", "stun-password"); // FIXME
 		tnet_ice_ctx_set_rtcpmux(self->ice.ctx_data, self->use_rtcpmux);
 	}
+	// "none" comparison is used to exclude the "first call"
+	if(self->ice.media_type != tmedia_none && self->ice.media_type != media_type){
+		// cancels contexts associated to old medias
+		if(self->ice.ctx_audio && !(media_type & tmedia_audio)){
+			tnet_ice_ctx_cancel(self->ice.ctx_audio);
+		}
+		if(self->ice.ctx_video && !(media_type & tmedia_video)){
+			tnet_ice_ctx_cancel(self->ice.ctx_video);
+		}
+        if(self->ice.ctx_data && !(media_type & tmedia_data)){
+			tnet_ice_ctx_cancel(self->ice.ctx_data);
+		}
+		// cancels contexts associated to new medias (e.g. session "remove" then "add")
+		// cancel() on newly created contexts don't have any effect
+		if(self->ice.ctx_audio && (!(media_type & tmedia_audio) && (self->ice.media_type & tmedia_audio))){
+			//tnet_ice_ctx_cancel(self->ice.ctx_audio);
+		}
+		if(self->ice.ctx_video && (!(media_type & tmedia_video) && (self->ice.media_type & tmedia_video))){
+			//tnet_ice_ctx_cancel(self->ice.ctx_video);
+		}
+	}
 
-	// set media type
-	tsip_dialog_invite_ice_set_media_type(self, media_type);
+	self->ice.media_type = media_type;
+	
+
+	// For now disable timers until both parties get candidates
+	// (RECV ACK) or RECV (200 OK)
+	tsip_dialog_invite_ice_timers_set(self, -1);
 
 	// update session manager with the right ICE contexts
 	if(self->msession_mgr){
 		tmedia_session_mgr_set_ice_ctx(self->msession_mgr, self->ice.ctx_audio, self->ice.ctx_video, self->ice.ctx_data);
 	}
 
-	return 0;
-}
-
-int tsip_dialog_invite_ice_set_media_type(tsip_dialog_invite_t * self, tmedia_type_t _media_type)
-{
-	if(self){
-		tmedia_type_t av_media_type = (_media_type & tmedia_audiovideodata); // filter to keep audio and video only
-		// "none" comparison is used to exclude the "first call"
-		if(self->ice.media_type != tmedia_none && self->ice.media_type != av_media_type){
-
-			// cancels contexts associated to new medias (e.g. session "remove" then "add")
-			// cancel() on newly created contexts don't have any effect
-			if(self->ice.ctx_audio && (!(av_media_type & tmedia_audio) && (self->ice.media_type & tmedia_audio))){
-				tnet_ice_ctx_cancel(self->ice.ctx_audio);
-			}
-			if(self->ice.ctx_video && (!(av_media_type & tmedia_video) && (self->ice.media_type & tmedia_video))){
-				tnet_ice_ctx_cancel(self->ice.ctx_video);
-			}
-			if(self->ice.ctx_data && (!(av_media_type & tmedia_data) && (self->ice.media_type & tmedia_data))){
-				tnet_ice_ctx_cancel(self->ice.ctx_data);
-			}
-		}
-		self->ice.media_type = av_media_type;
-	}
 	return 0;
 }
 
@@ -226,77 +203,8 @@ static int tsip_dialog_invite_ice_start_ctx(tsip_dialog_invite_t * self)
 				return ret;
 			}
 		}
-		if((self->ice.media_type & tmedia_data)){
+        if((self->ice.media_type & tmedia_data)){
 			if(self->ice.ctx_data && (ret = tnet_ice_ctx_start(self->ice.ctx_data)) != 0){
-				return ret;
-			}
-		}
-	}
-	return 0;
-}
-
-static int tsip_dialog_invite_ice_cancel_ctx(tsip_dialog_invite_t * self)
-{
-	int ret = 0;
-	if(self){
-		if((self->ice.media_type & tmedia_audio)){
-			if(self->ice.ctx_audio && (ret = tnet_ice_ctx_cancel(self->ice.ctx_audio)) != 0){
-				return ret;
-			}
-		}
-		if((self->ice.media_type & tmedia_video)){
-			if(self->ice.ctx_video && (ret = tnet_ice_ctx_cancel(self->ice.ctx_video)) != 0){
-				return ret;
-			}
-		}
-		if((self->ice.media_type & tmedia_data)){
-			if(self->ice.ctx_data && (ret = tnet_ice_ctx_cancel(self->ice.ctx_data)) != 0){
-				return ret;
-			}
-		}
-	}
-	return 0;
-}
-
-static int tsip_dialog_invite_ice_set_sync_mode_ctx(tsip_dialog_invite_t * self, tsk_bool_t sync_mode)
-{
-	int ret = 0;
-	if(self){
-		if((self->ice.media_type & tmedia_audio)){
-			if(self->ice.ctx_audio && (ret = tnet_ice_ctx_set_sync_mode(self->ice.ctx_audio, sync_mode)) != 0){
-				return ret;
-			}
-		}
-		if((self->ice.media_type & tmedia_video)){
-			if(self->ice.ctx_video && (ret = tnet_ice_ctx_set_sync_mode(self->ice.ctx_video, sync_mode)) != 0){
-				return ret;
-			}
-		}
-		if((self->ice.media_type & tmedia_data)){
-			if(self->ice.ctx_data && (ret = tnet_ice_ctx_set_sync_mode(self->ice.ctx_data, sync_mode)) != 0){
-				return ret;
-			}
-		}
-	}
-	return 0;
-}
-
-static int tsip_dialog_invite_ice_set_silent_mode_ctx(tsip_dialog_invite_t * self, tsk_bool_t silent_mode)
-{
-	int ret = 0;
-	if(self){
-		if((self->ice.media_type & tmedia_audio)){
-			if(self->ice.ctx_audio && (ret = tnet_ice_ctx_set_silent_mode(self->ice.ctx_audio, silent_mode)) != 0){
-				return ret;
-			}
-		}
-		if((self->ice.media_type & tmedia_video)){
-			if(self->ice.ctx_video && (ret = tnet_ice_ctx_set_silent_mode(self->ice.ctx_video, silent_mode)) != 0){
-				return ret;
-			}
-		}
-		if((self->ice.media_type & tmedia_data)){
-			if(self->ice.ctx_data && (ret = tnet_ice_ctx_set_silent_mode(self->ice.ctx_data, silent_mode)) != 0){
 				return ret;
 			}
 		}
@@ -307,7 +215,7 @@ static int tsip_dialog_invite_ice_set_silent_mode_ctx(tsip_dialog_invite_t * sel
 tsk_bool_t tsip_dialog_invite_ice_is_enabled(const tsip_dialog_invite_t * self)
 {
 	if(self){
-		return (self->supported.ice && (tnet_ice_ctx_is_active(self->ice.ctx_audio) || tnet_ice_ctx_is_active(self->ice.ctx_video)  || tnet_ice_ctx_is_active(self->ice.ctx_data)));
+		return (self->supported.ice && (tnet_ice_ctx_is_active(self->ice.ctx_audio) || tnet_ice_ctx_is_active(self->ice.ctx_video) || tnet_ice_ctx_is_active(self->ice.ctx_data)));
 	}
 	return tsk_false;
 }
@@ -316,8 +224,8 @@ tsk_bool_t tsip_dialog_invite_ice_is_connected(const tsip_dialog_invite_t * self
 {
 	if(self){
 		return (!tnet_ice_ctx_is_active(self->ice.ctx_audio) || tnet_ice_ctx_is_connected(self->ice.ctx_audio))
-        && (!tnet_ice_ctx_is_active(self->ice.ctx_video) || tnet_ice_ctx_is_connected(self->ice.ctx_video))
-        && (!tnet_ice_ctx_is_active(self->ice.ctx_data) || tnet_ice_ctx_is_connected(self->ice.ctx_data));
+			&& (!tnet_ice_ctx_is_active(self->ice.ctx_video) || tnet_ice_ctx_is_connected(self->ice.ctx_video))
+            && (!tnet_ice_ctx_is_active(self->ice.ctx_data) || tnet_ice_ctx_is_connected(self->ice.ctx_data));
 	}
 	return tsk_false;
 }
@@ -326,8 +234,8 @@ tsk_bool_t tsip_dialog_invite_ice_got_local_candidates(const tsip_dialog_invite_
 {
 	if(self){
 		return (!tnet_ice_ctx_is_active(self->ice.ctx_audio) || tnet_ice_ctx_got_local_candidates(self->ice.ctx_audio))
-        && (!tnet_ice_ctx_is_active(self->ice.ctx_video) || tnet_ice_ctx_got_local_candidates(self->ice.ctx_video))
-        && (!tnet_ice_ctx_is_active(self->ice.ctx_data) || tnet_ice_ctx_got_local_candidates(self->ice.ctx_data));
+			&& (!tnet_ice_ctx_is_active(self->ice.ctx_video) || tnet_ice_ctx_got_local_candidates(self->ice.ctx_video))
+         && (!tnet_ice_ctx_is_active(self->ice.ctx_data) || tnet_ice_ctx_got_local_candidates(self->ice.ctx_data));
 	}
 	return tsk_false;
 }
@@ -360,17 +268,18 @@ int tsip_dialog_invite_ice_process_lo(tsip_dialog_invite_t * self, const tsdp_me
 	int ret = 0, i;
     const char * media_list [] = { "audio" , "video" , "data" } ;
     struct tnet_ice_ctx_s * ctx_list [] = { self->ice.ctx_audio, self->ice.ctx_video, self->ice.ctx_data } ;
-
+    
 	if(!self || !sdp_lo){
 		TSK_DEBUG_ERROR("Invalid parameter");
 		return -1;
 	}
-
 	// cancels all ICE contexts without candidates
 	// this happens if codecs negotiations mismatch for one media out of two or three
-	for(i = 0; i < 3; ++i){
-               struct tnet_ice_ctx_s *ctx = ctx_list[i];
-               const char* media = media_list[i];
+    
+    
+	for(i = 0; i <3; ++i){
+		struct tnet_ice_ctx_s *ctx = ctx_list[i];
+		const char* media = media_list[i];
 		if(tnet_ice_ctx_is_active(ctx)){
 			tsk_bool_t cancel = tsk_true;
 			if((M = tsdp_message_find_media(sdp_lo, media))){
@@ -393,14 +302,13 @@ int tsip_dialog_invite_ice_process_ro(tsip_dialog_invite_t * self, const tsdp_me
 	const tsdp_header_M_t* M;
 	tsk_size_t index;
 	const tsdp_header_A_t *A;
-	const tsdp_header_O_t *O;
 	const char* sess_ufrag = tsk_null;
 	const char* sess_pwd = tsk_null;
 	int ret = 0, i;
 	struct tnet_ice_ctx_s *ctx;
     const char * media_list [] = { "audio" , "video" , "data" } ;
     struct tnet_ice_ctx_s * ctx_list [] = { self->ice.ctx_audio, self->ice.ctx_video, self->ice.ctx_data } ;
-
+    
 	if(!self || !sdp_ro){
 		TSK_DEBUG_ERROR("Invalid parameter");
 		return -1;
@@ -408,15 +316,6 @@ int tsip_dialog_invite_ice_process_ro(tsip_dialog_invite_t * self, const tsdp_me
 	if(!self->ice.ctx_audio && !self->ice.ctx_video && !self->ice.ctx_data){
 		return 0;
 	}
-
-	// make sure this is different SDP
-	if((O = (const tsdp_header_O_t*)tsdp_message_get_header(sdp_ro, tsdp_htype_O))){
-		if(self->ice.last_sdp_ro_ver == (int32_t)O->sess_version){
-			TSK_DEBUG_INFO("ICE: ignore processing SDP RO because version haven't changed");
-			return 0;
-		}
-		self->ice.last_sdp_ro_ver = (int32_t)O->sess_version;
-	}	
 
 	// session level attributes
 	
@@ -435,12 +334,14 @@ int tsip_dialog_invite_ice_process_ro(tsip_dialog_invite_t * self, const tsdp_me
 		}
 	}
 #endif
-
-       for(i = 0; i < 3; ++i){
-               if((M = tsdp_message_find_media(sdp_ro, media_list[i]))){
+	
+    
+    
+	for(i = 0; i < 3; ++i){
+		if((M = tsdp_message_find_media(sdp_ro, media_list[i]))){
 			const char *ufrag = sess_ufrag, *pwd = sess_pwd;
 			tsk_bool_t remote_use_rtcpmux = (tsdp_header_M_findA(M, "rtcp-mux") != tsk_null);
-                        ctx = ctx_list[i];
+			ctx = ctx_list[i];
 			ice_remote_candidates = tsk_null;
 			index = 0;
 			if((A = tsdp_header_M_findA(M, "ice-ufrag"))){
@@ -471,7 +372,7 @@ int tsip_dialog_invite_ice_process_ro(tsip_dialog_invite_t * self, const tsdp_me
 //--------------------------------------------------------
 
 
-// Current -> (oINVITE) -> Current
+// Started -> (oINVITE) -> Started
 static int x0500_Current_2_Current_X_oINVITE(va_list *app)
 {
 	int ret;
@@ -479,7 +380,6 @@ static int x0500_Current_2_Current_X_oINVITE(va_list *app)
 	const tsip_action_t* action;
 	const tsip_message_t *message;
 	tmedia_type_t media_type;
-	static const tsk_bool_t __force_restart_is_yes = tsk_true;
 
 	self = va_arg(*app, tsip_dialog_invite_t *);
 	message = va_arg(*app, const tsip_message_t *);
@@ -489,17 +389,11 @@ static int x0500_Current_2_Current_X_oINVITE(va_list *app)
 	self->is_client = tsk_true;
 	tsip_dialog_invite_ice_save_action(self, _fsm_action_oINVITE, action, message);
 
-	// Cancel without notifying ("silent mode") and perform the operation right now ("sync mode")
-	tsip_dialog_invite_ice_cancel_silent_and_sync_ctx(self);
-
 	// create ICE context
 	if((ret = tsip_dialog_invite_ice_create_ctx(self, media_type))){
 		TSK_DEBUG_ERROR("tsip_dialog_invite_ice_create_ctx() failed");
 		return ret;
 	}
-
-	// For now disable ICE timers until we receive the 2xx
-	ret = tsip_dialog_invite_ice_timers_set(self, -1);
 
 	// Start ICE
 	ret = tsip_dialog_invite_ice_start_ctx(self);
@@ -512,7 +406,7 @@ static int x0500_Current_2_Current_X_oINVITE(va_list *app)
 	return ret;
 }
 
-// Current -> (iINVITE) -> Current
+// Started -> (iINVITE) -> Started
 static int x0500_Current_2_Current_X_iINVITE(va_list *app)
 {
 	int ret;
@@ -527,9 +421,6 @@ static int x0500_Current_2_Current_X_iINVITE(va_list *app)
 	self->is_client = tsk_false;
 	ret = tsip_dialog_invite_ice_save_action(self, _fsm_action_iINVITE, action, message);
 	
-	// Cancel without notifying ("silent mode") and perform the operation right now ("sync mode")
-	tsip_dialog_invite_ice_cancel_silent_and_sync_ctx(self);
-
 	// set remote candidates
 	if(TSIP_MESSAGE_HAS_CONTENT(message)){
 		if(tsk_striequals("application/sdp", TSIP_MESSAGE_CONTENT_TYPE(message))){
@@ -552,9 +443,6 @@ static int x0500_Current_2_Current_X_iINVITE(va_list *app)
 		}
 	}
 
-	// For now disable ICE timers until we send the 2xx and receive the ACK
-	ret = tsip_dialog_invite_ice_timers_set(self, -1);
-
 	// Start ICE
 	ret = tsip_dialog_invite_ice_start_ctx(self);
 
@@ -575,7 +463,7 @@ static int tsip_dialog_invite_ice_callback(const tnet_ice_event_t *e)
 
 	TSK_DEBUG_INFO("ICE callback: %s", e->phrase);
 
-	dialog = tsk_object_ref(TSK_OBJECT(e->userdata));
+	dialog = (tsip_dialog_invite_t *)e->userdata;
 
 	// Do not lock: caller is thread safe
 
@@ -606,12 +494,13 @@ static int tsip_dialog_invite_ice_callback(const tnet_ice_event_t *e)
 				}
 				break;
 			}
-        default: break;
 	}
 
-	TSK_OBJECT_SAFE_FREE(dialog);
-
 	return ret;
+}
+static int tsip_dialog_invite_ice_data_callback(const tnet_ice_event_t *e)
+{
+	return tsip_dialog_invite_ice_callback(e);
 }
 
 static int tsip_dialog_invite_ice_audio_callback(const tnet_ice_event_t *e)
@@ -620,11 +509,6 @@ static int tsip_dialog_invite_ice_audio_callback(const tnet_ice_event_t *e)
 }
 
 static int tsip_dialog_invite_ice_video_callback(const tnet_ice_event_t *e)
-{
-	return tsip_dialog_invite_ice_callback(e);
-}
-
-static int tsip_dialog_invite_ice_data_callback(const tnet_ice_event_t *e)
 {
 	return tsip_dialog_invite_ice_callback(e);
 }

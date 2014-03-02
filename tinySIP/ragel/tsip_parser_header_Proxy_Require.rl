@@ -108,13 +108,9 @@ tsip_header_Proxy_Require_t *tsip_header_Proxy_Require_parse(const char *data, t
 	const char *eof = pe;
 	tsip_header_Proxy_Require_t *hdr_proxyrequire = tsip_header_Proxy_Require_create_null();
 	
-	const char *tag_start = tsk_null;
+	const char *tag_start;
 
 	%%write data;
-	(void)(eof);
-	(void)(tsip_machine_parser_header_Proxy_Require_first_final);
-	(void)(tsip_machine_parser_header_Proxy_Require_error);
-	(void)(tsip_machine_parser_header_Proxy_Require_en_main);
 	%%write init;
 	%%write exec;
 	

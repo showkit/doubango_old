@@ -1,20 +1,20 @@
 /*
  * copyright (c) 2006 Michael Niedermayer <michaelni@gmx.at>
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -28,9 +28,6 @@
  */
 
 #include "libavutil/avconfig.h"
-
-#define AVPALETTE_SIZE 1024
-#define AVPALETTE_COUNT 256
 
 /**
  * Pixel format.
@@ -137,13 +134,9 @@ enum PixelFormat {
     PIX_FMT_RGB444BE,  ///< packed RGB 4:4:4, 16bpp, (msb)4A 4R 4G 4B(lsb), big-endian, most significant bits to 0
     PIX_FMT_BGR444LE,  ///< packed BGR 4:4:4, 16bpp, (msb)4A 4B 4G 4R(lsb), little-endian, most significant bits to 1
     PIX_FMT_BGR444BE,  ///< packed BGR 4:4:4, 16bpp, (msb)4A 4B 4G 4R(lsb), big-endian, most significant bits to 1
-    PIX_FMT_GRAY8A,    ///< 8bit gray, 8bit alpha
+    PIX_FMT_Y400A,     ///< 8bit gray, 8bit alpha
     PIX_FMT_BGR48BE,   ///< packed RGB 16:16:16, 48bpp, 16B, 16G, 16R, the 2-byte value for each R/G/B component is stored as big-endian
     PIX_FMT_BGR48LE,   ///< packed RGB 16:16:16, 48bpp, 16B, 16G, 16R, the 2-byte value for each R/G/B component is stored as little-endian
-
-    //the following 10 formats have the disadvantage of needing 1 format for each bit depth, thus
-    //If you want to support multiple bit depths, then using PIX_FMT_YUV420P16* with the bpp stored separately
-    //is better
     PIX_FMT_YUV420P9BE, ///< planar YUV 4:2:0, 13.5bpp, (1 Cr & Cb sample per 2x2 Y samples), big-endian
     PIX_FMT_YUV420P9LE, ///< planar YUV 4:2:0, 13.5bpp, (1 Cr & Cb sample per 2x2 Y samples), little-endian
     PIX_FMT_YUV420P10BE,///< planar YUV 4:2:0, 15bpp, (1 Cr & Cb sample per 2x2 Y samples), big-endian
@@ -157,13 +150,6 @@ enum PixelFormat {
     PIX_FMT_YUV422P9BE, ///< planar YUV 4:2:2, 18bpp, (1 Cr & Cb sample per 2x1 Y samples), big-endian
     PIX_FMT_YUV422P9LE, ///< planar YUV 4:2:2, 18bpp, (1 Cr & Cb sample per 2x1 Y samples), little-endian
     PIX_FMT_VDA_VLD,    ///< hardware decoding through VDA
-
-#ifdef AV_PIX_FMT_ABI_GIT_MASTER
-    PIX_FMT_RGBA64BE,  ///< packed RGBA 16:16:16:16, 64bpp, 16R, 16G, 16B, 16A, the 2-byte value for each R/G/B/A component is stored as big-endian
-    PIX_FMT_RGBA64LE,  ///< packed RGBA 16:16:16:16, 64bpp, 16R, 16G, 16B, 16A, the 2-byte value for each R/G/B/A component is stored as little-endian
-    PIX_FMT_BGRA64BE,  ///< packed RGBA 16:16:16:16, 64bpp, 16B, 16G, 16R, 16A, the 2-byte value for each R/G/B/A component is stored as big-endian
-    PIX_FMT_BGRA64LE,  ///< packed RGBA 16:16:16:16, 64bpp, 16B, 16G, 16R, 16A, the 2-byte value for each R/G/B/A component is stored as little-endian
-#endif
     PIX_FMT_GBRP,      ///< planar GBR 4:4:4 24bpp
     PIX_FMT_GBRP9BE,   ///< planar GBR 4:4:4 27bpp, big endian
     PIX_FMT_GBRP9LE,   ///< planar GBR 4:4:4 27bpp, little endian
@@ -171,42 +157,8 @@ enum PixelFormat {
     PIX_FMT_GBRP10LE,  ///< planar GBR 4:4:4 30bpp, little endian
     PIX_FMT_GBRP16BE,  ///< planar GBR 4:4:4 48bpp, big endian
     PIX_FMT_GBRP16LE,  ///< planar GBR 4:4:4 48bpp, little endian
-
-#ifndef AV_PIX_FMT_ABI_GIT_MASTER
-    PIX_FMT_RGBA64BE=0x123,  ///< packed RGBA 16:16:16:16, 64bpp, 16R, 16G, 16B, 16A, the 2-byte value for each R/G/B/A component is stored as big-endian
-    PIX_FMT_RGBA64LE,  ///< packed RGBA 16:16:16:16, 64bpp, 16R, 16G, 16B, 16A, the 2-byte value for each R/G/B/A component is stored as little-endian
-    PIX_FMT_BGRA64BE,  ///< packed RGBA 16:16:16:16, 64bpp, 16B, 16G, 16R, 16A, the 2-byte value for each R/G/B/A component is stored as big-endian
-    PIX_FMT_BGRA64LE,  ///< packed RGBA 16:16:16:16, 64bpp, 16B, 16G, 16R, 16A, the 2-byte value for each R/G/B/A component is stored as little-endian
-#endif
-    PIX_FMT_0RGB=0x123+4,      ///< packed RGB 8:8:8, 32bpp, 0RGB0RGB...
-    PIX_FMT_RGB0,      ///< packed RGB 8:8:8, 32bpp, RGB0RGB0...
-    PIX_FMT_0BGR,      ///< packed BGR 8:8:8, 32bpp, 0BGR0BGR...
-    PIX_FMT_BGR0,      ///< packed BGR 8:8:8, 32bpp, BGR0BGR0...
-    PIX_FMT_YUVA444P,  ///< planar YUV 4:4:4 32bpp, (1 Cr & Cb sample per 1x1 Y & A samples)
-    PIX_FMT_YUVA422P,  ///< planar YUV 4:2:2 24bpp, (1 Cr & Cb sample per 2x1 Y & A samples)
-
-    PIX_FMT_YUV420P12BE, ///< planar YUV 4:2:0,18bpp, (1 Cr & Cb sample per 2x2 Y samples), big-endian
-    PIX_FMT_YUV420P12LE, ///< planar YUV 4:2:0,18bpp, (1 Cr & Cb sample per 2x2 Y samples), little-endian
-    PIX_FMT_YUV420P14BE, ///< planar YUV 4:2:0,21bpp, (1 Cr & Cb sample per 2x2 Y samples), big-endian
-    PIX_FMT_YUV420P14LE, ///< planar YUV 4:2:0,21bpp, (1 Cr & Cb sample per 2x2 Y samples), little-endian
-    PIX_FMT_YUV422P12BE, ///< planar YUV 4:2:2,24bpp, (1 Cr & Cb sample per 2x1 Y samples), big-endian
-    PIX_FMT_YUV422P12LE, ///< planar YUV 4:2:2,24bpp, (1 Cr & Cb sample per 2x1 Y samples), little-endian
-    PIX_FMT_YUV422P14BE, ///< planar YUV 4:2:2,28bpp, (1 Cr & Cb sample per 2x1 Y samples), big-endian
-    PIX_FMT_YUV422P14LE, ///< planar YUV 4:2:2,28bpp, (1 Cr & Cb sample per 2x1 Y samples), little-endian
-    PIX_FMT_YUV444P12BE, ///< planar YUV 4:4:4,36bpp, (1 Cr & Cb sample per 1x1 Y samples), big-endian
-    PIX_FMT_YUV444P12LE, ///< planar YUV 4:4:4,36bpp, (1 Cr & Cb sample per 1x1 Y samples), little-endian
-    PIX_FMT_YUV444P14BE, ///< planar YUV 4:4:4,42bpp, (1 Cr & Cb sample per 1x1 Y samples), big-endian
-    PIX_FMT_YUV444P14LE, ///< planar YUV 4:4:4,42bpp, (1 Cr & Cb sample per 1x1 Y samples), little-endian
-    PIX_FMT_GBRP12BE,    ///< planar GBR 4:4:4 36bpp, big endian
-    PIX_FMT_GBRP12LE,    ///< planar GBR 4:4:4 36bpp, little endian
-    PIX_FMT_GBRP14BE,    ///< planar GBR 4:4:4 42bpp, big endian
-    PIX_FMT_GBRP14LE,    ///< planar GBR 4:4:4 42bpp, little endian
-
     PIX_FMT_NB,        ///< number of pixel formats, DO NOT USE THIS if you want to link with shared libav* because the number of formats might differ between versions
 };
-
-#define PIX_FMT_Y400A PIX_FMT_GRAY8A
-#define PIX_FMT_GBR24P PIX_FMT_GBRP
 
 #if AV_HAVE_BIGENDIAN
 #   define PIX_FMT_NE(be, le) PIX_FMT_##be
@@ -218,8 +170,6 @@ enum PixelFormat {
 #define PIX_FMT_RGB32_1 PIX_FMT_NE(RGBA, ABGR)
 #define PIX_FMT_BGR32   PIX_FMT_NE(ABGR, RGBA)
 #define PIX_FMT_BGR32_1 PIX_FMT_NE(BGRA, ARGB)
-#define PIX_FMT_0RGB32  PIX_FMT_NE(0RGB, BGR0)
-#define PIX_FMT_0BGR32  PIX_FMT_NE(0BGR, RGB0)
 
 #define PIX_FMT_GRAY16 PIX_FMT_NE(GRAY16BE, GRAY16LE)
 #define PIX_FMT_RGB48  PIX_FMT_NE(RGB48BE,  RGB48LE)
@@ -237,22 +187,12 @@ enum PixelFormat {
 #define PIX_FMT_YUV420P10 PIX_FMT_NE(YUV420P10BE, YUV420P10LE)
 #define PIX_FMT_YUV422P10 PIX_FMT_NE(YUV422P10BE, YUV422P10LE)
 #define PIX_FMT_YUV444P10 PIX_FMT_NE(YUV444P10BE, YUV444P10LE)
-#define PIX_FMT_YUV420P12 PIX_FMT_NE(YUV420P12BE, YUV420P12LE)
-#define PIX_FMT_YUV422P12 PIX_FMT_NE(YUV422P12BE, YUV422P12LE)
-#define PIX_FMT_YUV444P12 PIX_FMT_NE(YUV444P12BE, YUV444P12LE)
-#define PIX_FMT_YUV420P14 PIX_FMT_NE(YUV420P14BE, YUV420P14LE)
-#define PIX_FMT_YUV422P14 PIX_FMT_NE(YUV422P14BE, YUV422P14LE)
-#define PIX_FMT_YUV444P14 PIX_FMT_NE(YUV444P14BE, YUV444P14LE)
 #define PIX_FMT_YUV420P16 PIX_FMT_NE(YUV420P16BE, YUV420P16LE)
 #define PIX_FMT_YUV422P16 PIX_FMT_NE(YUV422P16BE, YUV422P16LE)
 #define PIX_FMT_YUV444P16 PIX_FMT_NE(YUV444P16BE, YUV444P16LE)
 
-#define PIX_FMT_RGBA64 PIX_FMT_NE(RGBA64BE, RGBA64LE)
-#define PIX_FMT_BGRA64 PIX_FMT_NE(BGRA64BE, BGRA64LE)
 #define PIX_FMT_GBRP9     PIX_FMT_NE(GBRP9BE ,    GBRP9LE)
 #define PIX_FMT_GBRP10    PIX_FMT_NE(GBRP10BE,    GBRP10LE)
-#define PIX_FMT_GBRP12    PIX_FMT_NE(GBRP12BE,    GBRP12LE)
-#define PIX_FMT_GBRP14    PIX_FMT_NE(GBRP14BE,    GBRP14LE)
 #define PIX_FMT_GBRP16    PIX_FMT_NE(GBRP16BE,    GBRP16LE)
 
 #endif /* AVUTIL_PIXFMT_H */

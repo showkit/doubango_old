@@ -55,9 +55,8 @@ typedef struct tcomp_statehandler_s
 	tcomp_params_t *sigcomp_parameters;
 	
 	tcomp_dictionaries_L_t *dictionaries;
-	tsk_bool_t hasSipSdpDictionary;
-	tsk_bool_t hasPresenceDictionary;
-	tsk_bool_t useOnlyACKedStates;
+	int hasSipSdpDictionary;
+	int hasPresenceDictionary;
 
 	TSK_DECLARE_SAFEOBJ;
 }
@@ -66,10 +65,9 @@ tcomp_statehandler_t;
 tcomp_statehandler_t* tcomp_statehandler_create();
 
 tcomp_compartment_t *tcomp_statehandler_getCompartment(const tcomp_statehandler_t *statehandler, uint64_t id);
-int tcomp_statehandler_setUseOnlyACKedStates(tcomp_statehandler_t* self, tsk_bool_t useOnlyACKedStates);
 void tcomp_statehandler_deleteCompartment(tcomp_statehandler_t *statehandler, uint64_t id);
 tsk_bool_t tcomp_statehandler_compartmentExist(tcomp_statehandler_t *statehandler, uint64_t id);
-uint32_t tcomp_statehandler_findState(tcomp_statehandler_t *statehandler, const tcomp_buffer_handle_t *partial_identifier, tcomp_state_t** lpState);
+uint16_t tcomp_statehandler_findState(tcomp_statehandler_t *statehandler, const tcomp_buffer_handle_t *partial_identifier, tcomp_state_t** lpState);
 
 void tcomp_statehandler_handleResult(tcomp_statehandler_t *statehandler, tcomp_result_t **lpResult);
 tsk_bool_t tcomp_statehandler_handleNack(tcomp_statehandler_t *statehandler, const tcomp_nackinfo_t *);
